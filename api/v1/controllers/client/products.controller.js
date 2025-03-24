@@ -1,5 +1,5 @@
-const Product = require('../models/products.model')
-const productsHelper = require('../helpers/product')
+const Product = require('../../models/products.model')
+const productsHelper = require('../../helpers/product')
 
 //# Get /products
 module.exports.index = async (req, res) => {
