@@ -9,8 +9,11 @@ const port = process.env.PORT
 database.connect()
 
 const routeApiV1 = require('./api/v1/routes/client/index.route')
+const routeApiV1Admin = require('./api/v1/routes/admin/index.route')
 app.use(cors())
 
+//# routes
+routeApiV1Admin(app)
 routeApiV1(app)
 
 app.listen(port, () => {
