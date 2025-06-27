@@ -74,3 +74,21 @@ module.exports.create = async (req, res) => {
     res.status(500).json({ error: 'Failed to create product', status: 400 })
   }
 }
+
+//# Patch /api/v1/admin/products/delete/:id
+module.exports.delete = async (req, res) => {
+  try {
+    await Product.updateOne(
+      { _id: req.params.id },
+      {
+        deleted: true
+      }
+    )
+    res.json({
+      code: 200,
+      message: 'Product deleted successfully!'
+    })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete product', status: 400 })
+  }
+}
