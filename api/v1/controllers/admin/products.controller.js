@@ -131,3 +131,25 @@ module.exports.deleteMany = async (req, res) => {
     res.status(500).json({ error: 'Failed to delete products', status: 400 })
   }
 }
+
+//# PATCH /api/v1/admin/products/changeStatusMany
+module.exports.changeStatusMany = async (req, res) => {
+  try {
+    const { ids, status } = req.body
+
+    if (!Array.isArray(ids) || ids.length === 0 || !['active', 'inactive'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid request data', status: 400 })
+    }
+
+    await Product.updateMany({ _id: { $in: ids } }, { $set: { status } })
+
+    res.json({
+      code: 200,
+      message: `✅ Changed status of ${ids.length} products to "${status}"`,
+      status
+    })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Failed to change product statuses', status: 400 })
+  }
+}

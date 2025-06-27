@@ -10,5 +10,6 @@ router.post('/create', controller.create)
 router.patch('/delete/:id', controller.delete)
 router.patch('/delete-many', controller.deleteMany)
 router.patch('/changeStatus/:id', controller.changeStatus)
+router.patch('/change-status-many', controller.changeStatusMany)
 
 module.exports = router
