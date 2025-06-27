@@ -1,7 +1,7 @@
 const Product = require('../../models/products.model')
 const paginationHelper = require('../../helpers/pagination')
 
-//# Get /products
+//# Get /api/v1/admin/products
 module.exports.index = async (req, res) => {
   try {
     let find = {
@@ -32,7 +32,7 @@ module.exports.index = async (req, res) => {
   }
 }
 
-//# Get /products/:slug
+//# Get /api/v1/products/:slug
 // module.exports.detail = async (req, res) => {
 //   try {
 //     const product = await Product.findOne({
@@ -48,3 +48,29 @@ module.exports.index = async (req, res) => {
 //     res.status(500).json({ error: 'Internal server error', status: 500 })
 //   }
 // }
+
+//# Post /api/v1/admin/products/create
+module.exports.create = async (req, res) => {
+  try {
+    req.body.price = parseInt(req.body.price)
+    req.body.discountPercentage = parseInt(req.body.discountPercentage)
+    req.body.stock = parseInt(req.body.stock)
+    if (req.body.position === undefined || req.body.position === null || isNaN(req.body.position)) {
+      const countProducts = await Product.countDocuments()
+      req.body.position = countProducts + 1
+    } else {
+      req.body.position = parseInt(req.body.position)
+    }
+
+    const product = new Product(req.body)
+    const data = await product.save()
+
+    res.json({
+      code: 200,
+      message: ' Product created successfully!',
+      data: data
+    })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create product', status: 400 })
+  }
+}

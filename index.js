@@ -3,6 +3,7 @@ const database = require('./config/database')
 const app = express()
 const cors = require('cors')
 
+app.use(express.json())
 require('dotenv').config()
 const port = process.env.PORT
 

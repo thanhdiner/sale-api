@@ -7,19 +7,25 @@ const productSchema = new mongoose.Schema(
     title: String,
     productCategory: {
       type: String,
-      default: ''
+      required: true
     },
     description: String,
-    price: Number,
+    price: {
+      type: Number,
+      required: true,
+      min: 0
+    },
     discountPercentage: Number,
-    stock: Number,
+    stock: {
+      type: Number,
+      min: 0
+    },
     thumbnail: String,
     status: String,
     position: Number,
-    slug: String,
     content: String,
     timeStart: Date,
-    timeFinish: String,
+    timeFinish: Date,
     rate: Number,
     slug: {
       type: String,
