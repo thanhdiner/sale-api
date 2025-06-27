@@ -153,3 +153,25 @@ module.exports.changeStatusMany = async (req, res) => {
     res.status(500).json({ error: 'Failed to change product statuses', status: 400 })
   }
 }
+
+// PATCH /api/v1/admin/products/change-position-many
+module.exports.changePositionMany = async (req, res) => {
+  const { data } = req.body
+  if (!Array.isArray(data) || data.length === 0) {
+    return res.status(400).json({ error: 'Invalid data' })
+  }
+
+  const bulkOps = data.map(({ _id, position }) => ({
+    updateOne: {
+      filter: { _id },
+      update: { $set: { position } }
+    }
+  }))
+
+  await Product.bulkWrite(bulkOps)
+
+  res.json({
+    code: 200,
+    message: `✅ Updated position for ${data.length} products`
+  })
+}
