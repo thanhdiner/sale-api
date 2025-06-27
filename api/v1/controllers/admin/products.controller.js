@@ -92,3 +92,23 @@ module.exports.delete = async (req, res) => {
     res.status(500).json({ error: 'Failed to delete product', status: 400 })
   }
 }
+
+//# Patch /api/v1/admin/products/changeStatus/:id
+module.exports.changeStatus = async (req, res) => {
+  try {
+    const newStatus = req.body.status === 'active' ? 'inactive' : 'active'
+    await Product.updateOne(
+      { _id: req.params.id },
+      {
+        status: newStatus
+      }
+    )
+    res.json({
+      code: 200,
+      message: 'Product status changed successfully!',
+      status: newStatus
+    })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to change product status', status: 400 })
+  }
+}
