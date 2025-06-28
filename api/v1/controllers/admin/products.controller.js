@@ -32,22 +32,17 @@ module.exports.index = async (req, res) => {
   }
 }
 
-//# Get /api/v1/products/:slug
-// module.exports.detail = async (req, res) => {
-//   try {
-//     const product = await Product.findOne({
-//       deleted: false,
-//       status: 'active',
-//       slug: req.params.slug
-//     })
-
-//     product.priceNew = productsHelper.priceNewProduct(product)
-
-//     res.json(product)
-//   } catch (error) {
-//     res.status(500).json({ error: 'Internal server error', status: 500 })
-//   }
-// }
+//# Get /api/v1/products/:id
+module.exports.detail = async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id)
+    if (!product) return res.status(404).json({ message: 'Product not found' })
+    res.json(product)
+  } catch (err) {
+    console.error('Error fetching product:', err)
+    res.status(500).json({ message: 'Server error' })
+  }
+}
 
 //# Post /api/v1/admin/products/create
 module.exports.create = async (req, res) => {
@@ -156,22 +151,50 @@ module.exports.changeStatusMany = async (req, res) => {
 
 // PATCH /api/v1/admin/products/change-position-many
 module.exports.changePositionMany = async (req, res) => {
-  const { data } = req.body
-  if (!Array.isArray(data) || data.length === 0) {
-    return res.status(400).json({ error: 'Invalid data' })
-  }
-
-  const bulkOps = data.map(({ _id, position }) => ({
-    updateOne: {
-      filter: { _id },
-      update: { $set: { position } }
+  try {
+    const { data } = req.body
+    if (!Array.isArray(data) || data.length === 0) {
+      return res.status(400).json({ error: 'Invalid data' })
     }
-  }))
 
-  await Product.bulkWrite(bulkOps)
+    const bulkOps = data.map(({ _id, position }) => ({
+      updateOne: {
+        filter: { _id },
+        update: { $set: { position } }
+      }
+    }))
 
-  res.json({
-    code: 200,
-    message: `✅ Updated position for ${data.length} products`
-  })
+    await Product.bulkWrite(bulkOps)
+
+    res.json({
+      code: 200,
+      message: `✅ Updated position for ${data.length} products`
+    })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ error: 'Failed to change product positions', status: 400 })
+  }
+}
+
+//# PATCH /api/v1/admin/products/edit/:id
+module.exports.edit = async (req, res) => {
+  try {
+    const productId = req.params.id
+    req.body.price = parseInt(req.body.price)
+    req.body.discountPercentage = parseInt(req.body.discountPercentage)
+    req.body.stock = parseInt(req.body.stock)
+    req.body.position = parseInt(req.body.position)
+
+    const updatedProduct = await Product.findByIdAndUpdate(productId, req.body, {
+      new: true,
+      runValidators: true
+    })
+    return res.status(200).json({
+      message: '✅ Product updated successfully',
+      product: updatedProduct
+    })
+  } catch (err) {
+    console.error('Error updating product:', err)
+    return res.status(500).json({ error: 'Failed to update product', status: 400 })
+  }
 }
