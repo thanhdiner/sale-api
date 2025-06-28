@@ -8,6 +8,8 @@ module.exports.index = async (req, res) => {
       deleted: 'false'
     }
 
+    const { sortField, sortOrder } = req.query
+
     //@ pagination
     let initPagination = {
       currentPage: 1,
@@ -18,7 +20,12 @@ module.exports.index = async (req, res) => {
 
     let objectPagination = paginationHelper(initPagination, req.query, countProducts)
 
-    const products = await Product.find(find).sort({ position: 'desc' }).limit(objectPagination.limitItems).skip(objectPagination.skip)
+    //@ sorting
+    let sort = {}
+    if (sortField && sortOrder) sort[sortField] = sortOrder === 'descend' ? -1 : 1
+    else sort['position'] = -1
+
+    const products = await Product.find(find).sort(sort).limit(objectPagination.limitItems).skip(objectPagination.skip)
 
     res.json({
       products,
