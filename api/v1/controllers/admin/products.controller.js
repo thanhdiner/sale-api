@@ -10,29 +10,12 @@ module.exports.index = async (req, res) => {
 
     const { status, productName, price, stock, discountPercentage, position, sortField, sortOrder } = req.query
 
-    if (status && status !== 'all') {
-      find.status = status
-    }
-
-    if (productName) {
-      find.title = { $regex: productName, $options: 'i' }
-    }
-
-    if (price) {
-      find.price = +price
-    }
-
-    if (stock) {
-      find.stock = +stock
-    }
-
-    if (discountPercentage) {
-      find.discountPercentage = +discountPercentage
-    }
-
-    if (position) {
-      find.position = +position
-    }
+    if (status && status !== 'all') find.status = status
+    if (productName) find.title = { $regex: productName, $options: 'i' }
+    if (price) find.price = +price
+    if (stock) find.stock = +stock
+    if (discountPercentage) find.discountPercentage = +discountPercentage
+    if (position) find.position = +position
 
     //@ pagination
     let initPagination = {
