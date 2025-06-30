@@ -1,5 +1,8 @@
 const Product = require('../../models/products.model')
 const paginationHelper = require('../../helpers/pagination')
+const slugify = require('slugify')
+const { generateUniqueSlug } = require('../../helpers/slugify')
+const { parseIntegerFields, setDefaultPosition } = require('../../helpers/productHelper')
 
 //# Get /api/v1/admin/products
 module.exports.index = async (req, res) => {
@@ -51,7 +54,7 @@ module.exports.detail = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id)
     if (!product) return res.status(404).json({ message: 'Product not found' })
-    res.json(product)
+    res.json({ code: 200, message: ' Product created successfully!', product })
   } catch (err) {
     console.error('Error fetching product:', err)
     res.status(500).json({ message: 'Server error' })
@@ -61,15 +64,24 @@ module.exports.detail = async (req, res) => {
 //# Post /api/v1/admin/products/create
 module.exports.create = async (req, res) => {
   try {
-    req.body.price = parseInt(req.body.price)
-    req.body.discountPercentage = parseInt(req.body.discountPercentage)
-    req.body.stock = parseInt(req.body.stock)
-    if (req.body.position === undefined || req.body.position === null || isNaN(req.body.position)) {
-      const countProducts = await Product.countDocuments()
-      req.body.position = countProducts + 1
-    } else {
-      req.body.position = parseInt(req.body.position)
-    }
+    parseIntegerFields(req.body, ['price', 'discountPercentage', 'stock'])
+
+    await setDefaultPosition(req.body)
+
+    const rawSlugInput = req.body.slug?.trim()
+    const baseSlug = slugify(rawSlugInput || req.body.title, { lower: true })
+
+    if (rawSlugInput) {
+      const existed = await Product.findOne({ slug: baseSlug })
+      if (existed) {
+        const suggestedSlug = await generateUniqueSlug(baseSlug)
+        return res.status(400).json({
+          error: 'Slug already exists',
+          suggestedSlug
+        })
+      }
+      req.body.slug = baseSlug
+    } else req.body.slug = await generateUniqueSlug(baseSlug)
 
     const product = new Product(req.body)
     const data = await product.save()

@@ -29,8 +29,8 @@ const productSchema = new mongoose.Schema(
     rate: Number,
     slug: {
       type: String,
-      unique: true,
-      slug: 'title' //# tự động get slug từ field title
+      unique: true
+      // slug: 'title', //# tự động get slug từ field title
     },
     createdBy: {
       account_id: String,
