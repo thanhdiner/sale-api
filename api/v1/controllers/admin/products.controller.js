@@ -175,7 +175,7 @@ module.exports.changeStatusMany = async (req, res) => {
   }
 }
 
-// PATCH /api/v1/admin/products/change-position-many
+//# PATCH /api/v1/admin/products/change-position-many
 module.exports.changePositionMany = async (req, res) => {
   try {
     const { data } = req.body

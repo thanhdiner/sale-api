@@ -1,5 +1,6 @@
 const cloudinary = require('cloudinary').v2
 const streamifier = require('streamifier')
+const { extractPublicId } = require('../../helpers/cloudinary')
 
 //# Configure Cloudinary
 cloudinary.config({
@@ -29,4 +30,20 @@ module.exports.upload = (req, res, next) => {
 
     upload(req)
   } else next()
+}
+
+module.exports.deleteImage = async (req, res, next) => {
+  const { oldThumbnail } = req.body
+
+  if (!oldThumbnail) return next()
+
+  try {
+    const publicId = extractPublicId(oldThumbnail)
+    await cloudinary.uploader.destroy(publicId)
+    console.log('🗑️ Deleted old image from Cloudinary:', publicId)
+  } catch (err) {
+    console.error('❌ Failed to delete image:', err.message)
+  }
+
+  next()
 }

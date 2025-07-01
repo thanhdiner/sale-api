@@ -15,6 +15,6 @@ router.patch('/delete-many', controller.deleteMany)
 router.patch('/changeStatus/:id', controller.changeStatus)
 router.patch('/change-status-many', controller.changeStatusMany)
 router.patch('/change-position-many', controller.changePositionMany)
-router.patch('/edit/:id', controller.edit)
+router.patch('/edit/:id', fileUpload.single('thumbnail'), uploadCloud.deleteImage, uploadCloud.upload, controller.edit)
 
 module.exports = router
