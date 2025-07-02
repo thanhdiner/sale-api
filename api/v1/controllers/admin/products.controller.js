@@ -2,7 +2,7 @@ const Product = require('../../models/products.model')
 const paginationHelper = require('../../helpers/pagination')
 const slugify = require('slugify')
 const { generateUniqueSlug } = require('../../helpers/slugify')
-const { parseIntegerFields, setDefaultPosition } = require('../../helpers/productHelper')
+const { parseIntegerFields, setDefaultPosition, handleSlug } = require('../../helpers/productHelper')
 
 //# Get /api/v1/admin/products
 module.exports.index = async (req, res) => {
@@ -68,20 +68,9 @@ module.exports.create = async (req, res) => {
 
     await setDefaultPosition(req.body)
 
-    const rawSlugInput = req.body.slug?.trim()
-    const baseSlug = slugify(rawSlugInput || req.body.title, { lower: true })
-
-    if (rawSlugInput) {
-      const existed = await Product.findOne({ slug: baseSlug })
-      if (existed) {
-        const suggestedSlug = await generateUniqueSlug(baseSlug)
-        return res.status(400).json({
-          error: 'Slug already exists',
-          suggestedSlug
-        })
-      }
-      req.body.slug = baseSlug
-    } else req.body.slug = await generateUniqueSlug(baseSlug)
+    const { slug, error, suggestedSlug } = await handleSlug({ slugInput: req.body.slug, title: req.body.title })
+    if (error) return res.status(400).json({ error, suggestedSlug })
+    req.body.slug = slug
 
     const product = new Product(req.body)
     const data = await product.save()
@@ -92,6 +81,7 @@ module.exports.create = async (req, res) => {
       data: data
     })
   } catch (err) {
+    console.error('Error creating product:', err)
     res.status(500).json({ error: 'Failed to create product', status: 400 })
   }
 }
@@ -206,10 +196,11 @@ module.exports.changePositionMany = async (req, res) => {
 module.exports.edit = async (req, res) => {
   try {
     const productId = req.params.id
-    req.body.price = parseInt(req.body.price)
-    req.body.discountPercentage = parseInt(req.body.discountPercentage)
-    req.body.stock = parseInt(req.body.stock)
-    req.body.position = parseInt(req.body.position)
+    parseIntegerFields(req.body, ['price', 'discountPercentage', 'stock', 'position'])
+
+    const { slug, error, suggestedSlug } = await handleSlug({ slugInput: req.body.slug, title: req.body.title, currentId: productId })
+    if (error) return res.status(400).json({ error, suggestedSlug })
+    req.body.slug = slug
 
     const updatedProduct = await Product.findByIdAndUpdate(productId, req.body, {
       new: true,
