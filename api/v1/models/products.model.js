@@ -4,7 +4,11 @@ mongoose.plugin(slug)
 
 const productSchema = new mongoose.Schema(
   {
-    title: String,
+    title: {
+      type: String,
+      required: true,
+      trim: true
+    },
     productCategory: {
       type: String,
       required: true

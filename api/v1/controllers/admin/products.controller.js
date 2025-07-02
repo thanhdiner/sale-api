@@ -1,7 +1,5 @@
 const Product = require('../../models/products.model')
 const paginationHelper = require('../../helpers/pagination')
-const slugify = require('slugify')
-const { generateUniqueSlug } = require('../../helpers/slugify')
 const { parseIntegerFields, setDefaultPosition, handleSlug } = require('../../helpers/productHelper')
 
 //# Get /api/v1/admin/products
