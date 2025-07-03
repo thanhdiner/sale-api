@@ -8,6 +8,7 @@ const fileUpload = multer()
 const uploadCloud = require('../../middlewares/admin/uploadCloud.middleware')
 
 router.get('/', controller.index)
+router.get('/tree', controller.getProductCategoryTree)
 router.patch('/changeStatus/:id', controller.changeStatus)
 router.patch('/change-status-many', controller.changeStatusMany)
 router.patch('/delete/:id', controller.delete)

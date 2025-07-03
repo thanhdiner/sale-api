@@ -1,6 +1,7 @@
 const ProductCategory = require('../../models/product-category.model')
 const paginationHelper = require('../../helpers/pagination')
 const { setDefaultPosition, handleSlug, parseIntegerFields } = require('../../helpers/productHelper')
+const { buildTree } = require('../../helpers/product-categoryHelper')
 
 //# Get /api/v1/admin/product-categories
 module.exports.index = async (req, res) => {
@@ -41,6 +42,17 @@ module.exports.index = async (req, res) => {
     })
   } catch (err) {
     res.status(500).json({ error: 'Internal server error', status: 500 })
+  }
+}
+
+//# Get /api/v1/admin/product-categories/tree
+module.exports.getProductCategoryTree = async (req, res) => {
+  try {
+    const categories = await ProductCategory.find({ deleted: false })
+    const treeData = buildTree(categories)
+    res.json(treeData)
+  } catch (error) {
+    res.status(500).json({ error: 'Server error', status: 500 })
   }
 }
 
@@ -118,7 +130,6 @@ module.exports.changeStatusMany = async (req, res) => {
       status
     })
   } catch (err) {
-    console.error(err)
     res.status(500).json({ error: 'Failed to change product category statuses', status: 400 })
   }
 }
@@ -145,7 +156,6 @@ module.exports.changePositionMany = async (req, res) => {
       message: `✅ Updated position for ${data.length} product categories`
     })
   } catch (err) {
-    console.error(err)
     return res.status(500).json({ error: 'Failed to change product category positions', status: 400 })
   }
 }
@@ -154,6 +164,11 @@ module.exports.changePositionMany = async (req, res) => {
 module.exports.create = async (req, res) => {
   try {
     await setDefaultPosition(req.body)
+
+    if (req.body.parent_id) {
+      const parent = await ProductCategory.findOne({ _id: req.body.parent_id, deleted: false })
+      if (!parent) return res.status(400).json({ error: 'Parent category does not exist' })
+    }
 
     const { slug, error, suggestedSlug } = await handleSlug({ slugInput: req.body.slug, title: req.body.title })
     if (error) return res.status(400).json({ error, suggestedSlug })
@@ -168,7 +183,6 @@ module.exports.create = async (req, res) => {
       data: data
     })
   } catch (err) {
-    console.error('Error creating product category:', err)
     res.status(500).json({ error: 'Failed to create product category', status: 400 })
   }
 }
@@ -180,7 +194,6 @@ module.exports.detail = async (req, res) => {
     if (!productCategory) return res.status(404).json({ message: 'Product Category not found' })
     res.json({ code: 200, message: ' Get Product Category successfully!', productCategory })
   } catch (err) {
-    console.error('Error fetching product category:', err)
     res.status(500).json({ message: 'Server error' })
   }
 }
@@ -208,7 +221,6 @@ module.exports.edit = async (req, res) => {
       productCategory: updatedProductCategory
     })
   } catch (err) {
-    console.error('Error updating product category:', err)
     return res.status(500).json({ error: 'Failed to update product category', status: 400 })
   }
 }
