@@ -1,5 +1,6 @@
 const ProductCategory = require('../../models/product-category.model')
 const paginationHelper = require('../../helpers/pagination')
+const { setDefaultPosition, handleSlug, parseIntegerFields } = require('../../helpers/productHelper')
 
 //# Get /api/v1/admin/product-categories
 module.exports.index = async (req, res) => {
@@ -146,5 +147,68 @@ module.exports.changePositionMany = async (req, res) => {
   } catch (err) {
     console.error(err)
     return res.status(500).json({ error: 'Failed to change product category positions', status: 400 })
+  }
+}
+
+//# Post /api/v1/admin/product-categories/create
+module.exports.create = async (req, res) => {
+  try {
+    await setDefaultPosition(req.body)
+
+    const { slug, error, suggestedSlug } = await handleSlug({ slugInput: req.body.slug, title: req.body.title })
+    if (error) return res.status(400).json({ error, suggestedSlug })
+    req.body.slug = slug
+
+    const productCategory = new ProductCategory(req.body)
+    const data = await productCategory.save()
+
+    res.json({
+      code: 200,
+      message: ' Product Category created successfully!',
+      data: data
+    })
+  } catch (err) {
+    console.error('Error creating product category:', err)
+    res.status(500).json({ error: 'Failed to create product category', status: 400 })
+  }
+}
+
+//# Get /api/v1/product-categories/:id
+module.exports.detail = async (req, res) => {
+  try {
+    const productCategory = await ProductCategory.findById(req.params.id)
+    if (!productCategory) return res.status(404).json({ message: 'Product Category not found' })
+    res.json({ code: 200, message: ' Get Product Category successfully!', productCategory })
+  } catch (err) {
+    console.error('Error fetching product category:', err)
+    res.status(500).json({ message: 'Server error' })
+  }
+}
+
+//# PATCH /api/v1/admin/product-categories/edit/:id
+module.exports.edit = async (req, res) => {
+  try {
+    const productCategoryId = req.params.id
+    parseIntegerFields(req.body, ['position'])
+
+    const { slug, error, suggestedSlug } = await handleSlug({
+      slugInput: req.body.slug,
+      title: req.body.title,
+      currentId: productCategoryId
+    })
+    if (error) return res.status(400).json({ error, suggestedSlug })
+    req.body.slug = slug
+
+    const updatedProductCategory = await ProductCategory.findByIdAndUpdate(productCategoryId, req.body, {
+      new: true,
+      runValidators: true
+    })
+    return res.status(200).json({
+      message: '✅ Product Category updated successfully',
+      productCategory: updatedProductCategory
+    })
+  } catch (err) {
+    console.error('Error updating product category:', err)
+    return res.status(500).json({ error: 'Failed to update product category', status: 400 })
   }
 }
