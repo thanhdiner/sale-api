@@ -1,4 +1,3 @@
-const { default: slugify } = require('slugify')
 const ProductCategory = require('../models/product-category.model')
 
 const buildTree = (categories, parent = '') => {
@@ -26,46 +25,8 @@ const setDefaultPosition = async body => {
   } else body.position = parseInt(body.position)
 }
 
-const generateUniqueSlug = async baseSlug => {
-  const regex = new RegExp(`^${baseSlug}(-\\d+)?$`, 'i')
-  const existingSlugs = await ProductCategory.find({ slug: regex }).select('slug')
-
-  if (!existingSlugs.length) return baseSlug
-
-  const numbers = existingSlugs.map(p => {
-    const match = p.slug.match(new RegExp(`^${baseSlug}-(\\d+)$`))
-    return match ? parseInt(match[1]) : 0
-  })
-
-  const maxSuffix = Math.max(...numbers, 0)
-  return `${baseSlug}-${maxSuffix + 1}`
-}
-
-const handleSlug = async ({ slugInput, title, currentId = null }) => {
-  const hasUserInput = typeof slugInput === 'string' && slugInput.trim().length > 0
-  const slugBase = slugify(hasUserInput ? slugInput.trim() : title, { lower: true })
-  const existed = await ProductCategory.findOne({
-    slug: slugBase,
-    ...(currentId && { _id: { $ne: currentId } })
-  })
-
-  if (existed) {
-    if (hasUserInput) {
-      const suggestedSlug = await generateUniqueSlug(slugBase)
-      return { error: 'Slug already exists', suggestedSlug }
-    } else {
-      const uniqueSlug = await generateUniqueSlug(slugBase)
-      return { slug: uniqueSlug }
-    }
-  }
-
-  return { slug: slugBase }
-}
-
 module.exports = {
   buildTree,
   validateParentId,
-  setDefaultPosition,
-  generateUniqueSlug,
-  handleSlug
+  setDefaultPosition
 }

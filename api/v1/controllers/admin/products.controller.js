@@ -1,7 +1,8 @@
 const Product = require('../../models/products.model')
 const paginationHelper = require('../../helpers/pagination')
-const { setDefaultPosition, handleSlug } = require('../../helpers/productHelper')
+const { setDefaultPosition } = require('../../helpers/productHelper')
 const parseIntegerFields = require('../../utils/parseIntegerFields')
+const handleSlug = require('../../utils/handleSlug')
 
 //# Get /api/v1/admin/products
 module.exports.index = async (req, res) => {
@@ -67,7 +68,7 @@ module.exports.create = async (req, res) => {
 
     await setDefaultPosition(req.body)
 
-    const { slug, error, suggestedSlug } = await handleSlug({ slugInput: req.body.slug, title: req.body.title })
+    const { slug, error, suggestedSlug } = await handleSlug({ Model: Product, slugInput: req.body.slug, title: req.body.title })
     if (error) return res.status(400).json({ error, suggestedSlug })
     req.body.slug = slug
 
@@ -197,7 +198,12 @@ module.exports.edit = async (req, res) => {
     const productId = req.params.id
     parseIntegerFields(req.body, ['price', 'discountPercentage', 'stock', 'position'])
 
-    const { slug, error, suggestedSlug } = await handleSlug({ slugInput: req.body.slug, title: req.body.title, currentId: productId })
+    const { slug, error, suggestedSlug } = await handleSlug({
+      Model: Product,
+      slugInput: req.body.slug,
+      title: req.body.title,
+      currentId: productId
+    })
     if (error) return res.status(400).json({ error, suggestedSlug })
     req.body.slug = slug
 
