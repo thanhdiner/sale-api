@@ -1,6 +1,7 @@
 const Product = require('../../models/products.model')
 const paginationHelper = require('../../helpers/pagination')
-const { parseIntegerFields, setDefaultPosition, handleSlug } = require('../../helpers/productHelper')
+const { setDefaultPosition, handleSlug } = require('../../helpers/productHelper')
+const parseIntegerFields = require('../../utils/parseIntegerFields')
 
 //# Get /api/v1/admin/products
 module.exports.index = async (req, res) => {

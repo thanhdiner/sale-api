@@ -1,7 +1,7 @@
 const ProductCategory = require('../../models/product-category.model')
 const paginationHelper = require('../../helpers/pagination')
-const { setDefaultPosition, handleSlug, parseIntegerFields } = require('../../helpers/productHelper')
-const { buildTree } = require('../../helpers/product-categoryHelper')
+const parseIntegerFields = require('../../utils/parseIntegerFields')
+const { buildTree, validateParentId, setDefaultPosition, handleSlug } = require('../../helpers/product-categoryHelper')
 
 //# Get /api/v1/admin/product-categories
 module.exports.index = async (req, res) => {
@@ -165,10 +165,8 @@ module.exports.create = async (req, res) => {
   try {
     await setDefaultPosition(req.body)
 
-    if (req.body.parent_id) {
-      const parent = await ProductCategory.findOne({ _id: req.body.parent_id, deleted: false })
-      if (!parent) return res.status(400).json({ error: 'Parent category does not exist' })
-    }
+    const check = await validateParentId(req.body.parent_id)
+    if (!check.ok) return res.status(400).json({ error: check.error })
 
     const { slug, error, suggestedSlug } = await handleSlug({ slugInput: req.body.slug, title: req.body.title })
     if (error) return res.status(400).json({ error, suggestedSlug })
@@ -203,6 +201,9 @@ module.exports.edit = async (req, res) => {
   try {
     const productCategoryId = req.params.id
     parseIntegerFields(req.body, ['position'])
+
+    const check = await validateParentId(req.body.parent_id, productCategoryId)
+    if (!check.ok) return res.status(400).json({ error: check.error })
 
     const { slug, error, suggestedSlug } = await handleSlug({
       slugInput: req.body.slug,

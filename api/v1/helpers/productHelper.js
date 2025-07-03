@@ -1,18 +1,26 @@
 const { default: slugify } = require('slugify')
 const Product = require('../models/products.model')
-const { generateUniqueSlug } = require('./slugify')
-
-module.exports.parseIntegerFields = (body, fields) => {
-  fields.forEach(field => {
-    if (body[field] !== undefined) body[field] = parseInt(body[field])
-  })
-}
 
 module.exports.setDefaultPosition = async body => {
   if (body.position === undefined || body.position === null || isNaN(body.position)) {
     const countProducts = await Product.countDocuments()
     body.position = countProducts + 1
   } else body.position = parseInt(body.position)
+}
+
+module.exports.generateUniqueSlug = async baseSlug => {
+  const regex = new RegExp(`^${baseSlug}(-\\d+)?$`, 'i')
+  const existingSlugs = await Product.find({ slug: regex }).select('slug')
+
+  if (!existingSlugs.length) return baseSlug
+
+  const numbers = existingSlugs.map(p => {
+    const match = p.slug.match(new RegExp(`^${baseSlug}-(\\d+)$`))
+    return match ? parseInt(match[1]) : 0
+  })
+
+  const maxSuffix = Math.max(...numbers, 0)
+  return `${baseSlug}-${maxSuffix + 1}`
 }
 
 module.exports.handleSlug = async ({ slugInput, title, currentId = null }) => {
