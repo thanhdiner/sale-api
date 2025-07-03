@@ -35,7 +35,11 @@ module.exports.index = async (req, res) => {
     if (sortField && sortOrder) sort[sortField] = sortOrder === 'descend' ? -1 : 1
     else sort['position'] = -1
 
-    const products = await Product.find(find).sort(sort).limit(objectPagination.limitItems).skip(objectPagination.skip)
+    const products = await Product.find(find)
+      .populate('productCategory', 'title')
+      .sort(sort)
+      .limit(objectPagination.limitItems)
+      .skip(objectPagination.skip)
 
     res.json({
       products,

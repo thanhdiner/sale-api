@@ -10,7 +10,8 @@ const productSchema = new mongoose.Schema(
       trim: true
     },
     productCategory: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ProductCategory',
       required: true
     },
     description: String,
