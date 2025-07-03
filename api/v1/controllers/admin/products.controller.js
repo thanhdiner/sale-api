@@ -1,7 +1,6 @@
 const Product = require('../../models/products.model')
-const ProductCategory = require('../../models/product-category.model')
 const paginationHelper = require('../../helpers/pagination')
-const { setDefaultPosition } = require('../../helpers/productHelper')
+const { setDefaultPosition, validateProductCategory } = require('../../helpers/productHelper')
 const parseIntegerFields = require('../../utils/parseIntegerFields')
 const handleSlug = require('../../utils/handleSlug')
 
@@ -69,11 +68,7 @@ module.exports.create = async (req, res) => {
 
     await setDefaultPosition(req.body)
 
-    const categoryId = req.body.productCategory
-    const category = await ProductCategory.findOne({
-      _id: categoryId,
-      deleted: false
-    })
+    const category = await validateProductCategory(req.body.productCategory)
     if (!category) return res.status(400).json({ error: 'Invalid or deleted product category!' })
 
     const { slug, error, suggestedSlug } = await handleSlug({ Model: Product, slugInput: req.body.slug, title: req.body.title })
@@ -205,6 +200,9 @@ module.exports.edit = async (req, res) => {
   try {
     const productId = req.params.id
     parseIntegerFields(req.body, ['price', 'discountPercentage', 'stock', 'position'])
+
+    const category = await validateProductCategory(req.body.productCategory)
+    if (!category) return res.status(400).json({ error: 'Invalid or deleted product category!' })
 
     const { slug, error, suggestedSlug } = await handleSlug({
       Model: Product,
