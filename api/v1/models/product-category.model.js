@@ -11,8 +11,9 @@ const productCategorySchema = new mongoose.Schema(
       trim: true
     },
     parent_id: {
-      type: String,
-      default: ''
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ProductCategory',
+      default: null
     },
     slug: {
       type: String,

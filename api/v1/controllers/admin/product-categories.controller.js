@@ -189,9 +189,14 @@ module.exports.create = async (req, res) => {
 //# Get /api/v1/product-categories/:id
 module.exports.detail = async (req, res) => {
   try {
-    const productCategory = await ProductCategory.findById(req.params.id)
+    const productCategory = await ProductCategory.findById(req.params.id).populate('parent_id', 'title')
     if (!productCategory) return res.status(404).json({ message: 'Product Category not found' })
-    res.json({ code: 200, message: ' Get Product Category successfully!', productCategory })
+    res.json({
+      code: 200,
+      message: ' Get Product Category successfully!',
+      productCategory,
+      parentCategory: productCategory?.parent_id?.title
+    })
   } catch (err) {
     res.status(500).json({ message: 'Server error' })
   }
