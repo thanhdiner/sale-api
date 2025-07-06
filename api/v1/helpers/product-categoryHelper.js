@@ -1,11 +1,14 @@
 const ProductCategory = require('../models/product-category.model')
 
-const buildTree = (categories, parent = '') => {
+const buildTree = (categories, parent = null) => {
   return categories
-    .filter(item => (item.parent_id || '') === (typeof parent === 'object' ? parent.toString() : parent))
+    .filter(item => {
+      if (!item.parent_id && parent === null) return true
+      return item.parent_id?.toString() === parent?.toString()
+    })
     .map(item => ({
       title: item.title,
-      value: item._id,
+      value: item._id.toString(),
       children: buildTree(categories, item._id)
     }))
 }

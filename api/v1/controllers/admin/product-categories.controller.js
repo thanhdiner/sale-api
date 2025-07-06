@@ -172,7 +172,8 @@ module.exports.create = async (req, res) => {
     const { slug, error, suggestedSlug } = await handleSlug({ Model: ProductCategory, slugInput: req.body.slug, title: req.body.title })
     if (error) return res.status(400).json({ error, suggestedSlug })
     req.body.slug = slug
-
+    if (req.body.parent_id === '' || req.body.parent_id === undefined) req.body.parent_id = null
+    
     const productCategory = new ProductCategory(req.body)
     const data = await productCategory.save()
 
