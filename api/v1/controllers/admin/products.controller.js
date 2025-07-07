@@ -3,6 +3,7 @@ const paginationHelper = require('../../helpers/pagination')
 const { setDefaultPosition, validateProductCategory } = require('../../helpers/productHelper')
 const parseIntegerFields = require('../../utils/parseIntegerFields')
 const handleSlug = require('../../utils/handleSlug')
+const mongoose = require('mongoose')
 
 //# Get /api/v1/admin/products
 module.exports.index = async (req, res) => {
@@ -10,8 +11,7 @@ module.exports.index = async (req, res) => {
     let find = {
       deleted: false
     }
-
-    const { status, productName, price, stock, discountPercentage, position, sortField, sortOrder } = req.query
+    const { status, productName, price, stock, discountPercentage, position, sortField, sortOrder, product_category } = req.query
 
     if (status && status !== 'all') find.status = status
     if (productName) find.title = { $regex: productName, $options: 'i' }
@@ -19,7 +19,7 @@ module.exports.index = async (req, res) => {
     if (stock) find.stock = +stock
     if (discountPercentage) find.discountPercentage = +discountPercentage
     if (position) find.position = +position
-
+    if (mongoose.Types.ObjectId.isValid(product_category)) find.productCategory = new mongoose.Types.ObjectId(product_category)
     //@ pagination
     let initPagination = {
       currentPage: 1,
