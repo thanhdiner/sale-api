@@ -173,7 +173,7 @@ module.exports.create = async (req, res) => {
     if (error) return res.status(400).json({ error, suggestedSlug })
     req.body.slug = slug
     if (req.body.parent_id === '' || req.body.parent_id === undefined) req.body.parent_id = null
-    
+
     const productCategory = new ProductCategory(req.body)
     const data = await productCategory.save()
 
@@ -211,6 +211,8 @@ module.exports.edit = async (req, res) => {
 
     const check = await validateParentId(req.body.parent_id, productCategoryId)
     if (!check.ok) return res.status(400).json({ error: check.error })
+
+    if (req.body.parent_id === '' || req.body.parent_id === undefined) req.body.parent_id = null
 
     const { slug, error, suggestedSlug } = await handleSlug({
       Model: ProductCategory,

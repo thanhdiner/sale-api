@@ -54,7 +54,7 @@ module.exports.edit = async (req, res) => {
   }
 }
 
-//# DELETE /api/v1/admin/permission-groups/delete/:id
+//# PATCH /api/v1/admin/permission-groups/delete/:id
 module.exports.delete = async (req, res) => {
   try {
     const { id } = req.params

@@ -33,14 +33,14 @@ module.exports.upload = (req, res, next) => {
 }
 
 module.exports.deleteImage = async (req, res, next) => {
-  const { oldThumbnail } = req.body
-
-  if (!oldThumbnail) return next()
+  const { oldImage, deleteImage } = req.body
 
   try {
-    const publicId = extractPublicId(oldThumbnail)
-    await cloudinary.uploader.destroy(publicId)
-    console.log('🗑️ Deleted old image from Cloudinary:', publicId)
+    if (oldImage && (deleteImage === 'true' || req.file)) {
+      const publicId = extractPublicId(oldImage)
+      await cloudinary.uploader.destroy(publicId)
+      console.log('🗑️ Deleted old image from Cloudinary:', publicId)
+    }
   } catch (err) {
     console.error('❌ Failed to delete image:', err.message)
   }

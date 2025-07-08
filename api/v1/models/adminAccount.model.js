@@ -25,6 +25,11 @@ const adminAccountSchema = new mongoose.Schema(
     fullName: String,
     avatarUrl: String,
     role_id: String,
+    deleted: {
+      type: Boolean,
+      default: false
+    },
+    deletedAt: Date,
     status: {
       type: String,
       enum: ['active', 'inactive', 'banned'],
