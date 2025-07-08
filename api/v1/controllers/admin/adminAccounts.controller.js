@@ -52,14 +52,21 @@ module.exports.create = async (req, res) => {
 module.exports.edit = async (req, res) => {
   try {
     const { id } = req.params
-    const { email, fullName, role_id, status, avatarUrl } = req.body
+    const { email, fullName, role_id, status, avatarUrl, newPassword } = req.body
 
     if (!email) return res.status(400).json({ message: 'Email là bắt buộc!' })
 
     const exist = await AdminAccount.findOne({ _id: { $ne: id }, email })
     if (exist) return res.status(400).json({ message: 'Email đã tồn tại.' })
 
-    const updated = await AdminAccount.findByIdAndUpdate(id, { email, fullName, role_id, status, avatarUrl }, { new: true })
+    const updateData = { email, fullName, role_id, status, avatarUrl }
+
+    if (newPassword && newPassword.length >= 6) {
+      const passwordHash = await bcrypt.hash(newPassword, 10)
+      updateData.passwordHash = passwordHash
+    }
+
+    const updated = await AdminAccount.findByIdAndUpdate(id, updateData, { new: true })
     if (!updated) return res.status(404).json({ error: 'Account not found' })
 
     const { passwordHash: _, ...updatedData } = updated.toObject()
