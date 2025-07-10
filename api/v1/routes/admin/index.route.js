@@ -6,15 +6,19 @@ const permissionsRoutes = require('./permission.route')
 const permissionGroupsRoutes = require('./permission-groups.route')
 const rolesRoutes = require('./roles.route')
 const accountsRoutes = require('./adminAccounts.route')
+const authRoutes = require('./auth.route')
+
+const authenticateToken = require('../../middlewares/admin/authenticateToken.middleware')
 
 module.exports = app => {
   const PATH_ADMIN = systemConfig.prefixAdmin
 
-  app.use(PATH_ADMIN + '/dashboard', dashboardRoutes)
-  app.use(PATH_ADMIN + '/products', productsRoutes)
-  app.use(PATH_ADMIN + '/product-categories', productCategoryRoutes)
-  app.use(PATH_ADMIN + '/permissions', permissionsRoutes)
-  app.use(PATH_ADMIN + '/permission-groups', permissionGroupsRoutes)
-  app.use(PATH_ADMIN + '/roles', rolesRoutes)
-  app.use(PATH_ADMIN + '/accounts', accountsRoutes)
+  app.use(PATH_ADMIN + '/dashboard', authenticateToken.authenticateToken, dashboardRoutes)
+  app.use(PATH_ADMIN + '/products', authenticateToken.authenticateToken, productsRoutes)
+  app.use(PATH_ADMIN + '/product-categories', authenticateToken.authenticateToken, productCategoryRoutes)
+  app.use(PATH_ADMIN + '/permissions', authenticateToken.authenticateToken, permissionsRoutes)
+  app.use(PATH_ADMIN + '/permission-groups', authenticateToken.authenticateToken, permissionGroupsRoutes)
+  app.use(PATH_ADMIN + '/roles', authenticateToken.authenticateToken, rolesRoutes)
+  app.use(PATH_ADMIN + '/accounts', authenticateToken.authenticateToken, accountsRoutes)
+  app.use(PATH_ADMIN + '/auth', authRoutes)
 }
