@@ -42,14 +42,11 @@ module.exports.create = async (req, res) => {
 module.exports.edit = async (req, res) => {
   try {
     const { id } = req.params
-    const { name, title, description, group } = req.body
+    const { title, description, group } = req.body
 
-    if (!name || !title || !group) return res.status(400).json({ error: 'Name, title and group are required' })
-    if (!/^[a-z0-9_]+$/.test(name)) return res.status(400).json({ error: 'Only a-z, 0-9, and _' })
-    const exist = await Permission.findOne({ name, _id: { $ne: id }, deleted: false })
-    if (exist) return res.status(409).json({ error: 'Permission with this name already exists' })
+    if (!title || !group) return res.status(400).json({ error: 'Title and group are required' })
 
-    const updated = await Permission.findByIdAndUpdate(id, { name, title, description, group }, { new: true })
+    const updated = await Permission.findByIdAndUpdate(id, { title, description, group }, { new: true })
     if (!updated) return res.status(404).json({ error: 'Permission not found' })
 
     res.status(200).json({ message: 'Updated', data: updated })

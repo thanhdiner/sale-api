@@ -7,15 +7,30 @@ const fileUpload = multer()
 
 const uploadCloud = require('../../middlewares/admin/uploadCloud.middleware')
 
-router.get('/', controller.index)
-router.get('/tree', controller.getProductCategoryTree)
-router.patch('/changeStatus/:id', controller.changeStatus)
-router.patch('/change-status-many', controller.changeStatusMany)
-router.patch('/delete/:id', controller.delete)
-router.patch('/delete-many', controller.deleteMany)
-router.patch('/change-position-many', controller.changePositionMany)
-router.post('/create', fileUpload.single('thumbnail'), uploadCloud.upload, controller.create)
-router.get('/:id', controller.detail)
-router.patch('/edit/:id', fileUpload.single('thumbnail'), uploadCloud.deleteImage, uploadCloud.upload, controller.edit)
+const checkPermission = require('../../middlewares/admin/checkPermission.middleware')
+
+router.get('/', checkPermission.checkPermission('view_product_categories'), controller.index)
+router.get('/tree', checkPermission.checkPermission('view_product_categories'), controller.getProductCategoryTree)
+router.patch('/delete/:id', checkPermission.checkPermission('delete_product_category'), controller.delete)
+router.patch('/delete-many', checkPermission.checkPermission('delete_product_category'), controller.deleteMany)
+router.patch('/changeStatus/:id', checkPermission.checkPermission('edit_product_category'), controller.changeStatus)
+router.patch('/change-status-many', checkPermission.checkPermission('edit_product_category'), controller.changeStatusMany)
+router.patch('/change-position-many', checkPermission.checkPermission('edit_product_category'), controller.changePositionMany)
+router.post(
+  '/create',
+  checkPermission.checkPermission('create_product_category'),
+  fileUpload.single('thumbnail'),
+  uploadCloud.upload,
+  controller.create
+)
+router.get('/:id', checkPermission.checkPermission('view_product_categories'), controller.detail)
+router.patch(
+  '/edit/:id',
+  checkPermission.checkPermission('edit_product_category'),
+  fileUpload.single('thumbnail'),
+  uploadCloud.deleteImage,
+  uploadCloud.upload,
+  controller.edit
+)
 
 module.exports = router

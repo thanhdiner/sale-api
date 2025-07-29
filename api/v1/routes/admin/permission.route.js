@@ -3,9 +3,11 @@ const router = express.Router()
 
 const controller = require('../../controllers/admin/permissions.controller')
 
-router.get('/', controller.index)
-router.post('/create', controller.create)
-router.patch('/edit/:id', controller.edit)
-router.patch('/delete/:id', controller.delete)
+const checkPermission = require('../../middlewares/admin/checkPermission.middleware')
+
+router.get('/', checkPermission.checkPermission('view_permissions'), controller.index)
+router.post('/create', checkPermission.checkPermission('create_permission'), controller.create)
+router.patch('/edit/:id', checkPermission.checkPermission('edit_permission'), controller.edit)
+router.patch('/delete/:id', checkPermission.checkPermission('delete_permission'), controller.delete)
 
 module.exports = router

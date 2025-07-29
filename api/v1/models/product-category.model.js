@@ -29,20 +29,17 @@ const productCategorySchema = new mongoose.Schema(
       default: false
     },
     createdBy: {
-      account_id: String,
-      createAt: {
-        type: Date,
-        default: Date.now
-      }
+      by: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminAccount' },
+      at: Date
     },
     deletedBy: {
-      account_id: String,
-      deletedAt: Date
+      by: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminAccount' },
+      at: Date
     },
     updateBy: [
       {
-        account_id: String,
-        updatedAt: Date
+        by: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminAccount' },
+        at: Date
       }
     ]
   },

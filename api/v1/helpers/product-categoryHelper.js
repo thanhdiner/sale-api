@@ -9,6 +9,8 @@ const buildTree = (categories, parent = null) => {
     .map(item => ({
       title: item.title,
       value: item._id.toString(),
+      slug: item.slug,
+      thumbnail: item.thumbnail,
       children: buildTree(categories, item._id)
     }))
 }

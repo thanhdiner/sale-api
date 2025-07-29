@@ -32,6 +32,30 @@ module.exports.upload = (req, res, next) => {
   } else next()
 }
 
+module.exports.uploadMany = async (req, res, next) => {
+  if (req.files && Object.keys(req.files).length > 0) {
+    const entries = Object.entries(req.files)
+
+    try {
+      for (const [field, files] of entries) {
+        const file = files[0]
+        const result = await new Promise((resolve, reject) => {
+          let stream = cloudinary.uploader.upload_stream((error, result) => {
+            if (result) resolve(result)
+            else reject(error)
+          })
+          streamifier.createReadStream(file.buffer).pipe(stream)
+        })
+        req.body[field] = result.url
+      }
+    } catch (err) {
+      console.error('❌ Failed to upload image:', err.message)
+      return res.status(500).json({ error: 'Failed to upload image to cloud' })
+    }
+  }
+  next()
+}
+
 module.exports.deleteImage = async (req, res, next) => {
   const { oldImage, deleteImage } = req.body
 
@@ -43,6 +67,30 @@ module.exports.deleteImage = async (req, res, next) => {
     }
   } catch (err) {
     console.error('❌ Failed to delete image:', err.message)
+  }
+
+  next()
+}
+
+module.exports.deleteImageMany = async (req, res, next) => {
+  let { oldImages = [], deleteImages = [] } = req.body
+  if (typeof oldImages === 'string') oldImages = JSON.parse(oldImages)
+  if (typeof deleteImages === 'string') deleteImages = JSON.parse(deleteImages)
+
+  console.log('🗑️ Deleting old images:', oldImages, 'Delete flags:', deleteImages)
+
+  try {
+    for (let i = 0; i < oldImages.length; i++) {
+      const oldImage = oldImages[i]
+      const shouldDelete = deleteImages[i] === 'true' || deleteImages[i] === true
+      if (oldImage && shouldDelete) {
+        const publicId = extractPublicId(oldImage)
+        await cloudinary.uploader.destroy(publicId)
+        console.log('🗑️ Deleted old image from Cloudinary:', publicId)
+      }
+    }
+  } catch (err) {
+    console.error('❌ Failed to delete images:', err.message)
   }
 
   next()

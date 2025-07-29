@@ -32,7 +32,12 @@ module.exports.index = async (req, res) => {
     if (sortField && sortOrder) sort[sortField] = sortOrder === 'descend' ? -1 : 1
     else sort['position'] = -1
 
-    const productCategories = await ProductCategory.find(find).sort(sort).limit(objectPagination.limitItems).skip(objectPagination.skip)
+    const productCategories = await ProductCategory.find(find)
+      .sort(sort)
+      .limit(objectPagination.limitItems)
+      .skip(objectPagination.skip)
+      .populate('createdBy.by', 'fullName avatarUrl')
+      .populate('updateBy.by', 'fullName avatarUrl')
 
     res.json({
       productCategories,
@@ -63,7 +68,11 @@ module.exports.delete = async (req, res) => {
     await ProductCategory.updateOne(
       { _id: req.params.id },
       {
-        deleted: true
+        deleted: true,
+        deletedBy: {
+          by: req.user?.userId,
+          at: new Date()
+        }
       }
     )
     res.json({
@@ -83,7 +92,18 @@ module.exports.deleteMany = async (req, res) => {
       return res.status(400).json({ error: 'Invalid request data', status: 400 })
     }
 
-    await ProductCategory.updateMany({ _id: { $in: ids } }, { $set: { deleted: true } })
+    await ProductCategory.updateMany(
+      { _id: { $in: ids } },
+      {
+        $set: {
+          deleted: true,
+          deletedBy: {
+            by: req.user?.userId,
+            at: new Date()
+          }
+        }
+      }
+    )
 
     res.json({
       code: 200,
@@ -101,13 +121,25 @@ module.exports.changeStatus = async (req, res) => {
     await ProductCategory.updateOne(
       { _id: req.params.id },
       {
-        status: newStatus
+        status: newStatus,
+        $push: {
+          updateBy: {
+            by: req.user?.userId,
+            at: new Date()
+          }
+        }
       }
     )
+
+    const updatedProductCategory = await ProductCategory.findById(req.params.id)
+      .populate('updateBy.by', 'fullName avatarUrl')
+      .select('updateBy')
+
     res.json({
       code: 200,
       message: 'Product Category status changed successfully!',
-      status: newStatus
+      status: newStatus,
+      productCategory: updatedProductCategory
     })
   } catch (err) {
     res.status(500).json({ error: 'Failed to change product category status', status: 400 })
@@ -123,12 +155,28 @@ module.exports.changeStatusMany = async (req, res) => {
       return res.status(400).json({ error: 'Invalid request data', status: 400 })
     }
 
-    await ProductCategory.updateMany({ _id: { $in: ids } }, { $set: { status } })
+    const updateFields = {
+      status,
+      $push: {
+        updateBy: {
+          by: req.user?.userId,
+          at: new Date()
+        }
+      },
+      updatedAt: new Date()
+    }
+
+    await ProductCategory.updateMany({ _id: { $in: ids } }, updateFields)
+
+    const updatedProductCategories = await ProductCategory.find({ _id: { $in: ids } })
+      .populate('updateBy.by', 'fullName avatarUrl')
+      .select('_id status updateBy updatedAt')
 
     res.json({
       code: 200,
       message: `✅ Changed status of ${ids.length} product categories to "${status}"`,
-      status
+      status,
+      productCategories: updatedProductCategories
     })
   } catch (err) {
     res.status(500).json({ error: 'Failed to change product category statuses', status: 400 })
@@ -146,15 +194,29 @@ module.exports.changePositionMany = async (req, res) => {
     const bulkOps = data.map(({ _id, position }) => ({
       updateOne: {
         filter: { _id },
-        update: { $set: { position } }
+        update: {
+          $set: { position },
+          $push: {
+            updateBy: {
+              by: req.user?.userId,
+              at: new Date()
+            }
+          },
+          updatedAt: new Date()
+        }
       }
     }))
 
     await ProductCategory.bulkWrite(bulkOps)
 
+    const updatedProductCategories = await ProductCategory.find({ _id: { $in: data.map(i => i._id) } })
+      .populate('updateBy.by', 'fullName avatarUrl')
+      .select('_id position updateBy updatedAt')
+
     res.json({
       code: 200,
-      message: `✅ Updated position for ${data.length} product categories`
+      message: `✅ Updated position for ${data.length} product categories`,
+      productCategories: updatedProductCategories
     })
   } catch (err) {
     return res.status(500).json({ error: 'Failed to change product category positions', status: 400 })
@@ -173,6 +235,7 @@ module.exports.create = async (req, res) => {
     if (error) return res.status(400).json({ error, suggestedSlug })
     req.body.slug = slug
     if (req.body.parent_id === '' || req.body.parent_id === undefined) req.body.parent_id = null
+    req.body.createdBy = { by: req.user?.userId, at: Date.now() }
 
     const productCategory = new ProductCategory(req.body)
     const data = await productCategory.save()
@@ -223,7 +286,17 @@ module.exports.edit = async (req, res) => {
     if (error) return res.status(400).json({ error, suggestedSlug })
     req.body.slug = slug
 
-    const updatedProductCategory = await ProductCategory.findByIdAndUpdate(productCategoryId, req.body, {
+    const updateFields = {
+      ...req.body,
+      $push: {
+        updateBy: {
+          by: req.user?.userId,
+          at: new Date()
+        }
+      }
+    }
+
+    const updatedProductCategory = await ProductCategory.findByIdAndUpdate(productCategoryId, updateFields, {
       new: true,
       runValidators: true
     })

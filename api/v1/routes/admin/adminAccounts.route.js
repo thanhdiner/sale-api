@@ -11,5 +11,16 @@ router.post('/create', fileUpload.single('avatarUrl'), uploadCloud.upload, contr
 router.patch('/edit/:id', fileUpload.single('avatarUrl'), uploadCloud.deleteImage, uploadCloud.upload, controller.edit)
 router.patch('/delete/:id', controller.delete)
 router.patch('/change-status/:id', controller.changeStatus)
+router.patch('/update-avatar/:id', fileUpload.single('avatarUrl'), uploadCloud.deleteImage, uploadCloud.upload, controller.updateAvatar)
+router.patch('/update-profile/:id', controller.updateProfile)
+router.patch('/change-password', controller.changePassword)
+router.get('/2fa/status', controller.get2FAStatus)
+router.post('/2fa/generate', controller.generate2FASecret)
+router.post('/2fa/verify', controller.verify2FACode)
+router.post('/2fa/disable', controller.disable2FA)
+router.post('/2fa/backup-codes', controller.regenerateBackupCodes)
+router.post('/trusted-devices', controller.trustDevice)
+router.get('/trusted-devices', controller.getTrustedDevices)
+router.delete('/trusted-devices/:deviceId', controller.removeTrustedDevice)
 
 module.exports = router

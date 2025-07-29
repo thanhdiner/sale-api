@@ -7,6 +7,8 @@ const permissionGroupsRoutes = require('./permission-groups.route')
 const rolesRoutes = require('./roles.route')
 const accountsRoutes = require('./adminAccounts.route')
 const authRoutes = require('./auth.route')
+const meRoutes = require('./me.route')
+const adminWebsiteConfigRoutes = require('./adminWebsiteConfig.route')
 
 const authenticateToken = require('../../middlewares/admin/authenticateToken.middleware')
 
@@ -21,4 +23,6 @@ module.exports = app => {
   app.use(PATH_ADMIN + '/roles', authenticateToken.authenticateToken, rolesRoutes)
   app.use(PATH_ADMIN + '/accounts', authenticateToken.authenticateToken, accountsRoutes)
   app.use(PATH_ADMIN + '/auth', authRoutes)
+  app.use(PATH_ADMIN + '/me', authenticateToken.authenticateToken, meRoutes)
+  app.use(PATH_ADMIN + '/website-config', adminWebsiteConfigRoutes)
 }

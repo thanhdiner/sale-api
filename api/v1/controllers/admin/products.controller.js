@@ -37,6 +37,8 @@ module.exports.index = async (req, res) => {
 
     const products = await Product.find(find)
       .populate('productCategory', 'title')
+      .populate('createdBy.by', 'fullName avatarUrl')
+      .populate('updateBy.by', 'fullName avatarUrl')
       .sort(sort)
       .limit(objectPagination.limitItems)
       .skip(objectPagination.skip)
@@ -57,6 +59,8 @@ module.exports.index = async (req, res) => {
 module.exports.detail = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id)
+      .populate('createdBy.by', 'fullName avatarUrl')
+      .populate('updateBy.by', 'fullName avatarUrl')
     if (!product) return res.status(404).json({ message: 'Product not found' })
     res.json({ code: 200, message: ' Get Product Category successfully!', product })
   } catch (err) {
@@ -68,7 +72,7 @@ module.exports.detail = async (req, res) => {
 //# Post /api/v1/admin/products/create
 module.exports.create = async (req, res) => {
   try {
-    parseIntegerFields(req.body, ['price', 'discountPercentage', 'stock'])
+    parseIntegerFields(req.body, ['price', 'discountPercentage', 'stock', 'deliveryEstimateDays'])
 
     await setDefaultPosition(req.body)
 
@@ -78,6 +82,9 @@ module.exports.create = async (req, res) => {
     const { slug, error, suggestedSlug } = await handleSlug({ Model: Product, slugInput: req.body.slug, title: req.body.title })
     if (error) return res.status(400).json({ error, suggestedSlug })
     req.body.slug = slug
+    req.body.isTopDeal = req.body.isTopDeal === 'true'
+    req.body.isFeatured = req.body.isFeatured === 'true'
+    req.body.createdBy = { by: req.user?.userId, at: Date.now() }
 
     const product = new Product(req.body)
     const data = await product.save()
@@ -99,7 +106,11 @@ module.exports.delete = async (req, res) => {
     await Product.updateOne(
       { _id: req.params.id },
       {
-        deleted: true
+        deleted: true,
+        deletedBy: {
+          by: req.user?.userId,
+          at: new Date()
+        }
       }
     )
     res.json({
@@ -118,13 +129,22 @@ module.exports.changeStatus = async (req, res) => {
     await Product.updateOne(
       { _id: req.params.id },
       {
-        status: newStatus
+        status: newStatus,
+        $push: {
+          updateBy: {
+            by: req.user?.userId,
+            at: new Date()
+          }
+        }
       }
     )
+    const updatedProduct = await Product.findById(req.params.id).populate('updateBy.by', 'fullName avatarUrl').select('updateBy')
+
     res.json({
       code: 200,
       message: 'Product status changed successfully!',
-      status: newStatus
+      status: newStatus,
+      product: updatedProduct
     })
   } catch (err) {
     res.status(500).json({ error: 'Failed to change product status', status: 400 })
@@ -139,7 +159,18 @@ module.exports.deleteMany = async (req, res) => {
       return res.status(400).json({ error: 'Invalid request data', status: 400 })
     }
 
-    await Product.updateMany({ _id: { $in: ids } }, { $set: { deleted: true } })
+    await Product.updateMany(
+      { _id: { $in: ids } },
+      {
+        $set: {
+          deleted: true,
+          deletedBy: {
+            by: req.user?.userId,
+            at: new Date()
+          }
+        }
+      }
+    )
 
     res.json({
       code: 200,
@@ -159,12 +190,26 @@ module.exports.changeStatusMany = async (req, res) => {
       return res.status(400).json({ error: 'Invalid request data', status: 400 })
     }
 
-    await Product.updateMany({ _id: { $in: ids } }, { $set: { status } })
+    const updateFields = {
+      status,
+      $push: {
+        updateBy: {
+          by: req.user?.userId,
+          at: new Date()
+        }
+      },
+      updatedAt: new Date()
+    }
+    await Product.updateMany({ _id: { $in: ids } }, updateFields)
+
+    const updatedProducts = await Product.find({ _id: { $in: ids } })
+      .populate('updateBy.by', 'fullName avatarUrl')
+      .select('_id status updateBy updatedAt')
 
     res.json({
       code: 200,
       message: `✅ Changed status of ${ids.length} products to "${status}"`,
-      status
+      products: updatedProducts
     })
   } catch (err) {
     console.error(err)
@@ -183,15 +228,29 @@ module.exports.changePositionMany = async (req, res) => {
     const bulkOps = data.map(({ _id, position }) => ({
       updateOne: {
         filter: { _id },
-        update: { $set: { position } }
+        update: {
+          $set: { position },
+          $push: {
+            updateBy: {
+              by: req.user?.userId,
+              at: new Date()
+            }
+          },
+          updatedAt: new Date()
+        }
       }
     }))
 
     await Product.bulkWrite(bulkOps)
 
+    const updatedProducts = await Product.find({ _id: { $in: data.map(i => i._id) } })
+      .populate('updateBy.by', 'fullName avatarUrl')
+      .select('_id position updateBy updatedAt')
+
     res.json({
       code: 200,
-      message: `✅ Updated position for ${data.length} products`
+      message: `✅ Updated position for ${data.length} products`,
+      products: updatedProducts
     })
   } catch (err) {
     console.error(err)
@@ -216,11 +275,23 @@ module.exports.edit = async (req, res) => {
     })
     if (error) return res.status(400).json({ error, suggestedSlug })
     req.body.slug = slug
+    req.body.isTopDeal = req.body.isTopDeal === 'true'
+    req.body.isFeatured = req.body.isFeatured === 'true'
 
-    const updatedProduct = await Product.findByIdAndUpdate(productId, req.body, {
+    const updateFields = {
+      ...req.body,
+      $push: {
+        updateBy: {
+          by: req.user?.userId,
+          at: new Date()
+        }
+      }
+    }
+
+    const updatedProduct = await Product.findByIdAndUpdate(productId, updateFields, {
       new: true,
       runValidators: true
-    })
+    }).populate('updateBy.by', 'fullName avatarUrl')
     return res.status(200).json({
       message: '✅ Product updated successfully',
       product: updatedProduct

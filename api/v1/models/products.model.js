@@ -9,6 +9,7 @@ const productSchema = new mongoose.Schema(
       required: true,
       trim: true
     },
+    titleNoAccent: { type: String, required: true },
     productCategory: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'ProductCategory',
@@ -31,31 +32,31 @@ const productSchema = new mongoose.Schema(
     content: String,
     timeStart: Date,
     timeFinish: Date,
+    isTopDeal: { type: Boolean, default: false },
+    isFeatured: { type: Boolean, default: false },
     rate: Number,
+    deliveryEstimateDays: { type: Number, default: 0, min: 0 },
     slug: {
       type: String,
       unique: true
       // slug: 'title', //# tự động get slug từ field title
     },
     createdBy: {
-      account_id: String,
-      createAt: {
-        type: Date,
-        default: Date.now
-      }
+      by: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminAccount' },
+      at: Date
     },
     deleted: {
       type: Boolean,
       default: false
     },
     deletedBy: {
-      account_id: String,
-      deletedAt: Date
+      by: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminAccount' },
+      at: Date
     },
     updateBy: [
       {
-        account_id: String,
-        updatedAt: Date
+        by: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminAccount' },
+        at: Date
       }
     ]
   },
