@@ -1,6 +1,7 @@
 const cloudinary = require('cloudinary').v2
 const streamifier = require('streamifier')
 const { extractPublicId } = require('../../helpers/cloudinary')
+const axios = require('axios')
 
 //# Configure Cloudinary
 cloudinary.config({
@@ -94,4 +95,19 @@ module.exports.deleteImageMany = async (req, res, next) => {
   }
 
   next()
+}
+
+module.exports.uploadImageFromUrl = async (url, publicId = undefined) => {
+  const response = await axios.get(url, { responseType: 'arraybuffer' })
+  const buffer = Buffer.from(response.data, 'binary')
+  return new Promise((resolve, reject) => {
+    const upload_stream = cloudinary.uploader.upload_stream(
+      { folder: 'avatars', public_id: publicId, overwrite: true },
+      (error, result) => {
+        if (result) resolve(result)
+        else reject(error)
+      }
+    )
+    streamifier.createReadStream(buffer).pipe(upload_stream)
+  })
 }

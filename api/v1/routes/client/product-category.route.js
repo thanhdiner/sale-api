@@ -3,5 +3,6 @@ const router = express.Router()
 const controller = require('../../controllers/client/product-categories.controller')
 
 router.get('/tree', controller.index)
+router.get('/:slug/products', controller.getProductsByCategorySlug)
 
 module.exports = router

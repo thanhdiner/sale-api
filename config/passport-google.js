@@ -1,4 +1,5 @@
 const GoogleStrategy = require('passport-google-oauth20').Strategy
+const { uploadImageFromUrl } = require('../api/v1/middlewares/admin/uploadCloud.middleware')
 const User = require('../api/v1/models/user.model')
 const passport = require('passport')
 
@@ -14,11 +15,17 @@ passport.use(
         const email = profile.emails?.[0]?.value
         let user = await User.findOne({ email })
         if (!user) {
+          let avatarUrl = ''
+          if (profile.photos?.[0]?.value) {
+            const result = await uploadImageFromUrl(profile.photos[0].value, profile.id)
+            avatarUrl = result.secure_url
+          }
+
           user = await User.create({
             username: profile.id,
             email: email,
             fullName: profile.displayName,
-            avatarUrl: profile.photos?.[0]?.value,
+            avatarUrl,
             passwordHash: '',
             provider: 'google'
           })

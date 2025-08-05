@@ -30,8 +30,19 @@ const setDefaultPosition = async body => {
   } else body.position = parseInt(body.position)
 }
 
+const findAllDescendantIds = (categories, parentId) => {
+  let ids = [parentId]
+  categories.forEach(cat => {
+    if (cat.parent_id && cat.parent_id.toString() === parentId.toString()) {
+      ids = ids.concat(findAllDescendantIds(categories, cat._id))
+    }
+  })
+  return ids
+}
+
 module.exports = {
   buildTree,
   validateParentId,
-  setDefaultPosition
+  setDefaultPosition,
+  findAllDescendantIds
 }

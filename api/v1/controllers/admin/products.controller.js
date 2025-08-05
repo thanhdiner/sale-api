@@ -72,7 +72,7 @@ module.exports.detail = async (req, res) => {
 //# Post /api/v1/admin/products/create
 module.exports.create = async (req, res) => {
   try {
-    parseIntegerFields(req.body, ['price', 'discountPercentage', 'stock', 'deliveryEstimateDays'])
+    parseIntegerFields(req.body, ['price', 'costPrice', 'discountPercentage', 'stock', 'deliveryEstimateDays'])
 
     await setDefaultPosition(req.body)
 
@@ -85,6 +85,9 @@ module.exports.create = async (req, res) => {
     req.body.isTopDeal = req.body.isTopDeal === 'true'
     req.body.isFeatured = req.body.isFeatured === 'true'
     req.body.createdBy = { by: req.user?.userId, at: Date.now() }
+    if (req.body.features && !Array.isArray(req.body.features)) {
+      req.body.features = [req.body.features]
+    }
 
     const product = new Product(req.body)
     const data = await product.save()
@@ -262,7 +265,7 @@ module.exports.changePositionMany = async (req, res) => {
 module.exports.edit = async (req, res) => {
   try {
     const productId = req.params.id
-    parseIntegerFields(req.body, ['price', 'discountPercentage', 'stock', 'position'])
+    parseIntegerFields(req.body, ['price', 'costPrice', 'discountPercentage', 'stock', 'position'])
 
     const category = await validateProductCategory(req.body.productCategory)
     if (!category) return res.status(400).json({ error: 'Invalid or deleted product category!' })
@@ -273,6 +276,25 @@ module.exports.edit = async (req, res) => {
       title: req.body.title,
       currentId: productId
     })
+
+    if ('features' in req.body) {
+      const raw = req.body.features
+      let normalized = []
+
+      if (raw === '' || raw == null) {
+        normalized = []
+      } else if (Array.isArray(raw)) {
+        normalized = raw
+          .map(String)
+          .map(s => s.trim())
+          .filter(Boolean)
+      } else {
+        normalized = [String(raw)].map(s => s.trim()).filter(Boolean)
+      }
+
+      req.body.features = normalized
+    }
+
     if (error) return res.status(400).json({ error, suggestedSlug })
     req.body.slug = slug
     req.body.isTopDeal = req.body.isTopDeal === 'true'
