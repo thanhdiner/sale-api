@@ -2,6 +2,7 @@ const Order = require('../../models/order.model')
 const PromoCode = require('../../models/promoCode.model')
 const Product = require('../../models/products.model')
 const FlashSale = require('../../models/flashSale.model')
+const removeAccents = require('remove-accents')
 
 //# POST /api/v1/orders
 module.exports.createOrder = async (req, res) => {
@@ -42,6 +43,9 @@ module.exports.createOrder = async (req, res) => {
         image: item.image || product.thumbnail
       }
     })
+
+    contact.firstNameNoAccent = removeAccents(contact.firstName)
+    contact.lastNameNoAccent = removeAccents(contact.lastName)
 
     const newOrder = new Order({
       contact,

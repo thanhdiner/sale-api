@@ -14,6 +14,7 @@ const ordersRoutes = require('./order.route')
 const widgetsRoutes = require('./widgets.route')
 const bannersRoutes = require('./banners.route')
 const flashSaleRoutes = require('./flashSale.route')
+const bankInfoRoutes = require('./bankInfo.route')
 
 const authenticateToken = require('../../middlewares/admin/authenticateToken.middleware')
 
@@ -35,4 +36,5 @@ module.exports = app => {
   app.use(PATH_ADMIN + '/widgets', authenticateToken.authenticateToken, widgetsRoutes)
   app.use(PATH_ADMIN + '/banners', authenticateToken.authenticateToken, bannersRoutes)
   app.use(PATH_ADMIN + '/flash-sales', authenticateToken.authenticateToken, flashSaleRoutes)
+  app.use(PATH_ADMIN + '/bank-infos', authenticateToken.authenticateToken, bankInfoRoutes)
 }

@@ -5,6 +5,8 @@ const OrderSchema = new mongoose.Schema(
     contact: {
       firstName: { type: String, required: true },
       lastName: { type: String, required: true },
+      firstNameNoAccent: { type: String },
+      lastNameNoAccent: { type: String },
       phone: { type: String, required: true },
       email: { type: String },
       notes: { type: String }

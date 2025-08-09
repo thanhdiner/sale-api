@@ -8,6 +8,7 @@ const widgetsRouter = require('./widgets.route')
 const bannersRouter = require('./banners.route')
 const flashsalesRouter = require('./flashsales.route')
 const contactRouter = require('./contact.route')
+const bankInfoRouter = require('./bankInfo.route')
 
 const authenticateToken = require('../../middlewares/client/authenticateToken.middleware')
 
@@ -23,4 +24,5 @@ module.exports = app => {
   app.use(version + '/banners', bannersRouter)
   app.use(version + '/flash-sales', flashsalesRouter)
   app.use(version + '/contact', contactRouter)
+  app.use(version + '/bank-info', bankInfoRouter)
 }

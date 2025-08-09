@@ -51,5 +51,6 @@ router.patch(
 )
 router.post('/request-email-update', authenticateToken.authenticateToken, controller.requestEmailUpdate)
 router.post('/confirm-email-update', authenticateToken.authenticateToken, controller.confirmEmailUpdate)
+router.patch('/change-password', authenticateToken.authenticateToken, controller.changePassword)
 
 module.exports = router

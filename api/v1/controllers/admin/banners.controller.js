@@ -25,7 +25,6 @@ module.exports.create = async (req, res) => {
       return res.status(400).json({ message: 'Title is required' })
     }
 
-    // Lấy url ảnh từ req.body.img (được middleware uploadCloud.upload gán)
     const imgUrl = req.body.img
     if (!imgUrl) {
       return res.status(400).json({ message: 'Image is required' })

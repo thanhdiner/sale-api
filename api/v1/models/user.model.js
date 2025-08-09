@@ -56,6 +56,10 @@ const userSchema = new mongoose.Schema(
 
 userSchema.pre('save', async function (next) {
   if (!this.isModified('passwordHash')) return next()
+  if (!this.passwordHash || !this.passwordHash.trim()) {
+    this.passwordHash = ''
+    return next()
+  }
   this.passwordHash = await bcrypt.hash(this.passwordHash, 10)
   next()
 })
@@ -68,4 +72,12 @@ userSchema.methods.setPassword = function (newPassword) {
   this.passwordHash = newPassword
   return this.save()
 }
+
+userSchema.virtual('hasPassword').get(function () {
+  return !!(this.passwordHash && this.passwordHash.length > 0)
+})
+
+userSchema.set('toJSON', { virtuals: true })
+userSchema.set('toObject', { virtuals: true })
+
 module.exports = mongoose.model('User', userSchema, 'users')

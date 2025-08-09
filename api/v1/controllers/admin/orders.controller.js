@@ -1,18 +1,55 @@
 const Order = require('../../models/order.model')
+const removeAccents = require('remove-accents')
 
 //# GET /api/v1/orders
 module.exports.getAllOrders = async (req, res) => {
   try {
-    const { page = 1, limit = 20, keyword = '' } = req.query
+    const { page = 1, limit = 20, keyword = '', status = '' } = req.query
+    const pageNum = parseInt(page, 10) || 1
+    const pageLimit = parseInt(limit, 10) || 20
     const query = { isDeleted: false }
-    if (keyword) query['contact.phone'] = { $regex: keyword, $options: 'i' }
+
+    if (status && status !== '') {
+      query.status = status
+    }
+
+    if (keyword) {
+      const keywordNoAccent = removeAccents(keyword)
+      // Kiểm tra nếu là ObjectId hợp lệ
+      const isObjectId = keyword.length === 24 && keyword.match(/^[a-fA-F0-9]{24}$/)
+      if (keyword === keywordNoAccent) {
+        // Không dấu: search cả không dấu & có dấu, thêm phone, email, notes, _id
+        query.$or = [
+          { 'contact.firstNameNoAccent': { $regex: keyword, $options: 'i' } },
+          { 'contact.lastNameNoAccent': { $regex: keyword, $options: 'i' } },
+          { 'contact.firstName': { $regex: keyword, $options: 'i' } },
+          { 'contact.lastName': { $regex: keyword, $options: 'i' } },
+          { 'contact.phone': { $regex: keyword, $options: 'i' } },
+          { 'contact.email': { $regex: keyword, $options: 'i' } },
+          { 'contact.notes': { $regex: keyword, $options: 'i' } },
+          ...(isObjectId ? [{ _id: keyword }] : [])
+        ]
+      } else {
+        // Có dấu: chỉ search trường có dấu, + phone, email, notes, _id
+        query.$or = [
+          { 'contact.firstName': { $regex: keyword, $options: 'i' } },
+          { 'contact.lastName': { $regex: keyword, $options: 'i' } },
+          { 'contact.phone': { $regex: keyword, $options: 'i' } },
+          { 'contact.email': { $regex: keyword, $options: 'i' } },
+          { 'contact.notes': { $regex: keyword, $options: 'i' } },
+          ...(isObjectId ? [{ _id: keyword }] : [])
+        ]
+      }
+    }
+
     const total = await Order.countDocuments(query)
     const orders = await Order.find(query)
       .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(Number(limit))
+      .skip((pageNum - 1) * pageLimit)
+      .limit(Number(pageLimit))
     res.json({ success: true, orders, total })
   } catch (err) {
+    console.log(err)
     res.status(500).json({ error: 'Lỗi lấy đơn hàng' })
   }
 }

@@ -226,9 +226,12 @@ module.exports.oauthCodeLogin = async (req, res) => {
 //# GET /api/v1/user/me
 module.exports.getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select('-passwordHash -__v')
+    const user = await User.findById(req.user.userId).select('-__v')
     if (!user) return res.status(404).json({ error: 'User not found' })
-    res.json(user)
+    const userObj = user.toObject()
+    delete userObj.passwordHash
+
+    res.json(userObj)
   } catch (err) {
     res.status(500).json({ error: 'Server error' })
   }
@@ -274,7 +277,7 @@ module.exports.githubLoginCallback = async (req, res) => {
 }
 
 //# POST /api/v1/user/forgot-password
-exports.forgotPassword = async (req, res) => {
+module.exports.forgotPassword = async (req, res) => {
   const { email } = req.body
   if (!email) return res.status(400).json({ message: 'Email là bắt buộc!' })
   const user = await User.findOne({ email })
@@ -301,7 +304,7 @@ exports.forgotPassword = async (req, res) => {
 }
 
 //# POST /api/v1/user/verify-reset-code
-exports.verifyResetCode = async (req, res) => {
+module.exports.verifyResetCode = async (req, res) => {
   const { email, code } = req.body
   if (!email || !code) return res.status(400).json({ message: 'Thiếu email hoặc mã xác thực!' })
   const resetCode = await ResetCode.findOne({ email, code, used: false })
@@ -312,7 +315,7 @@ exports.verifyResetCode = async (req, res) => {
 }
 
 //# POST /api/v1/user/reset-password
-exports.resetPassword = async (req, res) => {
+module.exports.resetPassword = async (req, res) => {
   const { email, code, newPassword } = req.body
   if (!email || !code || !newPassword) return res.status(400).json({ message: 'Thiếu thông tin!' })
 
@@ -359,7 +362,7 @@ module.exports.updateProfile = async (req, res) => {
 }
 
 //# POST /api/v1/user/request-email-update
-exports.requestEmailUpdate = async (req, res) => {
+module.exports.requestEmailUpdate = async (req, res) => {
   const userId = req.user.userId
   const { email } = req.body
   if (!email) return res.status(400).json({ message: 'Thiếu email!' })
@@ -387,7 +390,7 @@ exports.requestEmailUpdate = async (req, res) => {
 }
 
 //# POST /api/v1/user/confirm-email-update
-exports.confirmEmailUpdate = async (req, res) => {
+module.exports.confirmEmailUpdate = async (req, res) => {
   const userId = req.user.userId
   const { email, code } = req.body
   if (!email || !code) return res.status(400).json({ message: 'Thiếu thông tin!' })
@@ -410,4 +413,39 @@ exports.confirmEmailUpdate = async (req, res) => {
     message: 'Cập nhật email thành công!',
     data: updatedUser
   })
+}
+
+//# PATCH /api/v1/user/change-password
+module.exports.changePassword = async (req, res) => {
+  try {
+    const id = req.user.userId
+    const { currentPassword, newPassword } = req.body
+
+    if (!newPassword) {
+      return res.status(400).json({ error: 'Missing new password' })
+    }
+
+    const user = await User.findById(id)
+    if (!user) {
+      return res.status(404).json({ error: 'User not found', message: 'User not found' })
+    }
+
+    if (user.hasPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({ error: 'Missing current password' })
+      }
+      const isMatch = await user.comparePassword(currentPassword)
+      if (!isMatch) {
+        return res.status(401).json({ error: 'Current password is incorrect', message: 'Current password is incorrect' })
+      }
+    }
+
+    user.passwordHash = newPassword
+    await user.save()
+
+    res.json({ message: user.hasPassword ? 'Password changed successfully' : 'Password set successfully' })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Server error' })
+  }
 }
