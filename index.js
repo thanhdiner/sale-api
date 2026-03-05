@@ -18,7 +18,7 @@ const routeApiV1Admin = require('./api/v1/routes/admin/index.route')
 // app.use(cors())
 app.use(
   cors({
-    origin: 'http://localhost:3000',
+    origin: process.env.CLIENT_URL || 'https://smartmall.site',
     credentials: true
   })
 )

@@ -7,7 +7,8 @@ const axios = require('axios')
 cloudinary.config({
   cloud_name: process.env.CLOUD_NAME,
   api_key: process.env.API_KEY,
-  api_secret: process.env.API_SECRET
+  api_secret: process.env.API_SECRET,
+  secure: true
 })
 //# End Configure Cloudinary
 
@@ -25,7 +26,7 @@ module.exports.upload = (req, res, next) => {
 
     async function upload(req) {
       let result = await streamUpload(req)
-      req.body[req.file.fieldname] = result.url
+      req.body[req.file.fieldname] = result.secure_url
       next()
     }
 
@@ -47,7 +48,7 @@ module.exports.uploadMany = async (req, res, next) => {
           })
           streamifier.createReadStream(file.buffer).pipe(stream)
         })
-        req.body[field] = result.url
+        req.body[field] = result.secure_url
       }
     } catch (err) {
       console.error('❌ Failed to upload image:', err.message)
