@@ -29,7 +29,9 @@ const OrderSchema = new mongoose.Schema(
     ],
 
     deliveryMethod: { type: String, enum: ['pickup', 'contact'], required: true },
-    paymentMethod: { type: String, enum: ['transfer', 'contact'], required: true },
+    paymentMethod: { type: String, enum: ['transfer', 'contact', 'vnpay', 'momo', 'zalopay'], required: true },
+    paymentStatus: { type: String, enum: ['pending', 'paid', 'failed'], default: 'pending' },
+    paymentTransactionId: { type: String },
     subtotal: { type: Number, required: true },
     discount: { type: Number, default: 0 },
     shipping: { type: Number, default: 0 },

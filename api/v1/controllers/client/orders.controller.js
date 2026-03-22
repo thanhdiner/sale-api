@@ -109,6 +109,76 @@ module.exports.createOrder = async (req, res) => {
   }
 }
 
+//# POST /api/v1/orders/pending
+//  Tạo đơn hàng với paymentStatus='pending' — dùng trước khi redirect sang cổng thanh toán
+module.exports.createPendingOrder = async (req, res) => {
+  try {
+    const { contact, orderItems, deliveryMethod, paymentMethod, subtotal, discount, shipping, total, promo } = req.body
+    if (!orderItems || !Array.isArray(orderItems) || orderItems.length === 0)
+      return res.status(400).json({ error: 'Đơn hàng phải có sản phẩm' })
+
+    const validOnline = ['vnpay', 'momo', 'zalopay']
+    if (!validOnline.includes(paymentMethod))
+      return res.status(400).json({ error: 'Phương thức thanh toán không hợp lệ cho đơn pending' })
+
+    const productIds = orderItems.map(i => i.productId)
+    const products = await Product.find({ _id: { $in: productIds } })
+    const productsMap = Object.fromEntries(products.map(p => [p._id.toString(), p]))
+
+    const populatedOrderItems = orderItems.map(item => {
+      const product = productsMap[item.productId?.toString()]
+      if (!product) throw new Error(`Không tìm thấy sản phẩm ${item.productId}`)
+      const finalPrice = item.salePrice !== undefined ? item.salePrice : product.price
+      return {
+        ...item,
+        price: finalPrice,
+        costPrice: product.costPrice,
+        name: item.name || product.title,
+        image: item.image || product.thumbnail
+      }
+    })
+
+    const removeAccents = require('remove-accents')
+    contact.firstNameNoAccent = removeAccents(contact.firstName)
+    contact.lastNameNoAccent = removeAccents(contact.lastName)
+
+    const newOrder = new Order({
+      contact,
+      orderItems: populatedOrderItems,
+      deliveryMethod,
+      paymentMethod,
+      subtotal,
+      discount,
+      shipping,
+      total,
+      promo: promo?.code || promo || '',
+      status: 'pending',
+      paymentStatus: 'pending',
+      userId: req.user?.userId
+    })
+
+    await newOrder.save()
+
+    // Trừ kho ngay (sẽ hoàn lại nếu thanh toán thất bại/hết timeout)
+    const stockBulkOps = populatedOrderItems.map(item => ({
+      updateOne: {
+        filter: { _id: item.productId, stock: { $gte: item.quantity } },
+        update: { $inc: { stock: -item.quantity, soldQuantity: item.quantity } }
+      }
+    }))
+    const stockResult = await Product.bulkWrite(stockBulkOps)
+    if (stockResult.modifiedCount !== populatedOrderItems.length) {
+      await Order.deleteOne({ _id: newOrder._id })
+      return res.status(400).json({ error: 'Có sản phẩm hết hàng hoặc không đủ số lượng!' })
+    }
+
+    res.json({ success: true, orderId: newOrder._id })
+  } catch (err) {
+    console.error('[createPendingOrder]', err)
+    res.status(500).json({ error: 'Lỗi tạo đơn hàng' })
+  }
+}
+
 //# GET /api/v1/orders/my
 module.exports.getMyOrders = async (req, res) => {
   try {
