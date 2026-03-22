@@ -9,11 +9,15 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000'
 // HELPERS
 // ─────────────────────────────────────────
 function getClientIp(req) {
-  return (
-    req.headers['x-forwarded-for']?.split(',')[0] ||
+  const raw =
+    req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
     req.socket?.remoteAddress ||
     '127.0.0.1'
-  )
+  // Chuyển IPv6 loopback sang IPv4 (VNPay chỉ chấp nhận IPv4)
+  if (raw === '::1' || raw === '::ffff:127.0.0.1') return '127.0.0.1'
+  // Strip IPv6-mapped IPv4 prefix (::ffff:x.x.x.x)
+  if (raw.startsWith('::ffff:')) return raw.slice(7)
+  return raw
 }
 
 // ─────────────────────────────────────────
