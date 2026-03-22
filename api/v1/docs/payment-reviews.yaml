@@ -1,0 +1,357 @@
+# ═══════════════════════════════════════════════════════════════
+# PAYMENT
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/payment/vnpay/create:
+  post:
+    tags: [Payment]
+    summary: Tạo URL thanh toán VNPay
+    security: [{ clientAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [orderId]
+            properties:
+              orderId: { type: string, example: 65f1a2b3c4d5e6f7a8b9c0d1 }
+    responses:
+      "200":
+        description: URL thanh toán VNPay
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean }
+                paymentUrl: { type: string, example: "https://sandbox.vnpayment.vn/..." }
+
+/api/v1/payment/vnpay/return:
+  get:
+    tags: [Payment]
+    summary: VNPay redirect callback (do VNPay gọi — không gọi trực tiếp)
+    description: Endpoint này nhận redirect từ VNPay sau khi thanh toán. Redirect về frontend.
+    parameters:
+      - name: vnp_ResponseCode
+        in: query
+        schema: { type: string, example: "00" }
+      - name: vnp_TxnRef
+        in: query
+        schema: { type: string }
+    responses:
+      "302":
+        description: Redirect về frontend order-success page
+
+/api/v1/payment/momo/create:
+  post:
+    tags: [Payment]
+    summary: Tạo URL thanh toán MoMo
+    security: [{ clientAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [orderId]
+            properties:
+              orderId: { type: string }
+    responses:
+      "200":
+        description: URL thanh toán MoMo
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean }
+                paymentUrl: { type: string }
+
+/api/v1/payment/momo/callback:
+  post:
+    tags: [Payment]
+    summary: MoMo IPN callback (do MoMo server gọi — không gọi trực tiếp)
+    description: Nhận thông báo kết quả thanh toán từ MoMo server (IPN — Instant Payment Notification).
+    responses:
+      "204":
+        description: Đã nhận và xử lý
+
+/api/v1/payment/zalopay/create:
+  post:
+    tags: [Payment]
+    summary: Tạo URL thanh toán ZaloPay
+    security: [{ clientAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [orderId]
+            properties:
+              orderId: { type: string }
+    responses:
+      "200":
+        description: URL thanh toán ZaloPay
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean }
+                paymentUrl: { type: string }
+
+/api/v1/payment/zalopay/callback:
+  post:
+    tags: [Payment]
+    summary: ZaloPay IPN callback (do ZaloPay server gọi — không gọi trực tiếp)
+    responses:
+      "200":
+        description: Đã xử lý
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                return_code: { type: integer, example: 1 }
+                return_message: { type: string, example: success }
+
+# ═══════════════════════════════════════════════════════════════
+# REVIEWS
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/reviews/{productId}:
+  get:
+    tags: [Reviews]
+    summary: Lấy danh sách đánh giá của sản phẩm
+    parameters:
+      - name: productId
+        in: path
+        required: true
+        schema: { type: string }
+      - name: page
+        in: query
+        schema: { type: integer, default: 1 }
+      - name: limit
+        in: query
+        schema: { type: integer, default: 10 }
+      - name: sort
+        in: query
+        schema:
+          type: string
+          enum: [newest, helpful, highRating, lowRating]
+          default: newest
+      - name: rating
+        in: query
+        description: Lọc theo số sao (1–5)
+        schema: { type: integer }
+    responses:
+      "200":
+        description: Danh sách đánh giá
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reviews:
+                  type: array
+                  items: { $ref: '#/components/schemas/Review' }
+                total: { type: integer }
+                summary:
+                  type: object
+                  properties:
+                    avgRating: { type: number }
+                    totalCount: { type: integer }
+                    ratingDist:
+                      type: object
+                      example: { "1": 2, "2": 5, "3": 10, "4": 30, "5": 53 }
+
+  post:
+    tags: [Reviews]
+    summary: Tạo đánh giá mới (upload ảnh/video)
+    security: [{ clientAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [rating]
+            properties:
+              rating: { type: integer, minimum: 1, maximum: 5 }
+              title: { type: string, maxLength: 200 }
+              content: { type: string, maxLength: 2000 }
+              files:
+                type: array
+                items: { type: string, format: binary }
+    responses:
+      "201":
+        description: Đánh giá đã tạo
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                review: { $ref: '#/components/schemas/Review' }
+
+/api/v1/reviews/{reviewId}:
+  put:
+    tags: [Reviews]
+    summary: Cập nhật đánh giá
+    security: [{ clientAuth: [] }]
+    parameters:
+      - name: reviewId
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            properties:
+              rating: { type: integer }
+              title: { type: string }
+              content: { type: string }
+              keepImages: { type: string, description: JSON array of image URLs to keep }
+              keepVideos: { type: string, description: JSON array of video URLs to keep }
+              files:
+                type: array
+                items: { type: string, format: binary }
+    responses:
+      "200":
+        description: Đánh giá đã cập nhật
+
+  delete:
+    tags: [Reviews]
+    summary: Xóa đánh giá
+    security: [{ clientAuth: [] }]
+    parameters:
+      - name: reviewId
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Đã xóa
+
+/api/v1/reviews/{reviewId}/vote:
+  post:
+    tags: [Reviews]
+    summary: Vote "hữu ích" cho đánh giá (toggle)
+    security: [{ clientAuth: [] }]
+    parameters:
+      - name: reviewId
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Đã vote / hủy vote
+
+# ═══════════════════════════════════════════════════════════════
+# PROMO CODES
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/promo-codes/validate:
+  post:
+    tags: [Promo Codes]
+    summary: Kiểm tra / áp dụng mã giảm giá
+    security: [{ clientAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [code, subtotal]
+            properties:
+              code: { type: string, example: SALE10 }
+              subtotal: { type: number, example: 500000 }
+    responses:
+      "200":
+        description: Kết quả kiểm tra mã
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                valid: { type: boolean }
+                discount: { type: number }
+                freeShipping: { type: boolean }
+                message: { type: string }
+                promoInfo: { type: object }
+
+# ═══════════════════════════════════════════════════════════════
+# PUBLIC ENDPOINTS (Banners, Widgets, Flash Sales, Bank Info)
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/banners:
+  get:
+    tags: [Banners]
+    summary: Lấy danh sách banner
+    responses:
+      "200":
+        description: Danh sách banner
+
+/api/v1/widgets:
+  get:
+    tags: [Widgets]
+    summary: Lấy nội dung widgets
+    responses:
+      "200":
+        description: Danh sách widgets
+
+/api/v1/flash-sales:
+  get:
+    tags: [Flash Sales]
+    summary: Flash sale đang diễn ra
+    responses:
+      "200":
+        description: Thông tin flash sale
+
+/api/v1/bank-info:
+  get:
+    tags: [Bank Info]
+    summary: Thông tin tài khoản ngân hàng để chuyển khoản
+    responses:
+      "200":
+        description: Thông tin ngân hàng
+
+# ═══════════════════════════════════════════════════════════════
+# CONTACT
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/contact:
+  post:
+    tags: [Contact]
+    summary: Gửi email liên hệ
+    description: Rate limit — tối đa 5 lần / 10 phút mỗi IP.
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [name, email, message]
+            properties:
+              name: { type: string, example: "Nguyễn Văn A" }
+              email: { type: string, format: email, example: user@example.com }
+              phone: { type: string, example: "0901234567" }
+              subject: { type: string, example: "Hỏi về đơn hàng #12345" }
+              message: { type: string, example: "Tôi muốn hỏi về..." }
+    responses:
+      "200":
+        description: Email đã gửi thành công
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean }
+                message: { type: string }
+      "429":
+        description: Quá nhiều yêu cầu — thử lại sau
+      "400":
+        description: Dữ liệu không hợp lệ

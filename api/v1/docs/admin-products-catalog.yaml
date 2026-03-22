@@ -1,0 +1,1029 @@
+# ═══════════════════════════════════════════════════════════════
+# ADMIN — PRODUCTS
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/admin/products:
+  get:
+    tags: [Admin — Products]
+    summary: Danh sách sản phẩm (có lọc, phân trang, sort)
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: page
+        in: query
+        schema: { type: integer, default: 1 }
+      - name: limit
+        in: query
+        schema: { type: integer, default: 10 }
+      - name: status
+        in: query
+        schema: { type: string, enum: [active, inactive, all] }
+      - name: productName
+        in: query
+        schema: { type: string }
+      - name: product_category
+        in: query
+        description: ObjectId của danh mục
+        schema: { type: string }
+      - name: sortField
+        in: query
+        schema: { type: string, example: price }
+      - name: sortOrder
+        in: query
+        schema: { type: string, enum: [ascend, descend] }
+    responses:
+      "200":
+        description: Danh sách sản phẩm
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                products:
+                  type: array
+                  items: { $ref: '#/components/schemas/Product' }
+                total: { type: integer }
+                currentPage: { type: integer }
+                totalPage: { type: integer }
+                limitItems: { type: integer }
+
+/api/v1/admin/products/create:
+  post:
+    tags: [Admin — Products]
+    summary: Tạo sản phẩm mới
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [title, price, stock]
+            properties:
+              title: { type: string, example: "iPhone 15 Pro" }
+              slug: { type: string }
+              price: { type: integer, example: 25000000 }
+              costPrice: { type: integer }
+              discountPercentage: { type: integer }
+              stock: { type: integer, example: 100 }
+              deliveryEstimateDays: { type: integer }
+              productCategory: { type: string, description: ObjectId danh mục }
+              description: { type: string }
+              features:
+                type: array
+                items: { type: string }
+              isTopDeal: { type: boolean }
+              isFeatured: { type: boolean }
+              status: { type: string, enum: [active, inactive] }
+              thumbnail: { type: string, format: binary }
+    responses:
+      "200":
+        description: Sản phẩm đã tạo
+      "400":
+        description: Dữ liệu không hợp lệ
+
+/api/v1/admin/products/delete-many:
+  patch:
+    tags: [Admin — Products]
+    summary: Xóa nhiều sản phẩm
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [ids]
+            properties:
+              ids:
+                type: array
+                items: { type: string }
+    responses:
+      "200":
+        description: Xóa thành công
+
+/api/v1/admin/products/change-status-many:
+  patch:
+    tags: [Admin — Products]
+    summary: Đổi trạng thái nhiều sản phẩm
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [ids, status]
+            properties:
+              ids: { type: array, items: { type: string } }
+              status: { type: string, enum: [active, inactive] }
+    responses:
+      "200":
+        description: Cập nhật thành công
+
+/api/v1/admin/products/change-position-many:
+  patch:
+    tags: [Admin — Products]
+    summary: Cập nhật vị trí nhiều sản phẩm (drag & drop sort)
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    _id: { type: string }
+                    position: { type: integer }
+    responses:
+      "200":
+        description: Cập nhật vị trí thành công
+
+/api/v1/admin/products/{id}:
+  get:
+    tags: [Admin — Products]
+    summary: Chi tiết sản phẩm
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Chi tiết sản phẩm
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                product: { $ref: '#/components/schemas/Product' }
+      "404":
+        description: Không tìm thấy
+
+/api/v1/admin/products/delete/{id}:
+  patch:
+    tags: [Admin — Products]
+    summary: Xóa sản phẩm (soft delete)
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Đã xóa
+
+/api/v1/admin/products/changeStatus/{id}:
+  patch:
+    tags: [Admin — Products]
+    summary: Toggle trạng thái sản phẩm (active ↔ inactive)
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, enum: [active, inactive] }
+    responses:
+      "200":
+        description: Đã đổi trạng thái
+
+/api/v1/admin/products/edit/{id}:
+  patch:
+    tags: [Admin — Products]
+    summary: Cập nhật sản phẩm
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            properties:
+              title: { type: string }
+              slug: { type: string }
+              price: { type: integer }
+              costPrice: { type: integer }
+              discountPercentage: { type: integer }
+              stock: { type: integer }
+              productCategory: { type: string }
+              description: { type: string }
+              features: { type: array, items: { type: string } }
+              isTopDeal: { type: boolean }
+              isFeatured: { type: boolean }
+              status: { type: string, enum: [active, inactive] }
+              thumbnail: { type: string, format: binary }
+    responses:
+      "200":
+        description: Sản phẩm đã cập nhật
+
+# ═══════════════════════════════════════════════════════════════
+# ADMIN — PRODUCT CATEGORIES
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/admin/product-categories:
+  get:
+    tags: [Admin — Categories]
+    summary: Danh sách danh mục sản phẩm
+    security: [{ adminAuth: [] }]
+    responses:
+      "200":
+        description: Danh sách danh mục
+
+/api/v1/admin/product-categories/tree:
+  get:
+    tags: [Admin — Categories]
+    summary: Cây danh mục (nested tree)
+    security: [{ adminAuth: [] }]
+    responses:
+      "200":
+        description: Cây danh mục nested
+
+/api/v1/admin/product-categories/create:
+  post:
+    tags: [Admin — Categories]
+    summary: Tạo danh mục mới
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [title]
+            properties:
+              title: { type: string, example: "Điện thoại" }
+              slug: { type: string }
+              parent_id: { type: string, description: ObjectId danh mục cha }
+              status: { type: string, enum: [active, inactive] }
+              thumbnail: { type: string, format: binary }
+    responses:
+      "201":
+        description: Danh mục đã tạo
+
+/api/v1/admin/product-categories/delete/{id}:
+  patch:
+    tags: [Admin — Categories]
+    summary: Xóa danh mục
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Đã xóa
+
+/api/v1/admin/product-categories/delete-many:
+  patch:
+    tags: [Admin — Categories]
+    summary: Xóa nhiều danh mục
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ids: { type: array, items: { type: string } }
+    responses:
+      "200":
+        description: Xóa thành công
+
+/api/v1/admin/product-categories/changeStatus/{id}:
+  patch:
+    tags: [Admin — Categories]
+    summary: Toggle trạng thái danh mục
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Đã đổi trạng thái
+
+/api/v1/admin/product-categories/change-status-many:
+  patch:
+    tags: [Admin — Categories]
+    summary: Đổi trạng thái nhiều danh mục
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ids: { type: array, items: { type: string } }
+              status: { type: string, enum: [active, inactive] }
+    responses:
+      "200":
+        description: Cập nhật thành công
+
+/api/v1/admin/product-categories/change-position-many:
+  patch:
+    tags: [Admin — Categories]
+    summary: Cập nhật vị trí nhiều danh mục
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    _id: { type: string }
+                    position: { type: integer }
+    responses:
+      "200":
+        description: Cập nhật vị trí thành công
+
+/api/v1/admin/product-categories/{id}:
+  get:
+    tags: [Admin — Categories]
+    summary: Chi tiết danh mục
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Chi tiết danh mục
+
+/api/v1/admin/product-categories/edit/{id}:
+  patch:
+    tags: [Admin — Categories]
+    summary: Cập nhật danh mục
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            properties:
+              title: { type: string }
+              slug: { type: string }
+              parent_id: { type: string }
+              status: { type: string, enum: [active, inactive] }
+              thumbnail: { type: string, format: binary }
+    responses:
+      "200":
+        description: Cập nhật thành công
+
+# ═══════════════════════════════════════════════════════════════
+# ADMIN — REVIEWS
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/admin/reviews:
+  get:
+    tags: [Admin — Reviews]
+    summary: Danh sách đánh giá (tất cả sản phẩm)
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: page
+        in: query
+        schema: { type: integer, default: 1 }
+      - name: limit
+        in: query
+        schema: { type: integer, default: 20 }
+      - name: rating
+        in: query
+        schema: { type: integer }
+      - name: productId
+        in: query
+        schema: { type: string }
+    responses:
+      "200":
+        description: Danh sách reviews
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reviews:
+                  type: array
+                  items: { $ref: '#/components/schemas/Review' }
+                total: { type: integer }
+
+/api/v1/admin/reviews/{reviewId}/reply:
+  put:
+    tags: [Admin — Reviews]
+    summary: Trả lời đánh giá (seller reply)
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: reviewId
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [content]
+            properties:
+              content: { type: string, example: "Cảm ơn bạn đã mua hàng tại SmartMall!" }
+    responses:
+      "200":
+        description: Đã trả lời
+  delete:
+    tags: [Admin — Reviews]
+    summary: Xóa phản hồi của shop
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: reviewId
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Đã xóa phản hồi
+
+/api/v1/admin/reviews/{reviewId}:
+  delete:
+    tags: [Admin — Reviews]
+    summary: Xóa đánh giá
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: reviewId
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Đã xóa đánh giá
+
+# ═══════════════════════════════════════════════════════════════
+# ADMIN — PROMO CODES
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/admin/promo-codes:
+  get:
+    tags: [Admin — Promo Codes]
+    summary: Danh sách mã giảm giá
+    security: [{ adminAuth: [] }]
+    responses:
+      "200":
+        description: Danh sách mã giảm giá
+
+/api/v1/admin/promo-codes/create:
+  post:
+    tags: [Admin — Promo Codes]
+    summary: Tạo mã giảm giá
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [code, discountType, discountValue]
+            properties:
+              code: { type: string, example: SALE10 }
+              discountType: { type: string, enum: [percent, fixed] }
+              discountValue: { type: number, example: 10 }
+              minOrderValue: { type: number }
+              maxDiscount: { type: number }
+              usageLimit: { type: integer }
+              freeShipping: { type: boolean }
+              expiresAt: { type: string, format: date-time }
+              status: { type: string, enum: [active, inactive] }
+    responses:
+      "201":
+        description: Mã giảm giá đã tạo
+
+/api/v1/admin/promo-codes/{id}:
+  get:
+    tags: [Admin — Promo Codes]
+    summary: Chi tiết mã giảm giá
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Chi tiết mã giảm giá
+
+/api/v1/admin/promo-codes/update/{id}:
+  patch:
+    tags: [Admin — Promo Codes]
+    summary: Cập nhật mã giảm giá
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              discountType: { type: string, enum: [percent, fixed] }
+              discountValue: { type: number }
+              minOrderValue: { type: number }
+              maxDiscount: { type: number }
+              usageLimit: { type: integer }
+              freeShipping: { type: boolean }
+              expiresAt: { type: string, format: date-time }
+              status: { type: string, enum: [active, inactive] }
+    responses:
+      "200":
+        description: Cập nhật thành công
+
+/api/v1/admin/promo-codes/delete/{id}:
+  delete:
+    tags: [Admin — Promo Codes]
+    summary: Xóa mã giảm giá
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Đã xóa
+
+# ═══════════════════════════════════════════════════════════════
+# ADMIN — BANNERS
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/admin/banners:
+  get:
+    tags: [Admin — Banners]
+    summary: Danh sách banner
+    security: [{ adminAuth: [] }]
+    responses:
+      "200":
+        description: Danh sách banner
+  post:
+    tags: [Admin — Banners]
+    summary: Tạo banner mới
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [title]
+            properties:
+              title: { type: string }
+              link: { type: string }
+              status: { type: string, enum: [active, inactive] }
+              img: { type: string, format: binary }
+    responses:
+      "201":
+        description: Banner đã tạo
+
+/api/v1/admin/banners/{id}:
+  patch:
+    tags: [Admin — Banners]
+    summary: Cập nhật banner
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            properties:
+              title: { type: string }
+              link: { type: string }
+              status: { type: string, enum: [active, inactive] }
+              img: { type: string, format: binary }
+    responses:
+      "200":
+        description: Cập nhật thành công
+  delete:
+    tags: [Admin — Banners]
+    summary: Xóa banner
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Đã xóa
+
+# ═══════════════════════════════════════════════════════════════
+# ADMIN — WIDGETS
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/admin/widgets:
+  get:
+    tags: [Admin — Widgets]
+    summary: Danh sách widgets
+    security: [{ adminAuth: [] }]
+    responses:
+      "200":
+        description: Danh sách widgets
+  post:
+    tags: [Admin — Widgets]
+    summary: Tạo widget mới
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [title]
+            properties:
+              title: { type: string }
+              content: { type: string }
+              status: { type: string, enum: [active, inactive] }
+              iconUrl: { type: string, format: binary }
+    responses:
+      "201":
+        description: Widget đã tạo
+
+/api/v1/admin/widgets/{id}:
+  patch:
+    tags: [Admin — Widgets]
+    summary: Cập nhật widget
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            properties:
+              title: { type: string }
+              content: { type: string }
+              status: { type: string, enum: [active, inactive] }
+              iconUrl: { type: string, format: binary }
+    responses:
+      "200":
+        description: Cập nhật thành công
+  delete:
+    tags: [Admin — Widgets]
+    summary: Xóa widget
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Đã xóa
+
+# ═══════════════════════════════════════════════════════════════
+# ADMIN — FLASH SALES
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/admin/flash-sales:
+  get:
+    tags: [Admin — Flash Sales]
+    summary: Danh sách flash sale
+    security: [{ adminAuth: [] }]
+    responses:
+      "200":
+        description: Danh sách flash sale
+  post:
+    tags: [Admin — Flash Sales]
+    summary: Tạo flash sale mới
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [title, startTime, endTime]
+            properties:
+              title: { type: string, example: "Flash Sale 12/12" }
+              startTime: { type: string, format: date-time }
+              endTime: { type: string, format: date-time }
+              status: { type: string, enum: [active, inactive] }
+              products:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    productId: { type: string }
+                    salePrice: { type: number }
+                    quantity: { type: integer }
+    responses:
+      "201":
+        description: Flash sale đã tạo
+
+/api/v1/admin/flash-sales/delete-many:
+  patch:
+    tags: [Admin — Flash Sales]
+    summary: Xóa nhiều flash sale
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ids: { type: array, items: { type: string } }
+    responses:
+      "200":
+        description: Xóa thành công
+
+/api/v1/admin/flash-sales/status-many:
+  patch:
+    tags: [Admin — Flash Sales]
+    summary: Đổi trạng thái nhiều flash sale
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              ids: { type: array, items: { type: string } }
+              status: { type: string, enum: [active, inactive] }
+    responses:
+      "200":
+        description: Cập nhật thành công
+
+/api/v1/admin/flash-sales/positions-many:
+  patch:
+    tags: [Admin — Flash Sales]
+    summary: Cập nhật vị trí nhiều flash sale
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    _id: { type: string }
+                    position: { type: integer }
+    responses:
+      "200":
+        description: Cập nhật vị trí thành công
+
+/api/v1/admin/flash-sales/{id}:
+  get:
+    tags: [Admin — Flash Sales]
+    summary: Chi tiết flash sale
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Chi tiết flash sale
+  patch:
+    tags: [Admin — Flash Sales]
+    summary: Cập nhật flash sale
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              title: { type: string }
+              startTime: { type: string, format: date-time }
+              endTime: { type: string, format: date-time }
+              status: { type: string, enum: [active, inactive] }
+    responses:
+      "200":
+        description: Cập nhật thành công
+
+/api/v1/admin/flash-sales/delete/{id}:
+  delete:
+    tags: [Admin — Flash Sales]
+    summary: Xóa flash sale
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Đã xóa
+
+/api/v1/admin/flash-sales/status/{id}:
+  patch:
+    tags: [Admin — Flash Sales]
+    summary: Đổi trạng thái flash sale
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, enum: [active, inactive] }
+    responses:
+      "200":
+        description: Đã đổi trạng thái
+
+# ═══════════════════════════════════════════════════════════════
+# ADMIN — BANK INFO
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/admin/bank-infos:
+  get:
+    tags: [Admin — Bank Info]
+    summary: Danh sách thông tin ngân hàng
+    security: [{ adminAuth: [] }]
+    responses:
+      "200":
+        description: Danh sách bank info
+  post:
+    tags: [Admin — Bank Info]
+    summary: Thêm thông tin ngân hàng
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [bankName, accountNumber, accountHolder]
+            properties:
+              bankName: { type: string, example: "Vietcombank" }
+              accountNumber: { type: string, example: "1234567890" }
+              accountHolder: { type: string, example: "NGUYEN VAN A" }
+              branch: { type: string }
+              qrCode: { type: string, format: binary }
+    responses:
+      "201":
+        description: Đã thêm thông tin ngân hàng
+
+/api/v1/admin/bank-infos/active:
+  get:
+    tags: [Admin — Bank Info]
+    summary: Lấy thông tin ngân hàng đang kích hoạt
+    security: [{ adminAuth: [] }]
+    responses:
+      "200":
+        description: Thông tin ngân hàng đang active
+
+/api/v1/admin/bank-infos/{id}:
+  patch:
+    tags: [Admin — Bank Info]
+    summary: Cập nhật thông tin ngân hàng
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            properties:
+              bankName: { type: string }
+              accountNumber: { type: string }
+              accountHolder: { type: string }
+              branch: { type: string }
+              qrCode: { type: string, format: binary }
+    responses:
+      "200":
+        description: Cập nhật thành công
+
+/api/v1/admin/bank-infos/{id}/delete:
+  patch:
+    tags: [Admin — Bank Info]
+    summary: Xóa thông tin ngân hàng (soft delete)
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Đã xóa
+
+/api/v1/admin/bank-infos/{id}/activate:
+  patch:
+    tags: [Admin — Bank Info]
+    summary: Kích hoạt tài khoản ngân hàng này
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Đã kích hoạt
+
+# ═══════════════════════════════════════════════════════════════
+# ADMIN — SETTINGS (Website Config)
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/admin/website-config:
+  get:
+    tags: [Admin — Settings]
+    summary: Lấy cấu hình website (public — không cần auth)
+    responses:
+      "200":
+        description: Cấu hình website
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                logo: { type: string }
+                favicon: { type: string }
+                siteName: { type: string }
+                contactEmail: { type: string }
+                contactPhone: { type: string }
+                address: { type: string }
+
+/api/v1/admin/website-config/edit:
+  patch:
+    tags: [Admin — Settings]
+    summary: Cập nhật cấu hình website
+    security: [{ adminAuth: [] }]
+    requestBody:
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            properties:
+              siteName: { type: string }
+              contactEmail: { type: string }
+              contactPhone: { type: string }
+              address: { type: string }
+              logo: { type: string, format: binary }
+              favicon: { type: string, format: binary }
+    responses:
+      "200":
+        description: Cập nhật thành công

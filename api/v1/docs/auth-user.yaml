@@ -1,0 +1,218 @@
+# ═══════════════════════════════════════════════════════════════
+# AUTH (CLIENT)
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/user/register:
+  post:
+    tags: [Auth (Client)]
+    summary: Đăng ký tài khoản
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [username, email, password]
+            properties:
+              username:
+                type: string
+                minLength: 4
+                example: nguyenvana
+              email:
+                type: string
+                format: email
+                example: user@example.com
+              password:
+                type: string
+                minLength: 6
+                example: "123456"
+    responses:
+      "201":
+        description: Đăng ký thành công
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean }
+                message: { type: string, example: "Đăng ký thành công" }
+      "400":
+        description: Dữ liệu không hợp lệ
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+
+/api/v1/user/login:
+  post:
+    tags: [Auth (Client)]
+    summary: Đăng nhập
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [username, password]
+            properties:
+              username:
+                type: string
+                example: nguyenvana
+              password:
+                type: string
+                example: "123456"
+    responses:
+      "200":
+        description: Đăng nhập thành công
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                accessToken: { type: string }
+                refreshToken: { type: string }
+                user: { $ref: '#/components/schemas/User' }
+      "401":
+        description: Sai thông tin đăng nhập
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Error' }
+
+/api/v1/user/logout:
+  post:
+    tags: [Auth (Client)]
+    summary: Đăng xuất
+    responses:
+      "200":
+        description: Đăng xuất thành công
+
+/api/v1/user/refresh-token:
+  post:
+    tags: [Auth (Client)]
+    summary: Làm mới access token
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              refreshToken: { type: string }
+    responses:
+      "200":
+        description: Token mới
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                accessToken: { type: string }
+
+/api/v1/user/forgot-password:
+  post:
+    tags: [Auth (Client)]
+    summary: Quên mật khẩu — gửi OTP
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              email: { type: string, format: email, example: user@example.com }
+    responses:
+      "200":
+        description: OTP đã gửi vào email
+
+/api/v1/user/verify-reset-code:
+  post:
+    tags: [Auth (Client)]
+    summary: Xác minh mã OTP đặt lại mật khẩu
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              email: { type: string }
+              code: { type: string, example: "123456" }
+    responses:
+      "200":
+        description: OTP hợp lệ — trả về resetToken
+
+/api/v1/user/reset-password:
+  post:
+    tags: [Auth (Client)]
+    summary: Đặt lại mật khẩu mới
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              resetToken: { type: string }
+              newPassword: { type: string, minLength: 6 }
+    responses:
+      "200":
+        description: Đặt lại mật khẩu thành công
+
+# ═══════════════════════════════════════════════════════════════
+# USER PROFILE
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/user/me:
+  get:
+    tags: [User]
+    summary: Lấy thông tin cá nhân
+    security: [{ clientAuth: [] }]
+    responses:
+      "200":
+        description: Thông tin user
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/User' }
+      "401":
+        description: Chưa đăng nhập
+
+/api/v1/user/update-profile:
+  patch:
+    tags: [User]
+    summary: Cập nhật hồ sơ cá nhân
+    security: [{ clientAuth: [] }]
+    requestBody:
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            properties:
+              fullName: { type: string }
+              phone: { type: string }
+              avatarUrl: { type: string, format: binary }
+    responses:
+      "200":
+        description: Cập nhật thành công
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/User' }
+
+/api/v1/user/change-password:
+  patch:
+    tags: [User]
+    summary: Đổi mật khẩu
+    security: [{ clientAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [oldPassword, newPassword]
+            properties:
+              oldPassword: { type: string }
+              newPassword: { type: string, minLength: 6 }
+    responses:
+      "200":
+        description: Đổi mật khẩu thành công
+      "400":
+        description: Mật khẩu cũ không đúng

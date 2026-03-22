@@ -1,0 +1,245 @@
+# ═══════════════════════════════════════════════════════════════
+# CART (CLIENT — cần đăng nhập)
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/cart:
+  get:
+    tags: [Cart]
+    summary: Lấy giỏ hàng hiện tại
+    security: [{ clientAuth: [] }]
+    responses:
+      "200":
+        description: Giỏ hàng của user
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items: { $ref: '#/components/schemas/CartItem' }
+      "401":
+        description: Chưa đăng nhập
+
+/api/v1/cart/add:
+  post:
+    tags: [Cart]
+    summary: Thêm sản phẩm vào giỏ hàng
+    security: [{ clientAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [productId, quantity]
+            properties:
+              productId: { type: string, example: 65f1a2b3c4d5e6f7a8b9c0d1 }
+              quantity: { type: integer, minimum: 1, example: 2 }
+    responses:
+      "200":
+        description: Đã thêm vào giỏ
+      "400":
+        description: Sản phẩm không hợp lệ hoặc hết hàng
+
+/api/v1/cart/update:
+  post:
+    tags: [Cart]
+    summary: Cập nhật số lượng sản phẩm trong giỏ
+    security: [{ clientAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [productId, quantity]
+            properties:
+              productId: { type: string }
+              quantity: { type: integer, minimum: 1 }
+    responses:
+      "200":
+        description: Đã cập nhật
+
+/api/v1/cart/remove:
+  post:
+    tags: [Cart]
+    summary: Xóa một sản phẩm khỏi giỏ
+    security: [{ clientAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              productId: { type: string }
+    responses:
+      "200":
+        description: Đã xóa
+
+/api/v1/cart/remove-many:
+  post:
+    tags: [Cart]
+    summary: Xóa nhiều sản phẩm khỏi giỏ (sau khi thanh toán)
+    security: [{ clientAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              productIds:
+                type: array
+                items: { type: string }
+    responses:
+      "200":
+        description: Đã xóa
+
+/api/v1/cart/clear:
+  post:
+    tags: [Cart]
+    summary: Xóa toàn bộ giỏ hàng
+    security: [{ clientAuth: [] }]
+    responses:
+      "200":
+        description: Đã xóa tất cả
+
+# ═══════════════════════════════════════════════════════════════
+# ORDERS (CLIENT — cần đăng nhập)
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/orders:
+  post:
+    tags: [Orders]
+    summary: Tạo đơn hàng (COD/transfer/online)
+    description: Tạo đơn hàng. Sau khi tạo thành công, email xác nhận sẽ được gửi tới khách hàng.
+    security: [{ clientAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [contact, orderItems, paymentMethod]
+            properties:
+              contact:
+                $ref: '#/components/schemas/OrderContact'
+              orderItems:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    productId: { type: string }
+                    quantity: { type: integer }
+              paymentMethod:
+                type: string
+                enum: [transfer, contact, vnpay, momo, zalopay]
+              promoCode: { type: string }
+    responses:
+      "200":
+        description: Đơn hàng đã tạo
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean }
+                order: { $ref: '#/components/schemas/Order' }
+      "400":
+        description: Dữ liệu không hợp lệ
+
+/api/v1/orders/pending:
+  post:
+    tags: [Orders]
+    summary: Tạo đơn hàng tạm (để lấy orderId trước khi thanh toán online)
+    security: [{ clientAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              contact: { $ref: '#/components/schemas/OrderContact' }
+              orderItems:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    productId: { type: string }
+                    quantity: { type: integer }
+              paymentMethod: { type: string, enum: [vnpay, momo, zalopay] }
+              promoCode: { type: string }
+    responses:
+      "200":
+        description: Đơn hàng tạm — trả về orderId để tạo URL thanh toán
+
+/api/v1/orders/my:
+  get:
+    tags: [Orders]
+    summary: Danh sách đơn hàng của tôi
+    security: [{ clientAuth: [] }]
+    parameters:
+      - name: page
+        in: query
+        schema: { type: integer, default: 1 }
+      - name: limit
+        in: query
+        schema: { type: integer, default: 10 }
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum: [pending, confirmed, shipping, completed, cancelled]
+    responses:
+      "200":
+        description: Danh sách đơn hàng
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                orders:
+                  type: array
+                  items: { $ref: '#/components/schemas/Order' }
+                pagination: { $ref: '#/components/schemas/Pagination' }
+
+/api/v1/orders/{id}:
+  get:
+    tags: [Orders]
+    summary: Chi tiết đơn hàng
+    security: [{ clientAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Chi tiết đơn hàng
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                order: { $ref: '#/components/schemas/Order' }
+      "404":
+        description: Không tìm thấy đơn hàng
+
+/api/v1/orders/cancel/{id}:
+  post:
+    tags: [Orders]
+    summary: Hủy đơn hàng
+    security: [{ clientAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Đã hủy đơn hàng
+      "400":
+        description: Đơn hàng không thể hủy (đã shipping/completed)

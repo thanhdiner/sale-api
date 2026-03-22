@@ -1,0 +1,784 @@
+# ═══════════════════════════════════════════════════════════════
+# ADMIN — AUTH
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/admin/auth/login:
+  post:
+    tags: [Admin — Auth]
+    summary: Đăng nhập Admin
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [username, password]
+            properties:
+              username: { type: string, example: superadmin }
+              password: { type: string, example: "123456" }
+              deviceId: { type: string, description: "Cookie deviceId để bỏ qua 2FA nếu thiết bị đã tin cậy" }
+    responses:
+      "200":
+        description: Đăng nhập thành công (hoặc yêu cầu 2FA)
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  description: Đăng nhập thành công
+                  properties:
+                    accessToken: { type: string }
+                    admin:
+                      type: object
+                      properties:
+                        _id: { type: string }
+                        username: { type: string }
+                        fullName: { type: string }
+                        role: { type: object }
+                - type: object
+                  description: Yêu cầu xác thực 2FA
+                  properties:
+                    require2FA: { type: boolean, example: true }
+                    userId: { type: string }
+      "401":
+        description: Sai tài khoản hoặc mật khẩu
+
+/api/v1/admin/auth/2fa-verify:
+  post:
+    tags: [Admin — Auth]
+    summary: Xác thực mã 2FA (TOTP hoặc backup code)
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [userId, code]
+            properties:
+              userId: { type: string }
+              code: { type: string, example: "123456" }
+              type: { type: string, enum: [totp, backup], default: totp }
+              deviceInfo: { type: object, description: Thông tin thiết bị để lưu trusted device }
+    responses:
+      "200":
+        description: Xác thực thành công — trả về accessToken
+      "400":
+        description: Mã xác thực sai
+
+/api/v1/admin/auth/refresh-token:
+  post:
+    tags: [Admin — Auth]
+    summary: Làm mới access token (dùng refreshToken từ cookie)
+    responses:
+      "200":
+        description: Access token mới
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                accessToken: { type: string }
+      "401":
+        description: Refresh token không hợp lệ hoặc đã hết hạn
+
+/api/v1/admin/auth/logout:
+  post:
+    tags: [Admin — Auth]
+    summary: Đăng xuất Admin (xóa refreshToken)
+    responses:
+      "204":
+        description: Đăng xuất thành công
+
+# ═══════════════════════════════════════════════════════════════
+# ADMIN — ACCOUNTS
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/admin/accounts:
+  get:
+    tags: [Admin — Accounts]
+    summary: Danh sách tài khoản admin
+    security: [{ adminAuth: [] }]
+    responses:
+      "200":
+        description: Danh sách tài khoản
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items: { $ref: '#/components/schemas/AdminAccount' }
+
+/api/v1/admin/accounts/create:
+  post:
+    tags: [Admin — Accounts]
+    summary: Tạo tài khoản admin mới
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            required: [username, email, password, fullName]
+            properties:
+              username: { type: string, example: admin01 }
+              email: { type: string, format: email }
+              password: { type: string, minLength: 6 }
+              fullName: { type: string }
+              role_id: { type: string, description: ObjectId của role }
+              status: { type: string, enum: [active, inactive, banned] }
+              avatarUrl: { type: string, format: binary }
+    responses:
+      "201":
+        description: Tài khoản đã tạo
+      "400":
+        description: Username / email đã tồn tại hoặc thiếu thông tin
+
+/api/v1/admin/accounts/change-password:
+  patch:
+    tags: [Admin — Accounts]
+    summary: Đổi mật khẩu (tài khoản hiện đang đăng nhập)
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [currentPassword, newPassword]
+            properties:
+              currentPassword: { type: string }
+              newPassword: { type: string, minLength: 6 }
+    responses:
+      "200":
+        description: Đổi mật khẩu thành công
+      "401":
+        description: Mật khẩu hiện tại không đúng
+
+/api/v1/admin/accounts/edit/{id}:
+  patch:
+    tags: [Admin — Accounts]
+    summary: Chỉnh sửa tài khoản admin
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      content:
+        multipart/form-data:
+          schema:
+            type: object
+            properties:
+              email: { type: string, format: email }
+              fullName: { type: string }
+              role_id: { type: string }
+              status: { type: string, enum: [active, inactive, banned] }
+              newPassword: { type: string }
+              avatarUrl: { type: string, format: binary }
+    responses:
+      "200":
+        description: Cập nhật thành công
+      "404":
+        description: Không tìm thấy tài khoản
+
+/api/v1/admin/accounts/delete/{id}:
+  patch:
+    tags: [Admin — Accounts]
+    summary: Xóa tài khoản admin (soft delete)
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Xóa thành công
+      "403":
+        description: Không thể xóa Super Admin
+
+/api/v1/admin/accounts/change-status/{id}:
+  patch:
+    tags: [Admin — Accounts]
+    summary: Đổi trạng thái tài khoản (active/inactive/banned)
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [status]
+            properties:
+              status: { type: string, enum: [active, inactive, banned] }
+    responses:
+      "200":
+        description: Cập nhật trạng thái thành công
+
+/api/v1/admin/accounts/update-avatar/{id}:
+  patch:
+    tags: [Admin — Accounts]
+    summary: Cập nhật avatar tài khoản (qua URL)
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              avatarUrl: { type: string, example: "https://res.cloudinary.com/..." }
+    responses:
+      "200":
+        description: Cập nhật avatar thành công
+
+/api/v1/admin/accounts/update-profile/{id}:
+  patch:
+    tags: [Admin — Accounts]
+    summary: Cập nhật họ tên
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [fullName]
+            properties:
+              fullName: { type: string }
+    responses:
+      "200":
+        description: Cập nhật thành công
+
+# ── 2FA ──────────────────────────────────────────────────────────
+
+/api/v1/admin/accounts/2fa/status:
+  get:
+    tags: [Admin — Accounts]
+    summary: Kiểm tra trạng thái 2FA
+    security: [{ adminAuth: [] }]
+    responses:
+      "200":
+        description: Trạng thái 2FA
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled: { type: boolean }
+                backupCodes: { type: array, items: { type: string } }
+
+/api/v1/admin/accounts/2fa/generate:
+  post:
+    tags: [Admin — Accounts]
+    summary: Sinh mã QR để kích hoạt 2FA (Google Authenticator)
+    security: [{ adminAuth: [] }]
+    responses:
+      "200":
+        description: Secret và QR code
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                secret: { type: string }
+                qrUrl: { type: string, description: Data URL ảnh QR }
+
+/api/v1/admin/accounts/2fa/verify:
+  post:
+    tags: [Admin — Accounts]
+    summary: Xác minh TOTP để bật 2FA
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [code]
+            properties:
+              code: { type: string, example: "123456" }
+    responses:
+      "200":
+        description: 2FA đã bật — trả về backup codes
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success: { type: boolean }
+                backupCodes: { type: array, items: { type: string } }
+
+/api/v1/admin/accounts/2fa/disable:
+  post:
+    tags: [Admin — Accounts]
+    summary: Tắt 2FA
+    security: [{ adminAuth: [] }]
+    responses:
+      "200":
+        description: 2FA đã tắt
+
+/api/v1/admin/accounts/2fa/backup-codes:
+  post:
+    tags: [Admin — Accounts]
+    summary: Tạo lại backup codes
+    security: [{ adminAuth: [] }]
+    responses:
+      "200":
+        description: Danh sách backup codes mới
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                codes: { type: array, items: { type: string } }
+
+# ── Trusted Devices ───────────────────────────────────────────────
+
+/api/v1/admin/accounts/trusted-devices:
+  get:
+    tags: [Admin — Accounts]
+    summary: Danh sách thiết bị tin cậy
+    security: [{ adminAuth: [] }]
+    responses:
+      "200":
+        description: Danh sách thiết bị
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                devices:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      deviceId: { type: string }
+                      name: { type: string }
+                      browser: { type: string }
+                      location: { type: string }
+                      lastUsed: { type: string, format: date-time }
+                      current: { type: boolean }
+  post:
+    tags: [Admin — Accounts]
+    summary: Thêm thiết bị tin cậy
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [deviceId]
+            properties:
+              deviceId: { type: string }
+              name: { type: string }
+              browser: { type: string }
+              location: { type: string }
+    responses:
+      "200":
+        description: Đã lưu thiết bị tin cậy
+
+/api/v1/admin/accounts/trusted-devices/{deviceId}:
+  delete:
+    tags: [Admin — Accounts]
+    summary: Xóa thiết bị tin cậy
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: deviceId
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Xóa thành công
+      "404":
+        description: Không tìm thấy thiết bị
+
+# ═══════════════════════════════════════════════════════════════
+# ADMIN — ROLES
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/admin/roles:
+  get:
+    tags: [Admin — Roles]
+    summary: Danh sách vai trò
+    security: [{ adminAuth: [] }]
+    responses:
+      "200":
+        description: Danh sách roles
+
+/api/v1/admin/roles/create:
+  post:
+    tags: [Admin — Roles]
+    summary: Tạo vai trò mới
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [label]
+            properties:
+              label: { type: string, example: "Editor" }
+              description: { type: string }
+              permissions: { type: array, items: { type: string } }
+    responses:
+      "201":
+        description: Vai trò đã tạo
+
+/api/v1/admin/roles/edit/{id}:
+  patch:
+    tags: [Admin — Roles]
+    summary: Cập nhật vai trò
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              label: { type: string }
+              description: { type: string }
+              permissions: { type: array, items: { type: string } }
+    responses:
+      "200":
+        description: Cập nhật thành công
+
+/api/v1/admin/roles/delete/{id}:
+  patch:
+    tags: [Admin — Roles]
+    summary: Xóa vai trò (soft delete)
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Đã xóa
+
+/api/v1/admin/roles/toggle-active/{id}:
+  patch:
+    tags: [Admin — Roles]
+    summary: Bật/tắt trạng thái vai trò
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Đã đổi trạng thái
+
+# ═══════════════════════════════════════════════════════════════
+# ADMIN — PERMISSIONS
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/admin/permissions:
+  get:
+    tags: [Admin — Permissions]
+    summary: Danh sách quyền
+    security: [{ adminAuth: [] }]
+    responses:
+      "200":
+        description: Danh sách permissions
+
+/api/v1/admin/permissions/create:
+  post:
+    tags: [Admin — Permissions]
+    summary: Tạo quyền mới
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [name, label]
+            properties:
+              name: { type: string, example: view_products }
+              label: { type: string, example: "Xem sản phẩm" }
+              group_id: { type: string }
+    responses:
+      "201":
+        description: Quyền đã tạo
+
+/api/v1/admin/permissions/edit/{id}:
+  patch:
+    tags: [Admin — Permissions]
+    summary: Cập nhật quyền
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              label: { type: string }
+              group_id: { type: string }
+    responses:
+      "200":
+        description: Cập nhật thành công
+
+/api/v1/admin/permissions/delete/{id}:
+  patch:
+    tags: [Admin — Permissions]
+    summary: Xóa quyền
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Đã xóa
+
+# ═══════════════════════════════════════════════════════════════
+# ADMIN — PERMISSION GROUPS
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/admin/permission-groups:
+  get:
+    tags: [Admin — Permissions]
+    summary: Danh sách nhóm quyền
+    security: [{ adminAuth: [] }]
+    responses:
+      "200":
+        description: Danh sách permission groups
+
+/api/v1/admin/permission-groups/create:
+  post:
+    tags: [Admin — Permissions]
+    summary: Tạo nhóm quyền
+    security: [{ adminAuth: [] }]
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [label]
+            properties:
+              label: { type: string, example: "Nhóm quản lý sản phẩm" }
+    responses:
+      "201":
+        description: Nhóm quyền đã tạo
+
+/api/v1/admin/permission-groups/edit/{id}:
+  patch:
+    tags: [Admin — Permissions]
+    summary: Cập nhật nhóm quyền
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              label: { type: string }
+    responses:
+      "200":
+        description: Cập nhật thành công
+
+/api/v1/admin/permission-groups/delete/{id}:
+  patch:
+    tags: [Admin — Permissions]
+    summary: Xóa nhóm quyền
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Đã xóa
+
+/api/v1/admin/permission-groups/toggle-active/{id}:
+  patch:
+    tags: [Admin — Permissions]
+    summary: Bật/tắt nhóm quyền
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Đã đổi trạng thái
+
+# ═══════════════════════════════════════════════════════════════
+# ADMIN — ORDERS
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/admin/orders:
+  get:
+    tags: [Admin — Orders]
+    summary: Danh sách đơn hàng (có lọc, phân trang)
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: page
+        in: query
+        schema: { type: integer, default: 1 }
+      - name: limit
+        in: query
+        schema: { type: integer, default: 10 }
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum: [pending, confirmed, shipping, completed, cancelled]
+      - name: paymentStatus
+        in: query
+        schema: { type: string, enum: [pending, paid, failed] }
+      - name: search
+        in: query
+        description: Tìm theo tên khách, số điện thoại
+        schema: { type: string }
+    responses:
+      "200":
+        description: Danh sách đơn hàng
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                orders:
+                  type: array
+                  items: { $ref: '#/components/schemas/Order' }
+                total: { type: integer }
+                currentPage: { type: integer }
+                totalPage: { type: integer }
+
+/api/v1/admin/orders/{id}:
+  get:
+    tags: [Admin — Orders]
+    summary: Chi tiết đơn hàng
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Chi tiết đơn hàng
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                order: { $ref: '#/components/schemas/Order' }
+      "404":
+        description: Không tìm thấy
+  patch:
+    tags: [Admin — Orders]
+    summary: Cập nhật trạng thái đơn hàng
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status:
+                type: string
+                enum: [pending, confirmed, shipping, completed, cancelled]
+              paymentStatus: { type: string, enum: [pending, paid, failed] }
+    responses:
+      "200":
+        description: Cập nhật thành công
+
+/api/v1/admin/orders/delete/{id}:
+  patch:
+    tags: [Admin — Orders]
+    summary: Xóa đơn hàng (soft delete)
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Đã xóa
+
+# ═══════════════════════════════════════════════════════════════
+# ADMIN — DASHBOARD
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/admin/dashboard:
+  get:
+    tags: [Admin — Dashboard]
+    summary: Dữ liệu tổng quan Dashboard
+    security: [{ adminAuth: [] }]
+    parameters:
+      - name: period
+        in: query
+        description: "Khoảng thời gian: today | week | month | year"
+        schema:
+          type: string
+          enum: [today, week, month, year]
+          default: month
+    responses:
+      "200":
+        description: Thống kê tổng quan
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                totalRevenue: { type: number }
+                totalOrders: { type: integer }
+                totalCustomers: { type: integer }
+                totalProducts: { type: integer }
+                revenueChart: { type: array, items: { type: object } }
+                recentOrders:
+                  type: array
+                  items: { $ref: '#/components/schemas/Order' }

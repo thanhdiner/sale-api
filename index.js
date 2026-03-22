@@ -97,6 +97,19 @@ const routeApiV1 = require('./api/v1/routes/client/index.route')
 routeApiV1Admin(app)
 routeApiV1(app)
 
+// ─── Swagger Documentation ───────────────────────────────────────────────────
+const swaggerUi = require('swagger-ui-express')
+const swaggerSpec = require('./config/swagger')
+
+const swaggerOptions = {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'SmartMall API Documentation',
+  customfavIcon: '/favicon.ico'
+}
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, swaggerOptions))
+app.use('/docs', (req, res) => res.redirect('/api-docs'))
+
 // ─── Global Error Handlers ───────────────────────────────────────────────────
 // Order matters: notFound FIRST then errorHandler
 app.use(notFound)

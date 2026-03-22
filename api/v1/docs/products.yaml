@@ -1,0 +1,145 @@
+# ═══════════════════════════════════════════════════════════════
+# PRODUCTS (PUBLIC)
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/products:
+  get:
+    tags: [Products]
+    summary: Danh sách sản phẩm (có lọc, phân trang, tìm kiếm)
+    parameters:
+      - name: page
+        in: query
+        schema: { type: integer, default: 1 }
+      - name: limit
+        in: query
+        schema: { type: integer, default: 12 }
+      - name: search
+        in: query
+        description: Tìm kiếm theo tên
+        schema: { type: string }
+      - name: category
+        in: query
+        description: Slug danh mục
+        schema: { type: string }
+      - name: minPrice
+        in: query
+        schema: { type: number }
+      - name: maxPrice
+        in: query
+        schema: { type: number }
+      - name: sort
+        in: query
+        description: "Sắp xếp: price_asc | price_desc | newest | bestseller"
+        schema:
+          type: string
+          enum: [price_asc, price_desc, newest, bestseller]
+      - name: rating
+        in: query
+        schema: { type: integer, minimum: 1, maximum: 5 }
+    responses:
+      "200":
+        description: Danh sách sản phẩm
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                products:
+                  type: array
+                  items: { $ref: '#/components/schemas/Product' }
+                pagination: { $ref: '#/components/schemas/Pagination' }
+
+/api/v1/products/suggest:
+  get:
+    tags: [Products]
+    summary: Gợi ý từ khóa tìm kiếm (search suggest)
+    parameters:
+      - name: query
+        in: query
+        required: true
+        schema: { type: string, example: "iphone" }
+      - name: limit
+        in: query
+        schema: { type: integer, default: 10 }
+    responses:
+      "200":
+        description: Danh sách từ khóa gợi ý
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                suggestions:
+                  type: array
+                  items: { type: string }
+                  example: ["iPhone 15", "iPhone 14 Pro", "iPhone SE"]
+
+/api/v1/products/{slug}:
+  get:
+    tags: [Products]
+    summary: Chi tiết sản phẩm
+    parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: { type: string, example: iphone-15-pro }
+    responses:
+      "200":
+        description: Chi tiết sản phẩm
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Product' }
+      "404":
+        description: Không tìm thấy sản phẩm
+
+# ═══════════════════════════════════════════════════════════════
+# PRODUCT CATEGORIES (PUBLIC)
+# ═══════════════════════════════════════════════════════════════
+
+/api/v1/product-categories:
+  get:
+    tags: [Product Categories]
+    summary: Danh sách danh mục sản phẩm
+    responses:
+      "200":
+        description: Danh sách danh mục
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                data:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      _id: { type: string }
+                      title: { type: string }
+                      slug: { type: string }
+                      thumbnail: { type: string }
+                      children:
+                        type: array
+                        items: { type: object }
+
+/api/v1/product-categories/tree:
+  get:
+    tags: [Product Categories]
+    summary: Cây danh mục (nested)
+    responses:
+      "200":
+        description: Cây danh mục nested
+
+/api/v1/product-categories/{slug}:
+  get:
+    tags: [Product Categories]
+    summary: Chi tiết danh mục theo slug
+    parameters:
+      - name: slug
+        in: path
+        required: true
+        schema: { type: string }
+    responses:
+      "200":
+        description: Chi tiết danh mục
+      "404":
+        description: Không tìm thấy
