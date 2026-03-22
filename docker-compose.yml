@@ -19,12 +19,30 @@ services:
       - /app/node_modules    # Preserve container's node_modules
     environment:
       - NODE_ENV=development
+      - REDIS_URL=redis://redis:6379
     env_file:
       - .env
     command: npx nodemon index.js
+    depends_on:
+      - redis
+    networks:
+      - sales-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: sales-redis-dev
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
     networks:
       - sales-net
 
 networks:
   sales-net:
     driver: bridge
+
+volumes:
+  redis-data:

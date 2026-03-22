@@ -54,6 +54,10 @@ app.use(morganMiddleware)
 // ─── Database ────────────────────────────────────────────────────────────────
 database.connect()
 
+// ─── Redis ───────────────────────────────────────────────────────────────────
+const redis = require('./config/redis')
+redis.getClient().connect().catch(() => {}) // graceful — không crash nếu Redis offline
+
 // ─── Socket.IO ───────────────────────────────────────────────────────────────
 const io = new Server(server, {
   cors: {
