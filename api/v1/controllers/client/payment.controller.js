@@ -2,22 +2,36 @@ const Order = require('../../models/order.model')
 const vnpay = require('../../services/payment/vnpay.service')
 const momo = require('../../services/payment/momo.service')
 const zalopay = require('../../services/payment/zalopay.service')
+const { getClientIp } = require('../../helpers/networkHelper')
+const { getIO } = require('../../helpers/socket')
 
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000'
 
 // ─────────────────────────────────────────
-// HELPERS
+// HELPER — emit socket sau khi thanh toán xác nhận
 // ─────────────────────────────────────────
-function getClientIp(req) {
-  const raw =
-    req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
-    req.socket?.remoteAddress ||
-    '127.0.0.1'
-  // Chuyển IPv6 loopback sang IPv4 (VNPay chỉ chấp nhận IPv4)
-  if (raw === '::1' || raw === '::ffff:127.0.0.1') return '127.0.0.1'
-  // Strip IPv6-mapped IPv4 prefix (::ffff:x.x.x.x)
-  if (raw.startsWith('::ffff:')) return raw.slice(7)
-  return raw
+function emitOrderConfirmed(order) {
+  try {
+    const io = getIO()
+    // Notify admin: có đơn hàng mới được thanh toán
+    io.to('admin').emit('new_order', {
+      _id: order._id,
+      contact: order.contact,
+      total: order.total,
+      paymentMethod: order.paymentMethod,
+      createdAt: order.createdAt
+    })
+    // Notify đúng user: đơn hàng đã xác nhận
+    if (order.userId) {
+      io.to(`user_${order.userId}`).emit('order_status_updated', {
+        _id: order._id,
+        status: order.status,
+        paymentStatus: order.paymentStatus
+      })
+    }
+  } catch (e) {
+    // Socket chưa sẵn sàng — không block luồng chính
+  }
 }
 
 // ─────────────────────────────────────────
@@ -64,6 +78,7 @@ module.exports.vnpayReturn = async (req, res) => {
         order.status = 'confirmed'
       }
       await order.save()
+      if (isSuccess) emitOrderConfirmed(order)
     }
 
     if (isSuccess) {
@@ -119,9 +134,9 @@ module.exports.momoCallback = async (req, res) => {
         order.status = 'confirmed'
       }
       await order.save()
+      if (isSuccess) emitOrderConfirmed(order)
     }
 
-    // MoMo yêu cầu response 204 hoặc JSON rỗng
     res.status(204).send()
   } catch (err) {
     console.error('[MoMo] callback error:', err)
@@ -172,9 +187,9 @@ module.exports.zalopayCallback = async (req, res) => {
         order.status = 'confirmed'
       }
       await order.save()
+      if (isSuccess) emitOrderConfirmed(order)
     }
 
-    // ZaloPay yêu cầu return_code:1
     res.json({ return_code: 1, return_message: 'success' })
   } catch (err) {
     console.error('[ZaloPay] callback error:', err)

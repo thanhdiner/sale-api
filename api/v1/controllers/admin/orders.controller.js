@@ -1,5 +1,6 @@
 const Order = require('../../models/order.model')
 const removeAccents = require('remove-accents')
+const { getIO } = require('../../helpers/socket')
 
 //# GET /api/v1/orders
 module.exports.getAllOrders = async (req, res) => {
@@ -76,6 +77,18 @@ module.exports.updateOrderStatus = async (req, res) => {
     if (transferInfo) order.transferInfo = transferInfo
 
     await order.save()
+
+    // Notify client realtime về trạng thái đơn hàng
+    try {
+      if (order.userId) {
+        getIO().to(`user_${order.userId}`).emit('order_status_updated', {
+          _id: order._id,
+          status: order.status,
+          paymentStatus: order.paymentStatus
+        })
+      }
+    } catch {}
+
     res.json({ success: true, order })
   } catch (err) {
     res.status(500).json({ error: 'Lỗi cập nhật đơn hàng' })

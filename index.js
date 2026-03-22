@@ -1,36 +1,30 @@
 require('dotenv').config()
 
 const express = require('express')
+const http = require('http')
+const { Server } = require('socket.io')
 const helmet = require('helmet')
 const cors = require('cors')
 const cookieParser = require('cookie-parser')
 const database = require('./config/database')
+const { initIO } = require('./api/v1/helpers/socket')
 
 const app = express()
+const server = http.createServer(app)
 const port = process.env.PORT
 
+const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000'
+
 // ─── Security Headers ────────────────────────────────────────────────────────
-// Helmet thêm các HTTP security headers quan trọng:
-//   X-DNS-Prefetch-Control, X-Frame-Options (clickjacking), X-Content-Type-Options (MIME sniffing),
-//   Strict-Transport-Security (HSTS), X-Download-Options, Referrer-Policy,
-//   X-Permitted-Cross-Domain-Policies, X-XSS-Protection...
 app.use(
   helmet({
-    // Tắt CSP vì đây là REST API thuần (không render HTML)
     contentSecurityPolicy: false,
-    // Tắt CORP để client không bị block khi load Cloudinary images/videos
     crossOriginResourcePolicy: false,
-    // Tắt COEP vì không dùng SharedArrayBuffer
     crossOriginEmbedderPolicy: false,
-    // Giữ nguyên tất cả các header khác
     dnsPrefetchControl: { allow: false },
     frameguard: { action: 'deny' },
     hidePoweredBy: true,
-    hsts: {
-      maxAge: 31536000,       // 1 năm
-      includeSubDomains: true,
-      preload: true
-    },
+    hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
     ieNoOpen: true,
     noSniff: true,
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
@@ -41,7 +35,7 @@ app.use(
 // ─── CORS ────────────────────────────────────────────────────────────────────
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || 'https://smartmall.site',
+    origin: CLIENT_URL,
     credentials: true
   })
 )
@@ -53,6 +47,38 @@ app.use(cookieParser())
 // ─── Database ────────────────────────────────────────────────────────────────
 database.connect()
 
+// ─── Socket.IO ───────────────────────────────────────────────────────────────
+const io = new Server(server, {
+  cors: {
+    origin: CLIENT_URL,
+    credentials: true
+  }
+})
+
+// Đăng ký io vào singleton (dùng được ở controllers)
+initIO(io)
+
+io.on('connection', socket => {
+  console.log(`[Socket] Client connected: ${socket.id}`)
+
+  // Client tự join vào room theo role
+  // Frontend emit: socket.emit('join', { role: 'admin' | 'user', userId })
+  socket.on('join', ({ role, userId }) => {
+    if (role === 'admin') {
+      socket.join('admin')
+      console.log(`[Socket] Admin joined: ${socket.id}`)
+    }
+    if (userId) {
+      socket.join(`user_${userId}`)
+      console.log(`[Socket] User ${userId} joined`)
+    }
+  })
+
+  socket.on('disconnect', () => {
+    console.log(`[Socket] Client disconnected: ${socket.id}`)
+  })
+})
+
 // ─── Routes ──────────────────────────────────────────────────────────────────
 const routeApiV1Admin = require('./api/v1/routes/admin/index.route')
 const routeApiV1 = require('./api/v1/routes/client/index.route')
@@ -61,6 +87,6 @@ routeApiV1Admin(app)
 routeApiV1(app)
 
 // ─── Start ───────────────────────────────────────────────────────────────────
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`Start on PORT: ${port}`)
 })

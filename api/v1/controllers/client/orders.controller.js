@@ -3,6 +3,7 @@ const PromoCode = require('../../models/promoCode.model')
 const Product = require('../../models/products.model')
 const FlashSale = require('../../models/flashSale.model')
 const removeAccents = require('remove-accents')
+const { getIO } = require('../../helpers/socket')
 
 //# POST /api/v1/orders
 module.exports.createOrder = async (req, res) => {
@@ -103,6 +104,17 @@ module.exports.createOrder = async (req, res) => {
     }
 
     res.json({ success: true, order: newOrder })
+
+    // Notify admin realtime
+    try {
+      getIO().to('admin').emit('new_order', {
+        _id: newOrder._id,
+        contact: newOrder.contact,
+        total: newOrder.total,
+        paymentMethod: newOrder.paymentMethod,
+        createdAt: newOrder.createdAt
+      })
+    } catch {}
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Lỗi tạo đơn hàng' })
