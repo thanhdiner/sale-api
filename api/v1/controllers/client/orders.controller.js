@@ -2,11 +2,32 @@ const Order = require('../../models/order.model')
 const PromoCode = require('../../models/promoCode.model')
 const Product = require('../../models/products.model')
 const FlashSale = require('../../models/flashSale.model')
+const User = require('../../models/user.model')
 const removeAccents = require('remove-accents')
 const logger = require('../../../../config/logger')
 const { getIO } = require('../../helpers/socket')
 const { sendMail } = require('../../../../config/mailer')
 const { orderConfirmedTemplate } = require('../../utils/emailTemplates')
+
+/**
+ * Resolve the best email to send the order confirmation to.
+ * Priority: contact.email → user account email → null (skip)
+ */
+const resolveOrderEmail = async order => {
+  if (order.contact?.email) {
+    logger.debug(`[Mailer] Using contact.email: ${order.contact.email}`)
+    return order.contact.email
+  }
+  if (order.userId) {
+    const user = await User.findById(order.userId).select('email').lean()
+    if (user?.email) {
+      logger.debug(`[Mailer] contact.email empty — fallback to user.email: ${user.email}`)
+      return user.email
+    }
+  }
+  logger.warn(`[Mailer] No email found for order ${order._id} — skipping email`)
+  return null
+}
 
 //# POST /api/v1/orders
 module.exports.createOrder = async (req, res) => {
@@ -120,11 +141,12 @@ module.exports.createOrder = async (req, res) => {
     } catch {}
 
     // Send confirmation email (fire-and-forget)
-    const recipientEmail = newOrder.contact?.email
-    if (recipientEmail) {
-      const { subject, html } = orderConfirmedTemplate(newOrder)
-      sendMail({ to: recipientEmail, subject, html })
-    }
+    resolveOrderEmail(newOrder).then(to => {
+      if (to) {
+        const { subject, html } = orderConfirmedTemplate(newOrder)
+        sendMail({ to, subject, html })
+      }
+    }).catch(err => logger.error('[Mailer] resolveOrderEmail error:', err))
   } catch (err) {
     logger.error('[Client] createOrder error:', err)
     res.status(500).json({ error: 'Lỗi tạo đơn hàng' })

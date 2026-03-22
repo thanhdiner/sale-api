@@ -7,6 +7,20 @@ const logger = require('../../../../config/logger')
 const { getIO } = require('../../helpers/socket')
 const { sendMail } = require('../../../../config/mailer')
 const { paymentSuccessTemplate } = require('../../utils/emailTemplates')
+const User = require('../../models/user.model')
+
+const resolveOrderEmail = async order => {
+  if (order.contact?.email) return order.contact.email
+  if (order.userId) {
+    const user = await User.findById(order.userId).select('email').lean()
+    if (user?.email) {
+      logger.debug(`[Mailer] payment: fallback to user.email: ${user.email}`)
+      return user.email
+    }
+  }
+  logger.warn(`[Mailer] No email for order ${order._id} — skipping`)
+  return null
+}
 
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000'
 
@@ -33,11 +47,12 @@ function emitOrderConfirmed(order) {
   } catch (e) {}
 
   // Send payment success email (fire-and-forget)
-  const recipientEmail = order.contact?.email
-  if (recipientEmail) {
-    const { subject, html } = paymentSuccessTemplate(order)
-    sendMail({ to: recipientEmail, subject, html })
-  }
+  resolveOrderEmail(order).then(to => {
+    if (to) {
+      const { subject, html } = paymentSuccessTemplate(order)
+      sendMail({ to, subject, html })
+    }
+  }).catch(err => logger.error('[Mailer] payment resolveEmail error:', err))
 }
 
 // ─────────────────────────────────────────

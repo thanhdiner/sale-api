@@ -4,6 +4,20 @@ const logger = require('../../../../config/logger')
 const { getIO } = require('../../helpers/socket')
 const { sendMail } = require('../../../../config/mailer')
 const { orderStatusUpdatedTemplate } = require('../../utils/emailTemplates')
+const User = require('../../models/user.model')
+
+const resolveOrderEmail = async order => {
+  if (order.contact?.email) return order.contact.email
+  if (order.userId) {
+    const user = await User.findById(order.userId).select('email').lean()
+    if (user?.email) {
+      logger.debug(`[Mailer] admin: fallback to user.email: ${user.email}`)
+      return user.email
+    }
+  }
+  logger.warn(`[Mailer] No email for order ${order._id} — skipping`)
+  return null
+}
 
 //# GET /api/v1/orders
 module.exports.getAllOrders = async (req, res) => {
@@ -99,12 +113,15 @@ module.exports.updateOrderStatus = async (req, res) => {
 
     res.json({ success: true, order })
 
-    // Send status update email (fire-and-forget, only for meaningful statuses)
+    // Send status update email (fire-and-forget)
     const notifyStatuses = ['confirmed', 'shipping', 'completed', 'cancelled']
-    const recipientEmail = order.contact?.email
-    if (recipientEmail && notifyStatuses.includes(order.status)) {
-      const { subject, html } = orderStatusUpdatedTemplate(order)
-      sendMail({ to: recipientEmail, subject, html })
+    if (notifyStatuses.includes(order.status)) {
+      resolveOrderEmail(order).then(to => {
+        if (to) {
+          const { subject, html } = orderStatusUpdatedTemplate(order)
+          sendMail({ to, subject, html })
+        }
+      }).catch(err => logger.error('[Mailer] admin resolveEmail error:', err))
     }
   } catch (err) {
     res.status(500).json({ error: 'Lỗi cập nhật đơn hàng' })
