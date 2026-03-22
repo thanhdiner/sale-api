@@ -9,6 +9,8 @@ const cookieParser = require('cookie-parser')
 const database = require('./config/database')
 const logger = require('./config/logger')
 const morganMiddleware = require('./api/v1/middlewares/morgan.middleware')
+const notFound = require('./api/v1/middlewares/notFound.middleware')
+const errorHandler = require('./api/v1/middlewares/errorHandler.middleware')
 const { initIO } = require('./api/v1/helpers/socket')
 
 const app = express()
@@ -90,6 +92,11 @@ const routeApiV1 = require('./api/v1/routes/client/index.route')
 
 routeApiV1Admin(app)
 routeApiV1(app)
+
+// ─── Global Error Handlers ───────────────────────────────────────────────────
+// Order matters: notFound FIRST then errorHandler
+app.use(notFound)
+app.use(errorHandler)
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 server.listen(port, () => {
