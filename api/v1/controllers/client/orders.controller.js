@@ -5,6 +5,8 @@ const FlashSale = require('../../models/flashSale.model')
 const removeAccents = require('remove-accents')
 const logger = require('../../../../config/logger')
 const { getIO } = require('../../helpers/socket')
+const { sendMail } = require('../../../../config/mailer')
+const { orderConfirmedTemplate } = require('../../utils/emailTemplates')
 
 //# POST /api/v1/orders
 module.exports.createOrder = async (req, res) => {
@@ -116,6 +118,13 @@ module.exports.createOrder = async (req, res) => {
         createdAt: newOrder.createdAt
       })
     } catch {}
+
+    // Send confirmation email (fire-and-forget)
+    const recipientEmail = newOrder.contact?.email
+    if (recipientEmail) {
+      const { subject, html } = orderConfirmedTemplate(newOrder)
+      sendMail({ to: recipientEmail, subject, html })
+    }
   } catch (err) {
     logger.error('[Client] createOrder error:', err)
     res.status(500).json({ error: 'Lỗi tạo đơn hàng' })

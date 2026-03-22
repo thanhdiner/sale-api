@@ -2,6 +2,8 @@ const Order = require('../../models/order.model')
 const removeAccents = require('remove-accents')
 const logger = require('../../../../config/logger')
 const { getIO } = require('../../helpers/socket')
+const { sendMail } = require('../../../../config/mailer')
+const { orderStatusUpdatedTemplate } = require('../../utils/emailTemplates')
 
 //# GET /api/v1/orders
 module.exports.getAllOrders = async (req, res) => {
@@ -96,6 +98,14 @@ module.exports.updateOrderStatus = async (req, res) => {
     }
 
     res.json({ success: true, order })
+
+    // Send status update email (fire-and-forget, only for meaningful statuses)
+    const notifyStatuses = ['confirmed', 'shipping', 'completed', 'cancelled']
+    const recipientEmail = order.contact?.email
+    if (recipientEmail && notifyStatuses.includes(order.status)) {
+      const { subject, html } = orderStatusUpdatedTemplate(order)
+      sendMail({ to: recipientEmail, subject, html })
+    }
   } catch (err) {
     res.status(500).json({ error: 'Lỗi cập nhật đơn hàng' })
   }

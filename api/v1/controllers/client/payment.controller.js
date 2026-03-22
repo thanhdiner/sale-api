@@ -5,6 +5,8 @@ const zalopay = require('../../services/payment/zalopay.service')
 const { getClientIp } = require('../../helpers/networkHelper')
 const logger = require('../../../../config/logger')
 const { getIO } = require('../../helpers/socket')
+const { sendMail } = require('../../../../config/mailer')
+const { paymentSuccessTemplate } = require('../../utils/emailTemplates')
 
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000'
 
@@ -14,7 +16,6 @@ const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000'
 function emitOrderConfirmed(order) {
   try {
     const io = getIO()
-    // Notify admin: có đơn hàng mới được thanh toán
     io.to('admin').emit('new_order', {
       _id: order._id,
       contact: order.contact,
@@ -22,7 +23,6 @@ function emitOrderConfirmed(order) {
       paymentMethod: order.paymentMethod,
       createdAt: order.createdAt
     })
-    // Notify đúng user: đơn hàng đã xác nhận
     if (order.userId) {
       io.to(`user_${order.userId}`).emit('order_status_updated', {
         _id: order._id,
@@ -30,8 +30,13 @@ function emitOrderConfirmed(order) {
         paymentStatus: order.paymentStatus
       })
     }
-  } catch (e) {
-    // Socket chưa sẵn sàng — không block luồng chính
+  } catch (e) {}
+
+  // Send payment success email (fire-and-forget)
+  const recipientEmail = order.contact?.email
+  if (recipientEmail) {
+    const { subject, html } = paymentSuccessTemplate(order)
+    sendMail({ to: recipientEmail, subject, html })
   }
 }
 
