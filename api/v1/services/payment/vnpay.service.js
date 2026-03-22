@@ -1,5 +1,6 @@
 const crypto = require('crypto')
 const qs = require('qs')
+const logger = require('../../../../config/logger')
 
 const VNPAY_CONFIG = {
   tmnCode: process.env.VNPAY_TMN_CODE || 'DEMO1234',
@@ -71,8 +72,8 @@ function createPaymentUrl({ orderId, amount, orderInfo, clientIp = '127.0.0.1', 
   sortedParams.vnp_SecureHash = secureHash
   const paymentUrl = `${VNPAY_CONFIG.vnpUrl}?${qs.stringify(sortedParams, { encode: false })}`
 
-  console.log('[VNPay] signData:', signData)
-  console.log('[VNPay] secureHash:', secureHash)
+  logger.debug('[VNPay] signData:', { signData })
+  logger.debug('[VNPay] secureHash:', { secureHash })
 
   return paymentUrl
 }

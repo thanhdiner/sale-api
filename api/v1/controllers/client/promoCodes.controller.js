@@ -1,4 +1,5 @@
 const PromoCode = require('../../models/promoCode.model')
+const logger = require('../../../../config/logger')
 
 //# GET /api/v1/promo-codes
 module.exports.getPromoCodes = async (req, res) => {
@@ -7,7 +8,7 @@ module.exports.getPromoCodes = async (req, res) => {
 
     res.json({ success: true, promoCodes })
   } catch (err) {
-    console.error(err)
+    logger.error('[Client] getPromoCodes error:', err)
     res.status(500).json({ success: false, message: 'Lỗi máy chủ' })
   }
 }

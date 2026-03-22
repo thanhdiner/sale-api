@@ -1,5 +1,6 @@
 const Cart = require('../../models/cart.model')
 const Product = require('../../models/products.model')
+const logger = require('../../../../config/logger')
 
 const getUserId = req => req.user?.userId
 
@@ -91,7 +92,7 @@ exports.add = async (req, res) => {
         slug: product.slug
       })
     }
-    console.log(cart)
+    logger.debug('[Cart] add item:', { userId: getUserId(req), items: cart.items.length })
     cart.updatedAt = new Date()
     await cart.save()
     res.json(cart)

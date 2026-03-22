@@ -1,4 +1,5 @@
 const PromoCode = require('../../models/promoCode.model')
+const logger = require('../../../../config/logger')
 
 //# GET /api/v1/admin/promo-codes
 module.exports.listPromoCodes = async (req, res) => {
@@ -48,7 +49,7 @@ module.exports.updatePromoCode = async (req, res) => {
     const promo = await PromoCode.findByIdAndUpdate(req.params.id, data, { new: true })
     res.json({ success: true, promoCode: promo })
   } catch (err) {
-    console.error('UPDATE PROMO ERROR:', err)
+    logger.error('[Admin] UPDATE PROMO ERROR:', err)
     res.status(400).json({ error: err.message })
   }
 }

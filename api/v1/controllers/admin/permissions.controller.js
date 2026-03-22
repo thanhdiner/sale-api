@@ -1,4 +1,5 @@
 const Permission = require('../../models/permission.model')
+const logger = require('../../../../config/logger')
 
 //# GET /api/v1/admin/permissions
 module.exports.index = async (req, res) => {
@@ -9,7 +10,7 @@ module.exports.index = async (req, res) => {
     const permissions = await Permission.find(query)
     res.json({ data: permissions })
   } catch (err) {
-    console.error('Error getting permissions:', err)
+    logger.error('[Admin] Error getting permissions:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -33,7 +34,7 @@ module.exports.create = async (req, res) => {
 
     res.status(201).json({ message: 'Created', data: permission })
   } catch (err) {
-    console.error('Error creating permission:', err)
+    logger.error('[Admin] Error creating permission:', err)
     return res.status(500).json({ error: 'Internal server error', message: 'Created unsuccessful', status: 500 })
   }
 }
@@ -64,7 +65,7 @@ module.exports.delete = async (req, res) => {
 
     res.status(200).json({ message: 'Deleted', data: deleted })
   } catch (err) {
-    console.error('Error deleting permission:', err)
+    logger.error('[Admin] Error deleting permission:', err)
     res.status(500).json({ error: 'Internal server error', status: 500 })
   }
 }

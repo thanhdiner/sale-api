@@ -8,6 +8,7 @@ const { v4: uuidv4 } = require('uuid')
 const OauthCode = require('../../models/OauthCodeSchema')
 const sendMail = require('../../utils/sendMail')
 const { getVerifyCodeHtml } = require('../../utils/emailTemplates')
+const logger = require('../../../../config/logger')
 
 const ACCESS_SECRET = process.env.ACCESS_SECRET
 const REFRESH_SECRET = process.env.REFRESH_SECRET
@@ -271,7 +272,7 @@ module.exports.githubLoginCallback = async (req, res) => {
 
     res.redirect(`${process.env.CLIENT_URL}/user/oauth-callback?code=${code}`)
   } catch (err) {
-    console.error('githubLoginCallback error:', err)
+    logger.error('[OAuth] githubLoginCallback error:', err)
     res.status(500).send('Lỗi đăng nhập GitHub!')
   }
 }
@@ -445,7 +446,7 @@ module.exports.changePassword = async (req, res) => {
 
     res.json({ message: user.hasPassword ? 'Password changed successfully' : 'Password set successfully' })
   } catch (err) {
-    console.error(err)
+    logger.error('[User] changePassword error:', err)
     res.status(500).json({ error: 'Server error' })
   }
 }

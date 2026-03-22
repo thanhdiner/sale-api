@@ -1,6 +1,7 @@
 const Widget = require('../../models/widgets.model')
 const mongoose = require('mongoose')
 const { deleteImageFromCloudinary } = require('../../utils/cloudinaryUtils')
+const logger = require('../../../../config/logger')
 
 //# GET /api/v1/admin/widgets
 module.exports.index = async (req, res) => {
@@ -22,7 +23,7 @@ module.exports.index = async (req, res) => {
       data: widgets
     })
   } catch (err) {
-    console.error('Error fetching widgets:', err)
+    logger.error('[Admin] Error fetching widgets:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -60,7 +61,7 @@ module.exports.create = async (req, res) => {
       data: savedWidget
     })
   } catch (err) {
-    console.error('Error creating widget:', err)
+    logger.error('[Admin] Error creating widget:', err)
     res.status(500).json({ error: 'Failed to create widget' })
   }
 }
@@ -94,7 +95,7 @@ module.exports.edit = async (req, res) => {
       data: updatedWidget
     })
   } catch (err) {
-    console.error('Error updating widget:', err)
+    logger.error('[Admin] Error updating widget:', err)
     res.status(500).json({ error: 'Failed to update widget' })
   }
 }
@@ -117,7 +118,7 @@ module.exports.delete = async (req, res) => {
       message: 'Widget deleted successfully'
     })
   } catch (err) {
-    console.error('Error deleting widget:', err)
+    logger.error('[Admin] Error deleting widget:', err)
     res.status(500).json({ error: 'Failed to delete widget' })
   }
 }

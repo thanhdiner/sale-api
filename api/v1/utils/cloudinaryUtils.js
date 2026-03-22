@@ -1,4 +1,5 @@
 const cloudinary = require('cloudinary').v2
+const logger = require('../../../config/logger')
 
 function extractPublicId(url) {
   if (!url) return null
@@ -30,10 +31,10 @@ async function deleteImageFromCloudinary(url) {
     const publicId = extractPublicId(url)
     if (!publicId) return false
     const result = await cloudinary.uploader.destroy(publicId)
-    console.log('Deleted image from Cloudinary:', publicId, result)
+    logger.info('Deleted image from Cloudinary:', { publicId, result: result.result })
     return result.result === 'ok' || result.result === 'not found'
   } catch (err) {
-    console.error('Failed to delete image from Cloudinary:', err)
+    logger.error('Failed to delete image from Cloudinary:', err)
     return false
   }
 }

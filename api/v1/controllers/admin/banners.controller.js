@@ -1,6 +1,7 @@
 const Banner = require('../../models/banner.model')
 const mongoose = require('mongoose')
 const { deleteImageFromCloudinary } = require('../../utils/cloudinaryUtils')
+const logger = require('../../../../config/logger')
 
 //# GET /api/v1/admin/banners
 module.exports.index = async (req, res) => {
@@ -11,7 +12,7 @@ module.exports.index = async (req, res) => {
       data: banners
     })
   } catch (err) {
-    console.error('Error fetching banners:', err)
+    logger.error('[Admin] Error fetching banners:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -46,7 +47,7 @@ module.exports.create = async (req, res) => {
       data: savedBanner
     })
   } catch (err) {
-    console.error('Error creating banner:', err)
+    logger.error('[Admin] Error creating banner:', err)
     res.status(500).json({ error: 'Failed to create banner' })
   }
 }
@@ -91,7 +92,7 @@ module.exports.edit = async (req, res) => {
       data: updatedBanner
     })
   } catch (err) {
-    console.error('Error updating banner:', err)
+    logger.error('[Admin] Error updating banner:', err)
     res.status(500).json({ error: 'Failed to update banner' })
   }
 }
@@ -114,7 +115,7 @@ module.exports.delete = async (req, res) => {
       message: 'Banner deleted successfully'
     })
   } catch (err) {
-    console.error('Error deleting banner:', err)
+    logger.error('[Admin] Error deleting banner:', err)
     res.status(500).json({ error: 'Failed to delete banner' })
   }
 }

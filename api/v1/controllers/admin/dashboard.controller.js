@@ -3,6 +3,7 @@ const User = require('../../models/user.model')
 const Order = require('../../models/order.model')
 const Product = require('../../models/products.model')
 const ProductCategory = require('../../models/product-category.model')
+const logger = require('../../../../config/logger')
 
 const calcChange = (current, previous) => {
   if (previous === 0) {
@@ -416,7 +417,7 @@ module.exports.dashboard = async (req, res) => {
       data: statistic
     })
   } catch (err) {
-    console.error('Error fetching dashboard data:', err)
+    logger.error('[Admin] Error fetching dashboard data:', err)
     return res.status(500).json({
       error: 'Failed to fetch dashboard data',
       status: 500

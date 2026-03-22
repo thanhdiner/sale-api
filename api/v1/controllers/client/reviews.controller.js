@@ -1,6 +1,7 @@
 const mongoose = require('mongoose')
 const cloudinary = require('cloudinary').v2
 const streamifier = require('streamifier')
+const logger = require('../../../../config/logger')
 
 const Review = require('../../models/review.model')
 const ReviewVote = require('../../models/reviewVote.model')
@@ -97,7 +98,7 @@ module.exports.getReviews = async (req, res) => {
       }
     })
   } catch (err) {
-    console.error(err)
+    logger.error('[Reviews] error:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -137,7 +138,7 @@ module.exports.createReview = async (req, res) => {
       review: { ...review.toObject(), isVoted: false, isOwner: true }
     })
   } catch (err) {
-    console.error(err)
+    logger.error('[Reviews] error:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -178,7 +179,7 @@ module.exports.updateReview = async (req, res) => {
       review: { ...review.toObject(), isVoted: false, isOwner: true }
     })
   } catch (err) {
-    console.error(err)
+    logger.error('[Reviews] error:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -201,7 +202,7 @@ module.exports.deleteReview = async (req, res) => {
     await recalcProductRating(productId)
     res.json({ message: 'Deleted' })
   } catch (err) {
-    console.error(err)
+    logger.error('[Reviews] error:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -232,7 +233,7 @@ module.exports.voteReview = async (req, res) => {
 
     res.json({ helpfulCount: review.helpfulCount, isVoted })
   } catch (err) {
-    console.error(err)
+    logger.error('[Reviews] error:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }

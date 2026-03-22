@@ -1,6 +1,7 @@
 const ProductCategory = require('../../models/product-category.model')
 const Product = require('../../models/products.model')
 const { buildTree, findAllDescendantIds } = require('../../helpers/product-categoryHelper')
+const logger = require('../../../../config/logger')
 
 //# GET /api/v1/product-categories/tree
 module.exports.index = async (req, res) => {
@@ -20,7 +21,7 @@ module.exports.index = async (req, res) => {
       data: tree
     })
   } catch (err) {
-    console.error('Get public categories error:', err)
+    logger.error('[Client] Get public categories error:', err)
     res.status(500).json({
       error: 'Failed to get product categories',
       status: 500
@@ -51,7 +52,7 @@ module.exports.getProductsByCategorySlug = async (req, res) => {
       category
     })
   } catch (err) {
-    console.error('Get products by category error:', err)
+    logger.error('[Client] Get products by category error:', err)
     res.status(500).json({
       error: 'Failed to get products by category',
       status: 500

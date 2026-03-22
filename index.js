@@ -7,6 +7,8 @@ const helmet = require('helmet')
 const cors = require('cors')
 const cookieParser = require('cookie-parser')
 const database = require('./config/database')
+const logger = require('./config/logger')
+const morganMiddleware = require('./api/v1/middlewares/morgan.middleware')
 const { initIO } = require('./api/v1/helpers/socket')
 
 const app = express()
@@ -44,6 +46,9 @@ app.use(
 app.use(express.json())
 app.use(cookieParser())
 
+// ─── HTTP Request Logging (Morgan → Winston) ────────────────────────────────
+app.use(morganMiddleware)
+
 // ─── Database ────────────────────────────────────────────────────────────────
 database.connect()
 
@@ -59,23 +64,23 @@ const io = new Server(server, {
 initIO(io)
 
 io.on('connection', socket => {
-  console.log(`[Socket] Client connected: ${socket.id}`)
+  logger.info(`[Socket] Client connected: ${socket.id}`)
 
   // Client tự join vào room theo role
   // Frontend emit: socket.emit('join', { role: 'admin' | 'user', userId })
   socket.on('join', ({ role, userId }) => {
     if (role === 'admin') {
       socket.join('admin')
-      console.log(`[Socket] Admin joined: ${socket.id}`)
+      logger.info(`[Socket] Admin joined: ${socket.id}`)
     }
     if (userId) {
       socket.join(`user_${userId}`)
-      console.log(`[Socket] User ${userId} joined`)
+      logger.info(`[Socket] User ${userId} joined`)
     }
   })
 
   socket.on('disconnect', () => {
-    console.log(`[Socket] Client disconnected: ${socket.id}`)
+    logger.info(`[Socket] Client disconnected: ${socket.id}`)
   })
 })
 
@@ -88,5 +93,5 @@ routeApiV1(app)
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 server.listen(port, () => {
-  console.log(`Start on PORT: ${port}`)
+  logger.info(`🚀 Server started on PORT: ${port}`)
 })

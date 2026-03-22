@@ -1,4 +1,5 @@
 const Review = require('../../models/review.model')
+const logger = require('../../../../config/logger')
 
 // GET /admin/reviews  – list all reviews (paginated)
 module.exports.getReviews = async (req, res) => {
@@ -18,7 +19,7 @@ module.exports.getReviews = async (req, res) => {
 
     res.json({ reviews, total })
   } catch (err) {
-    console.error(err)
+    logger.error('[Admin] Reviews error:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -37,7 +38,7 @@ module.exports.replyReview = async (req, res) => {
 
     res.json({ sellerReply: review.sellerReply })
   } catch (err) {
-    console.error(err)
+    logger.error('[Admin] Reviews error:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -54,7 +55,7 @@ module.exports.deleteReply = async (req, res) => {
 
     res.json({ message: 'Reply deleted' })
   } catch (err) {
-    console.error(err)
+    logger.error('[Admin] Reviews error:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -72,7 +73,7 @@ module.exports.deleteReview = async (req, res) => {
 
     res.json({ message: 'Deleted' })
   } catch (err) {
-    console.error(err)
+    logger.error('[Admin] Reviews error:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }

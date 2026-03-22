@@ -1,4 +1,5 @@
 const Role = require('../../models/roles.model')
+const logger = require('../../../../config/logger')
 
 //# GET /api/v1/admin/roles
 module.exports.index = async (req, res) => {
@@ -7,7 +8,7 @@ module.exports.index = async (req, res) => {
     const roles = await Role.find(find)
     res.json({ data: roles })
   } catch (err) {
-    console.error('Error getting roles:', err)
+    logger.error('[Admin] Error getting roles:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -30,7 +31,7 @@ module.exports.create = async (req, res) => {
 
     res.status(201).json({ message: 'Created', data: roles })
   } catch (err) {
-    console.error('Error creating role:', err)
+    logger.error('[Admin] Error creating role:', err)
     return res.status(500).json({ error: 'Internal server error', message: 'Created unsuccessful' })
   }
 }

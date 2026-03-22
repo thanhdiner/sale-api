@@ -4,6 +4,7 @@ const generateBackupCodes = require('../../utils/generateBackupCodes')
 const speakeasy = require('speakeasy')
 const QRCode = require('qrcode')
 const TrustedDevice = require('../../models/adminTrustedDevice.model')
+const logger = require('../../../../config/logger')
 
 //# GET /api/v1/admin/accounts
 module.exports.index = async (req, res) => {
@@ -12,7 +13,7 @@ module.exports.index = async (req, res) => {
     const accounts = await AdminAccount.find(find).select('-passwordHash')
     res.json({ data: accounts })
   } catch (err) {
-    console.error('Error getting accounts:', err)
+    logger.error('[Admin] Error getting accounts:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -47,7 +48,7 @@ module.exports.create = async (req, res) => {
 
     res.status(201).json({ data: accountData })
   } catch (err) {
-    console.error('Error creating account:', err)
+    logger.error('[Admin] Error creating account:', err)
     return res.status(500).json({ error: 'Internal server error', message: 'Created unsuccessful', status: 500 })
   }
 }
@@ -135,7 +136,7 @@ module.exports.updateAvatar = async (req, res) => {
     const { passwordHash, ...accountData } = account.toObject()
     res.status(200).json({ message: 'Cập nhật ảnh đại diện thành công!', data: accountData })
   } catch (err) {
-    console.error('Lỗi cập nhật avatar:', err)
+    logger.error('[Admin] Error updating avatar:', err)
     res.status(500).json({ message: 'Lỗi máy chủ khi cập nhật avatar.' })
   }
 }
@@ -155,7 +156,7 @@ module.exports.updateProfile = async (req, res) => {
 
     res.status(200).json({ message: 'Cập nhật thành công!', data })
   } catch (err) {
-    console.error(err)
+    logger.error('[Admin] Error updating profile:', err)
     res.status(500).json({ message: 'Lỗi máy chủ khi cập nhật profile!' })
   }
 }
@@ -180,7 +181,7 @@ module.exports.changePassword = async (req, res) => {
 
     res.json({ message: 'Password changed successfully' })
   } catch (err) {
-    console.error(err)
+    logger.error('[Admin] Error changing password:', err)
     res.status(500).json({ error: 'Server error' })
   }
 }
@@ -314,7 +315,7 @@ module.exports.getTrustedDevices = async (req, res) => {
 
     res.json({ devices: devicesWithCurrent })
   } catch (err) {
-    console.error(err)
+    logger.error('[Admin] Error getting trusted devices:', err)
     res.status(500).json({ error: 'Không lấy được thiết bị tin cậy' })
   }
 }
@@ -337,7 +338,7 @@ module.exports.removeTrustedDevice = async (req, res) => {
 
     res.json({ success: true, message: 'Xóa thiết bị thành công' })
   } catch (err) {
-    console.error('Lỗi khi xoá thiết bị:', err)
+    logger.error('[Admin] Error removing trusted device:', err)
     res.status(500).json({ message: 'Lỗi máy chủ khi xoá thiết bị' })
   }
 }

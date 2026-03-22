@@ -1,5 +1,6 @@
 const PermissionGroups = require('../../models/permission-group.model')
 const Permissions = require('../../models/permission.model')
+const logger = require('../../../../config/logger')
 
 //# GET /api/v1/admin/permission-groups
 module.exports.index = async (req, res) => {
@@ -8,7 +9,7 @@ module.exports.index = async (req, res) => {
     const permissionGroups = await PermissionGroups.find(find)
     res.json({ data: permissionGroups })
   } catch (err) {
-    console.error('Error getting permission groups:', err)
+    logger.error('[Admin] Error getting permission groups:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -32,7 +33,7 @@ module.exports.create = async (req, res) => {
 
     res.status(201).json({ message: 'Created', data: permissionGroups })
   } catch (err) {
-    console.error('Error creating permission group:', err)
+    logger.error('[Admin] Error creating permission group:', err)
     return res.status(500).json({ error: 'Internal server error', message: 'Created unsuccessful', status: 500 })
   }
 }

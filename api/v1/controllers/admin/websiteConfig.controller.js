@@ -1,4 +1,5 @@
 const WebsiteConfig = require('../../models/adminWebsiteConfig.model')
+const logger = require('../../../../config/logger')
 
 //#GET /api/v1/admin/website-config
 exports.index = async (req, res) => {
@@ -31,7 +32,7 @@ module.exports.edit = async (req, res) => {
     await config.save()
     return res.json({ success: true, message: 'Cập nhật cấu hình thành công!', data: config })
   } catch (err) {
-    console.error('❌ Update config error:', err)
+    logger.error('[Admin] Update config error:', err)
     res.status(500).json({ success: false, message: 'Cập nhật cấu hình thất bại!' })
   }
 }

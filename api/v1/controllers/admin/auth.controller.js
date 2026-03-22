@@ -5,6 +5,7 @@ const RefreshToken = require('../../models/refreshToken.model')
 const TrustedDevice = require('../../models/adminTrustedDevice.model')
 const speakeasy = require('speakeasy')
 const { issueTokensAndRespond } = require('../../helpers/authHelper')
+const logger = require('../../../../config/logger')
 
 const ACCESS_SECRET = process.env.ACCESS_SECRET
 const REFRESH_SECRET = process.env.REFRESH_SECRET
@@ -45,7 +46,7 @@ module.exports.login = async (req, res) => {
 
     await issueTokensAndRespond(res, admin)
   } catch (error) {
-    console.error('Login error:', error)
+    logger.error('[Admin] Login error:', error)
     res.status(500).json({ error: 'Đăng nhập thất bại, vui lòng thử lại sau!' })
   }
 }
@@ -89,7 +90,7 @@ module.exports.verify2FA = async (req, res) => {
 
     await issueTokensAndRespond(res, admin)
   } catch (err) {
-    console.error('2FA verify error:', err)
+    logger.error('[Admin] 2FA verify error:', err)
     res.status(500).json({ error: 'Xác thực 2FA thất bại' })
   }
 }
@@ -127,7 +128,7 @@ module.exports.refreshToken = async (req, res) => {
       return res.status(401).json({ error: 'Refresh token không hợp lệ hoặc đã hết hạn' })
     }
   } catch (error) {
-    console.error('Refresh token error:', error)
+    logger.error('[Admin] Refresh token error:', error)
     res.status(500).json({ error: 'Có lỗi xảy ra, vui lòng thử lại sau!' })
   }
 }
@@ -145,7 +146,7 @@ module.exports.logout = async (req, res) => {
     }
     res.sendStatus(204)
   } catch (error) {
-    console.error('Logout error:', error)
+    logger.error('[Admin] Logout error:', error)
     res.status(500).json({ error: 'Đăng xuất thất bại, vui lòng thử lại sau!' })
   }
 }

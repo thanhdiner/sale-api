@@ -3,6 +3,7 @@ const PromoCode = require('../../models/promoCode.model')
 const Product = require('../../models/products.model')
 const FlashSale = require('../../models/flashSale.model')
 const removeAccents = require('remove-accents')
+const logger = require('../../../../config/logger')
 const { getIO } = require('../../helpers/socket')
 
 //# POST /api/v1/orders
@@ -116,7 +117,7 @@ module.exports.createOrder = async (req, res) => {
       })
     } catch {}
   } catch (err) {
-    console.error(err)
+    logger.error('[Client] createOrder error:', err)
     res.status(500).json({ error: 'Lỗi tạo đơn hàng' })
   }
 }
@@ -186,7 +187,7 @@ module.exports.createPendingOrder = async (req, res) => {
 
     res.json({ success: true, orderId: newOrder._id })
   } catch (err) {
-    console.error('[createPendingOrder]', err)
+    logger.error('[Client] createPendingOrder error:', err)
     res.status(500).json({ error: 'Lỗi tạo đơn hàng' })
   }
 }

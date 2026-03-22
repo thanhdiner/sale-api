@@ -4,6 +4,7 @@ const { setDefaultPosition, validateProductCategory } = require('../../helpers/p
 const parseIntegerFields = require('../../utils/parseIntegerFields')
 const handleSlug = require('../../utils/handleSlug')
 const mongoose = require('mongoose')
+const logger = require('../../../../config/logger')
 
 //# Get /api/v1/admin/products
 module.exports.index = async (req, res) => {
@@ -64,7 +65,7 @@ module.exports.detail = async (req, res) => {
     if (!product) return res.status(404).json({ message: 'Product not found' })
     res.json({ code: 200, message: ' Get Product Category successfully!', product })
   } catch (err) {
-    console.error('Error fetching product:', err)
+    logger.error('[Admin] Error fetching product:', err)
     res.status(500).json({ message: 'Server error' })
   }
 }
@@ -98,7 +99,7 @@ module.exports.create = async (req, res) => {
       data: data
     })
   } catch (err) {
-    console.error('Error creating product:', err)
+    logger.error('[Admin] Error creating product:', err)
     res.status(500).json({ error: 'Failed to create product', status: 400 })
   }
 }
@@ -215,7 +216,7 @@ module.exports.changeStatusMany = async (req, res) => {
       products: updatedProducts
     })
   } catch (err) {
-    console.error(err)
+    logger.error('[Admin] Error changing product statuses:', err)
     res.status(500).json({ error: 'Failed to change product statuses', status: 400 })
   }
 }
@@ -256,7 +257,7 @@ module.exports.changePositionMany = async (req, res) => {
       products: updatedProducts
     })
   } catch (err) {
-    console.error(err)
+    logger.error('[Admin] Error changing product positions:', err)
     return res.status(500).json({ error: 'Failed to change product positions', status: 400 })
   }
 }
@@ -319,7 +320,7 @@ module.exports.edit = async (req, res) => {
       product: updatedProduct
     })
   } catch (err) {
-    console.error('Error updating product:', err)
+    logger.error('[Admin] Error updating product:', err)
     return res.status(500).json({ error: 'Failed to update product', status: 400 })
   }
 }

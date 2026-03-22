@@ -2,6 +2,7 @@ const cloudinary = require('cloudinary').v2
 const streamifier = require('streamifier')
 const { extractPublicId } = require('../../helpers/cloudinary')
 const axios = require('axios')
+const logger = require('../../../../config/logger')
 
 //# Configure Cloudinary
 cloudinary.config({
@@ -51,7 +52,7 @@ module.exports.uploadMany = async (req, res, next) => {
         req.body[field] = result.secure_url
       }
     } catch (err) {
-      console.error('❌ Failed to upload image:', err.message)
+      logger.error('Failed to upload image:', err.message)
       return res.status(500).json({ error: 'Failed to upload image to cloud' })
     }
   }
@@ -65,10 +66,10 @@ module.exports.deleteImage = async (req, res, next) => {
     if (oldImage && (deleteImage === 'true' || req.file)) {
       const publicId = extractPublicId(oldImage)
       await cloudinary.uploader.destroy(publicId)
-      console.log('🗑️ Deleted old image from Cloudinary:', publicId)
+      logger.info('Deleted old image from Cloudinary:', { publicId })
     }
   } catch (err) {
-    console.error('❌ Failed to delete image:', err.message)
+    logger.error('Failed to delete image:', err.message)
   }
 
   next()
@@ -79,7 +80,7 @@ module.exports.deleteImageMany = async (req, res, next) => {
   if (typeof oldImages === 'string') oldImages = JSON.parse(oldImages)
   if (typeof deleteImages === 'string') deleteImages = JSON.parse(deleteImages)
 
-  console.log('🗑️ Deleting old images:', oldImages, 'Delete flags:', deleteImages)
+  logger.debug('Deleting old images:', { oldImages, deleteImages })
 
   try {
     for (let i = 0; i < oldImages.length; i++) {
@@ -88,11 +89,11 @@ module.exports.deleteImageMany = async (req, res, next) => {
       if (oldImage && shouldDelete) {
         const publicId = extractPublicId(oldImage)
         await cloudinary.uploader.destroy(publicId)
-        console.log('🗑️ Deleted old image from Cloudinary:', publicId)
+        logger.info('Deleted old image from Cloudinary:', { publicId })
       }
     }
   } catch (err) {
-    console.error('❌ Failed to delete images:', err.message)
+    logger.error('Failed to delete images:', err.message)
   }
 
   next()

@@ -1,5 +1,6 @@
 const Order = require('../../models/order.model')
 const removeAccents = require('remove-accents')
+const logger = require('../../../../config/logger')
 const { getIO } = require('../../helpers/socket')
 
 //# GET /api/v1/orders
@@ -50,7 +51,7 @@ module.exports.getAllOrders = async (req, res) => {
       .limit(Number(pageLimit))
     res.json({ success: true, orders, total })
   } catch (err) {
-    console.log(err)
+    logger.error('[Admin] getAllOrders error:', err)
     res.status(500).json({ error: 'Lỗi lấy đơn hàng' })
   }
 }
@@ -81,17 +82,17 @@ module.exports.updateOrderStatus = async (req, res) => {
     // Notify client realtime về trạng thái đơn hàng
     try {
       if (order.userId) {
-        console.log(`[Socket] Emitting order_status_updated to user_${order.userId}, status: ${order.status}`)
+        logger.info(`[Socket] Emitting order_status_updated to user_${order.userId}, status: ${order.status}`)
         getIO().to(`user_${order.userId}`).emit('order_status_updated', {
           _id: order._id,
           status: order.status,
           paymentStatus: order.paymentStatus
         })
       } else {
-        console.log(`[Socket] Order ${order._id} has no userId — cannot notify client`)
+        logger.warn(`[Socket] Order ${order._id} has no userId — cannot notify client`)
       }
     } catch (e) {
-      console.error('[Socket] Emit error:', e.message)
+      logger.error('[Socket] Emit error:', e.message)
     }
 
     res.json({ success: true, order })

@@ -1,6 +1,7 @@
 // controllers/admin/bankInfo.controller.js
 const BankInfo = require('../../models/bankInfo.model')
 const removeAccents = require('remove-accents')
+const logger = require('../../../../config/logger')
 
 const toBool = v => v === true || v === 'true' || v === 1 || v === '1'
 
@@ -47,7 +48,7 @@ module.exports.getAllBankInfos = async (req, res) => {
 
     res.json({ success: true, bankInfos, total })
   } catch (err) {
-    console.error(err)
+    logger.error('[Admin] getAllBankInfos error:', err)
     res.status(500).json({ error: 'Lỗi lấy danh sách bank info' })
   }
 }

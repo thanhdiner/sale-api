@@ -1,4 +1,5 @@
 const Banner = require('../../models/banner.model')
+const logger = require('../../../../config/logger')
 
 //# GET /api/v1/banners
 module.exports.index = async (req, res) => {
@@ -10,7 +11,7 @@ module.exports.index = async (req, res) => {
       data: banners
     })
   } catch (err) {
-    console.error('Error fetching banners:', err)
+    logger.error('[Client] Error fetching banners:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }

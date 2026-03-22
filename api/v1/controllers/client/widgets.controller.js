@@ -1,4 +1,5 @@
 const Widget = require('../../models/widgets.model')
+const logger = require('../../../../config/logger')
 
 //# GET /api/v1/widgets
 module.exports.index = async (req, res) => {
@@ -10,7 +11,7 @@ module.exports.index = async (req, res) => {
       data: widgets
     })
   } catch (err) {
-    console.error('Error fetching widgets:', err)
+    logger.error('[Client] Error fetching widgets:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }

@@ -3,6 +3,7 @@ const vnpay = require('../../services/payment/vnpay.service')
 const momo = require('../../services/payment/momo.service')
 const zalopay = require('../../services/payment/zalopay.service')
 const { getClientIp } = require('../../helpers/networkHelper')
+const logger = require('../../../../config/logger')
 const { getIO } = require('../../helpers/socket')
 
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000'
@@ -56,7 +57,7 @@ module.exports.createVNPayUrl = async (req, res) => {
 
     res.json({ success: true, paymentUrl })
   } catch (err) {
-    console.error('[VNPay] createUrl error:', err)
+    logger.error('[VNPay] createUrl error:', err)
     res.status(500).json({ error: err.message || 'Lỗi tạo VNPay URL' })
   }
 }
@@ -86,7 +87,7 @@ module.exports.vnpayReturn = async (req, res) => {
     }
     return res.redirect(`${CLIENT_URL}/order-success?status=failed&reason=payment_failed&orderId=${orderId}`)
   } catch (err) {
-    console.error('[VNPay] return error:', err)
+    logger.error('[VNPay] return error:', err)
     res.redirect(`${CLIENT_URL}/order-success?status=failed&reason=server_error`)
   }
 }
@@ -112,7 +113,7 @@ module.exports.createMoMoUrl = async (req, res) => {
 
     res.json({ success: true, paymentUrl: result.paymentUrl })
   } catch (err) {
-    console.error('[MoMo] createUrl error:', err)
+    logger.error('[MoMo] createUrl error:', err)
     res.status(500).json({ error: err.message || 'Lỗi tạo MoMo URL' })
   }
 }
@@ -139,7 +140,7 @@ module.exports.momoCallback = async (req, res) => {
 
     res.status(204).send()
   } catch (err) {
-    console.error('[MoMo] callback error:', err)
+    logger.error('[MoMo] callback error:', err)
     res.status(500).json({ error: err.message })
   }
 }
@@ -165,7 +166,7 @@ module.exports.createZaloPayUrl = async (req, res) => {
 
     res.json({ success: true, paymentUrl: result.paymentUrl })
   } catch (err) {
-    console.error('[ZaloPay] createUrl error:', err)
+    logger.error('[ZaloPay] createUrl error:', err)
     res.status(500).json({ error: err.message || 'Lỗi tạo ZaloPay URL' })
   }
 }
@@ -192,7 +193,7 @@ module.exports.zalopayCallback = async (req, res) => {
 
     res.json({ return_code: 1, return_message: 'success' })
   } catch (err) {
-    console.error('[ZaloPay] callback error:', err)
+    logger.error('[ZaloPay] callback error:', err)
     res.json({ return_code: 0, return_message: err.message })
   }
 }
