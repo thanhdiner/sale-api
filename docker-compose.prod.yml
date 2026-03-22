@@ -1,0 +1,31 @@
+# docker-compose.prod.yml — PRODUCTION (runs on VPS)
+# Usage (manual): docker compose -f docker-compose.prod.yml up -d
+# Note: CI/CD deploys this automatically via GitHub Actions
+
+version: '3.9'
+
+services:
+  api:
+    image: ghcr.io/${GITHUB_REPOSITORY}:latest
+    container_name: sales-api
+    restart: always
+    ports:
+      - '${PORT:-3001}:3001'
+    environment:
+      - NODE_ENV=production
+    env_file:
+      - /opt/sales-api/.env   # .env file stored on VPS server (not in image)
+    volumes:
+      - /opt/sales-api/logs:/app/logs  # Persist logs on host
+    networks:
+      - sales-net
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://localhost:3001/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+networks:
+  sales-net:
+    driver: bridge

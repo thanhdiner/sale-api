@@ -1,0 +1,30 @@
+# docker-compose.yml — LOCAL DEVELOPMENT
+# Usage: docker compose up --build
+#
+# Note: For production on VPS, use docker-compose.prod.yml
+
+version: '3.9'
+
+services:
+  api:
+    build:
+      context: .
+      target: builder        # Use builder stage (includes nodemon)
+    container_name: sales-api-dev
+    restart: unless-stopped
+    ports:
+      - '${PORT:-3001}:3001'
+    volumes:
+      - .:/app               # Mount source for hot-reload
+      - /app/node_modules    # Preserve container's node_modules
+    environment:
+      - NODE_ENV=development
+    env_file:
+      - .env
+    command: npx nodemon index.js
+    networks:
+      - sales-net
+
+networks:
+  sales-net:
+    driver: bridge

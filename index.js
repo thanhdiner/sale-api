@@ -86,7 +86,11 @@ io.on('connection', socket => {
   })
 })
 
+// ─── Health Check ────────────────────────────────────────────────────────────
+app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime() }))
+
 // ─── Routes ──────────────────────────────────────────────────────────────────
+
 const routeApiV1Admin = require('./api/v1/routes/admin/index.route')
 const routeApiV1 = require('./api/v1/routes/client/index.route')
 
