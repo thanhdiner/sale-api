@@ -81,13 +81,18 @@ module.exports.updateOrderStatus = async (req, res) => {
     // Notify client realtime về trạng thái đơn hàng
     try {
       if (order.userId) {
+        console.log(`[Socket] Emitting order_status_updated to user_${order.userId}, status: ${order.status}`)
         getIO().to(`user_${order.userId}`).emit('order_status_updated', {
           _id: order._id,
           status: order.status,
           paymentStatus: order.paymentStatus
         })
+      } else {
+        console.log(`[Socket] Order ${order._id} has no userId — cannot notify client`)
       }
-    } catch {}
+    } catch (e) {
+      console.error('[Socket] Emit error:', e.message)
+    }
 
     res.json({ success: true, order })
   } catch (err) {
