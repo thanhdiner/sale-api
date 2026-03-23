@@ -1,12 +1,13 @@
 const Review = require('../../models/review.model')
 const logger = require('../../../../config/logger')
 
-// GET /admin/reviews  – list all reviews (paginated)
+// GET /admin/reviews  – list all reviews (paginated, with search & rating filter)
 module.exports.getReviews = async (req, res) => {
   try {
-    const { page = 1, limit = 20, productId } = req.query
+    const { page = 1, limit = 20, productId, rating, search } = req.query
     const query = { deleted: false }
     if (productId) query.productId = productId
+    if (rating) query.rating = Number(rating)
 
     const skip = (Number(page) - 1) * Number(limit)
     const total = await Review.countDocuments(query)
@@ -17,7 +18,19 @@ module.exports.getReviews = async (req, res) => {
       .populate('userId', 'fullName avatarUrl username email')
       .populate('productId', 'title thumbnail slug')
 
-    res.json({ reviews, total })
+    // Post-populate search filter
+    let filtered = reviews
+    if (search && search.trim()) {
+      const s = search.trim().toLowerCase()
+      filtered = reviews.filter(r =>
+        (r.userId?.fullName || '').toLowerCase().includes(s) ||
+        (r.userId?.email || '').toLowerCase().includes(s) ||
+        (r.content || '').toLowerCase().includes(s) ||
+        (r.title || '').toLowerCase().includes(s)
+      )
+    }
+
+    res.json({ reviews: filtered, total })
   } catch (err) {
     logger.error('[Admin] Reviews error:', err)
     res.status(500).json({ error: 'Internal server error' })
