@@ -12,11 +12,12 @@ function getClient() {
     maxRetriesPerRequest: 3,
     enableReadyCheck: true,
     lazyConnect: true,
-    // Nếu Redis không kết nối được, fallback về null — không crash app
+    // TLS bắt buộc khi dùng rediss:// (Upstash, Redis Cloud...)
+    tls: REDIS_URL.startsWith('rediss://') ? {} : undefined,
     retryStrategy: times => {
       if (times > 3) {
         logger.warn('[Redis] Không thể kết nối Redis, sẽ chạy không có cache.')
-        return null // dừng retry
+        return null
       }
       return Math.min(times * 200, 2000)
     }

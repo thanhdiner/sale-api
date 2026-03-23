@@ -11,6 +11,7 @@ const contactRouter = require('./contact.route')
 const bankInfoRouter = require('./bankInfo.route')
 const reviewsRouter = require('./reviews.route')
 const paymentRouter = require('./payment.route')
+const wishlistRouter = require('./wishlist.route')
 
 const authenticateToken = require('../../middlewares/client/authenticateToken.middleware')
 
@@ -29,4 +30,5 @@ module.exports = app => {
   app.use(version + '/bank-info', bankInfoRouter)
   app.use(version + '/reviews', reviewsRouter)
   app.use(version + '/payment', paymentRouter)
+  app.use(version + '/wishlist', authenticateToken.authenticateToken, wishlistRouter)
 }

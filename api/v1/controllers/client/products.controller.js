@@ -10,49 +10,92 @@ const TTL_SUGGEST = 60  // 1 phút
 //# GET /products
 module.exports.index = async (req, res) => {
   try {
-    const search = (req.query.search || '').replace(/\+/g, ' ')
-    const sort = req.query.sort || 'newest'
-    const page = parseInt(req.query.page) || 1
-    const limit = parseInt(req.query.limit) || 20
+    const search    = (req.query.search || '').replace(/\+/g, ' ')
+    const sort      = req.query.sort || 'newest'
+    const page      = parseInt(req.query.page)  || 1
+    const limit     = parseInt(req.query.limit) || 20
     const isTopDeal = req.query.isTopDeal || ''
-    const isFeatured = req.query.isFeatured || ''
+    const isFeatured= req.query.isFeatured || ''
+
+    // ─── Advanced filters ───────────────────────────
+    const minPrice  = parseFloat(req.query.minPrice) || 0
+    const maxPrice  = parseFloat(req.query.maxPrice) || 0
+    const category  = req.query.category  || ''   // ObjectId string
+    const minRate   = parseFloat(req.query.minRate) || 0
+    const inStock   = req.query.inStock || ''     // 'true' | 'false' | ''
+
+    const hasAdvanced = minPrice > 0 || maxPrice > 0 || category || minRate > 0 || inStock !== ''
 
     const cacheKey = `products:list:${search}:${sort}:${page}:${limit}:${isTopDeal}:${isFeatured}`
 
-    const result = await cache.getOrSet(cacheKey, async () => {
+    const fetchFn = async () => {
       const query = {
         status: 'active',
-        deleted: false,
-        stock: { $gt: 0 }
+        deleted: false
       }
+
+      // Stock filter
+      if (inStock === 'true')  query.stock = { $gt: 0 }
+      else if (inStock === 'false') query.stock = 0
+      else query.stock = { $gt: 0 } // default: chỉ còn hàng
 
       const skip = (page - 1) * limit
 
-      if (isTopDeal === 'true') query.isTopDeal = true
+      if (isTopDeal  === 'true') query.isTopDeal  = true
       if (isFeatured === 'true') query.isFeatured = true
-      if (search) query.titleNoAccent = { $regex: search, $options: 'i' }
+      if (search)   query.titleNoAccent = { $regex: search, $options: 'i' }
+      if (category) query.productCategory = category
+      if (minRate > 0) query.rate = { $gte: minRate }
 
-      let sortObj = { position: -1 }
+      // Price filter (áp dụng lên giá sau giảm)
+      if (minPrice > 0 || maxPrice > 0) {
+        query.$expr = {
+          $and: [
+            ...(minPrice > 0 ? [{
+              $gte: [
+                { $subtract: ['$price', { $multiply: ['$price', { $divide: ['$discountPercentage', 100] }] }] },
+                minPrice
+              ]
+            }] : []),
+            ...(maxPrice > 0 ? [{
+              $lte: [
+                { $subtract: ['$price', { $multiply: ['$price', { $divide: ['$discountPercentage', 100] }] }] },
+                maxPrice
+              ]
+            }] : [])
+          ]
+        }
+      }
+
+      let sortObj = { createdAt: -1 }
       switch (sort) {
-        case 'price_asc':  sortObj = { price: 1 };      break
-        case 'price_desc': sortObj = { price: -1 };     break
-        case 'name_asc':   sortObj = { title: 1 };      break
-        case 'name_desc':  sortObj = { title: -1 };     break
+        case 'price_asc':   sortObj = { price: 1 };           break
+        case 'price_desc':  sortObj = { price: -1 };          break
+        case 'name_asc':    sortObj = { title: 1 };           break
+        case 'name_desc':   sortObj = { title: -1 };          break
+        case 'sold_desc':   sortObj = { soldQuantity: -1 };   break
+        case 'rate_desc':   sortObj = { rate: -1 };           break
         case 'newest':
-        default:           sortObj = { createdAt: -1 }; break
+        default:            sortObj = { createdAt: -1 };      break
       }
 
       const total = await Product.countDocuments(query)
       const products = await Product.find(query).sort(sortObj).skip(skip).limit(limit)
       const newProduct = productsHelper.priceNewProducts(products)
       return { data: newProduct, total }
-    }, TTL_LIST)
+    }
+
+    // Không cache khi có filter nâng cao (tránh key quá dài / collision)
+    const result = hasAdvanced
+      ? await fetchFn()
+      : await cache.getOrSet(cacheKey, fetchFn, TTL_LIST)
 
     res.json(result)
   } catch (err) {
     res.status(500).json({ error: 'Internal server error', status: 500 })
   }
 }
+
 
 //# GET /products/suggest
 module.exports.suggest = async (req, res) => {
