@@ -54,9 +54,16 @@ app.use(morganMiddleware)
 // ─── Database ────────────────────────────────────────────────────────────────
 database.connect()
 
+// ─── Global unhandled rejection guard ────────────────────────────────────────
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('[Process] Unhandled Rejection:', reason?.message || String(reason))
+})
+
 // ─── Redis ───────────────────────────────────────────────────────────────────
 const redis = require('./config/redis')
-redis.getClient().connect().catch(() => {}) // graceful — không crash nếu Redis offline
+redis.getClient().connect().catch(err => {
+  logger.warn('[Redis] Không thể khởi tạo kết nối Redis:', err?.message || String(err))
+})
 
 // ─── Socket.IO ───────────────────────────────────────────────────────────────
 const io = new Server(server, {
@@ -145,8 +152,154 @@ io.on('connection', socket => {
       } else {
         io.to('agents').emit('chat:new_message', { ...payload, sessionId })
       }
+
+      // ── AI Bot Processing ─────────────────────────────────────────────
+      // Chỉ xử lý nếu chatbot enabled, chưa có agent assign và KHÔNG bị escalated.
+      const chatbotEnabled = process.env.CHATBOT_ENABLED !== 'false'
+      const hasAgent = conv.assignedAgent && conv.assignedAgent.agentId
+      const isEscalated = conv.botStats?.escalated === true
+      if (chatbotEnabled && !hasAgent && !isEscalated) {
+        try {
+          // Emit bot typing indicator
+          io.to(`chat_${sessionId}`).emit('chat:bot_typing', { isTyping: true })
+
+          const aiService = require('./api/v1/services/ai/ai.service')
+          const botReply = await aiService.processMessage(sessionId, message.trim(), {
+            name: senderName,
+            currentPage,
+            userId: senderId
+          })
+
+          // Tắt typing indicator
+          io.to(`chat_${sessionId}`).emit('chat:bot_typing', { isTyping: false })
+
+          if (botReply && botReply.text) {
+            const botMsg = await ChatMessage.create({
+              conversationId: conv._id,
+              sessionId,
+              sender: 'bot',
+              type: 'text',
+              senderName: 'SmartMall Bot',
+              message: botReply.text,
+              metadata: {
+                suggestions: botReply.suggestions || [],
+                provider: botReply.metadata?.provider,
+                intent: botReply.metadata?.intent,
+                responseTime: botReply.metadata?.responseTime
+              },
+              isRead: false
+            })
+
+            // Cập nhật conversation
+            await ChatConversation.updateOne({ sessionId }, {
+              $set: {
+                lastMessage: botReply.text,
+                lastMessageAt: new Date(),
+                lastMessageSender: 'bot'
+              },
+              $inc: { 'botStats.messagesHandled': 1, messageCount: 1, unreadByCustomer: 1 }
+            })
+
+            io.to(`chat_${sessionId}`).emit('chat:message', botMsg.toObject())
+
+            // Nếu bot yêu cầu escalate → thông báo agents
+            if (botReply.escalate) {
+              await ChatConversation.updateOne({ sessionId }, {
+                $set: {
+                  'botStats.escalated': true,
+                  'botStats.escalatedAt': new Date(),
+                  'botStats.escalationReason': botReply.escalateReason
+                }
+              })
+              const escalatedConv = await ChatConversation.findOne({ sessionId }).lean()
+              io.to('agents').emit('chat:escalation', {
+                sessionId,
+                reason: botReply.escalateReason,
+                conversation: escalatedConv
+              })
+            }
+          }
+        } catch (botErr) {
+          console.error('[Chat] Bot processing error FULL:', botErr)
+          logger.error('[Chat] Bot processing error:', botErr.stack || botErr.message || botErr)
+          io.to(`chat_${sessionId}`).emit('chat:bot_typing', { isTyping: false })
+        }
+      }
     } catch (err) {
       logger.error('[Chat] send error:', err.message)
+    }
+  })
+
+  // ─── Customer: yêu cầu chuyển nhân viên (manual escalation) ────────────────
+  socket.on('chat:request_agent', async ({ sessionId, reason }) => {
+    try {
+      const conv = await ChatConversation.findOne({ sessionId })
+      if (!conv) return
+
+      // Đánh dấu escalation
+      await ChatConversation.updateOne({ sessionId }, {
+        $set: {
+          'botStats.escalated': true,
+          'botStats.escalatedAt': new Date(),
+          'botStats.escalationReason': reason || 'Khách yêu cầu chuyển nhân viên'
+        }
+      })
+
+      // Tạo system message
+      const sysMsg = await ChatMessage.create({
+        conversationId: conv._id,
+        sessionId,
+        sender: 'system',
+        type: 'system',
+        senderName: 'System',
+        message: 'Khách hàng yêu cầu nói chuyện với nhân viên hỗ trợ'
+      })
+
+      io.to(`chat_${sessionId}`).emit('chat:message', sysMsg.toObject())
+
+      // Thông báo agents
+      const updatedConv = await ChatConversation.findOne({ sessionId }).lean()
+      io.to('agents').emit('chat:escalation', {
+        sessionId,
+        reason: reason || 'Khách yêu cầu chuyển nhân viên',
+        conversation: updatedConv
+      })
+      io.to('agents').emit('chat:conversation_updated', updatedConv)
+    } catch (err) {
+      logger.error('[Chat] request_agent error:', err.message)
+    }
+  })
+
+  // ─── Customer: yêu cầu chuyển lại sang cho AI ──────────────────────────────
+  socket.on('chat:switch_to_bot', async ({ sessionId }) => {
+    try {
+      const conv = await ChatConversation.findOne({ sessionId })
+      if (!conv) return
+
+      await ChatConversation.updateOne({ sessionId }, {
+        $set: {
+          'botStats.escalated': false,
+          status: 'unassigned', 
+          assignedAgent: null
+        }
+      })
+
+      // Ghi status system
+      const sysMsg = await ChatMessage.create({
+        conversationId: conv._id,
+        sessionId,
+        sender: 'system',
+        type: 'system',
+        senderName: 'System',
+        message: 'Trợ lý AI SmartMall Bot đã quay trở lại. Bạn cần tôi giúp gì?'
+      })
+
+      io.to(`chat_${sessionId}`).emit('chat:message', sysMsg.toObject())
+
+      const updatedConv = await ChatConversation.findOne({ sessionId }).lean()
+      io.to('agents').emit('chat:conversation_updated', updatedConv)
+    } catch (err) {
+      logger.error('[Chat] switch_to_bot error:', err.message)
     }
   })
 
@@ -300,6 +453,9 @@ app.use('/docs', (req, res) => res.redirect('/api-docs'))
 // Order matters: notFound FIRST then errorHandler
 app.use(notFound)
 app.use(errorHandler)
+
+// ─── Cron Jobs ───────────────────────────────────────────────────────────────
+require('./api/v1/jobs/recalcRecommendScore').start()
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 server.listen(port, () => {

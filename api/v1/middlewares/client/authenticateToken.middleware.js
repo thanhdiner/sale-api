@@ -17,3 +17,18 @@ module.exports.authenticateToken = (req, res, next) => {
     next(err)
   }
 }
+
+module.exports.optionalAuthenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization']
+  const token = authHeader && authHeader.split(' ')[1]
+  if (!token) return next()
+
+  try {
+    const decoded = jwt.verify(token, ACCESS_SECRET)
+    req.user = decoded
+    next()
+  } catch (err) {
+    // Ignore error for optional auth
+    next()
+  }
+}

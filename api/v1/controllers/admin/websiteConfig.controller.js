@@ -14,7 +14,7 @@ exports.index = async (req, res) => {
 //#PATCH /admin/website-config/edit
 module.exports.edit = async (req, res) => {
   try {
-    const { siteName, tagline, description, contactInfo, seoSettings, logo, favicon } = req.body
+    const { siteName, tagline, description, contactInfo, seoSettings, logo, favicon, dailySuggestionBanner, dailySuggestionBannerImg } = req.body
 
     const contactObj = typeof contactInfo === 'string' ? JSON.parse(contactInfo) : contactInfo
     const seoObj = typeof seoSettings === 'string' ? JSON.parse(seoSettings) : seoSettings
@@ -23,6 +23,16 @@ module.exports.edit = async (req, res) => {
 
     if (typeof logo === 'string' && logo.trim() !== '') config.logoUrl = logo
     if (typeof favicon === 'string' && favicon.trim() !== '') config.faviconUrl = favicon
+    
+    // Xử lý banner
+    if (dailySuggestionBanner) {
+      const bannerObj = typeof dailySuggestionBanner === 'string' ? JSON.parse(dailySuggestionBanner) : dailySuggestionBanner
+      config.dailySuggestionBanner = { ...config.dailySuggestionBanner, ...bannerObj }
+    }
+    if (typeof dailySuggestionBannerImg === 'string' && dailySuggestionBannerImg.trim() !== '') {
+      config.dailySuggestionBanner = { ...config.dailySuggestionBanner, imageUrl: dailySuggestionBannerImg }
+    }
+
     config.siteName = siteName
     config.tagline = tagline
     config.description = description

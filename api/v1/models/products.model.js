@@ -26,29 +26,52 @@ const productSchema = new mongoose.Schema(
       min: 0,
       default: 0
     },
-    discountPercentage: Number,
+    discountPercentage: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 0
+    },
     stock: {
       type: Number,
-      min: 0
+      min: 0,
+      default: 0
     },
     soldQuantity: {
       type: Number,
       default: 0
     },
-    thumbnail: String,
-    features: [String],
-    status: String,
+    thumbnail: {
+      type: String,
+      default: ''
+    },
+    features: {
+      type: [String],
+      default: []
+    },
+    status: {
+      type: String,
+      enum: ['active', 'inactive'],
+      default: 'active'
+    },
     position: Number,
     content: String,
     timeStart: Date,
     timeFinish: Date,
     isTopDeal: { type: Boolean, default: false },
     isFeatured: { type: Boolean, default: false },
-    rate: Number,
+    rate: {
+      type: Number,
+      min: 0,
+      max: 5,
+      default: 0
+    },
     deliveryEstimateDays: { type: Number, default: 0, min: 0 },
+    viewsCount: { type: Number, default: 0 },
+    recommendScore: { type: Number, default: 0 },
     slug: {
       type: String,
-      unique: true
+      trim: true
       // slug: 'title', //# tự động get slug từ field title
     },
     createdBy: {
@@ -72,6 +95,13 @@ const productSchema = new mongoose.Schema(
   },
   { timestamps: true }
 )
+
+productSchema.index({ slug: 1 }, { unique: true })
+productSchema.index({ productCategory: 1, status: 1, deleted: 1 })
+productSchema.index({ status: 1, deleted: 1, createdAt: -1 })
+productSchema.index({ isFeatured: 1, status: 1, deleted: 1 })
+productSchema.index({ isTopDeal: 1, status: 1, deleted: 1 })
+productSchema.index({ status: 1, deleted: 1, recommendScore: -1 })
 
 const Product = mongoose.model('Product', productSchema, 'products')
 

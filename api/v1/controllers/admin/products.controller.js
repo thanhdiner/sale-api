@@ -73,14 +73,23 @@ module.exports.detail = async (req, res) => {
 //# Post /api/v1/admin/products/create
 module.exports.create = async (req, res) => {
   try {
+    logger.debug('[Admin][CreateProduct] ── START ──')
+    logger.debug('[Admin][CreateProduct] req.body:', JSON.stringify(req.body, null, 2))
+    logger.debug('[Admin][CreateProduct] req.file:', req.file ? { name: req.file.originalname, size: req.file.size, mimetype: req.file.mimetype } : 'NO FILE')
+    logger.debug('[Admin][CreateProduct] req.user:', req.user)
+
     parseIntegerFields(req.body, ['price', 'costPrice', 'discountPercentage', 'stock', 'deliveryEstimateDays'])
+    logger.debug('[Admin][CreateProduct] After parseIntegerFields:', { price: req.body.price, costPrice: req.body.costPrice, stock: req.body.stock })
 
     await setDefaultPosition(req.body)
+    logger.debug('[Admin][CreateProduct] Position:', req.body.position)
 
     const category = await validateProductCategory(req.body.productCategory)
+    logger.debug('[Admin][CreateProduct] Category validation:', category ? category._id : 'INVALID')
     if (!category) return res.status(400).json({ error: 'Invalid or deleted product category!' })
 
     const { slug, error, suggestedSlug } = await handleSlug({ Model: Product, slugInput: req.body.slug, title: req.body.title })
+    logger.debug('[Admin][CreateProduct] Slug result:', { slug, error, suggestedSlug })
     if (error) return res.status(400).json({ error, suggestedSlug })
     req.body.slug = slug
     req.body.isTopDeal = req.body.isTopDeal === 'true'
@@ -90,8 +99,12 @@ module.exports.create = async (req, res) => {
       req.body.features = [req.body.features]
     }
 
+    logger.debug('[Admin][CreateProduct] Final body before save:', JSON.stringify(req.body, null, 2))
+
     const product = new Product(req.body)
     const data = await product.save()
+
+    logger.debug('[Admin][CreateProduct] ✅ Saved product _id:', data._id)
 
     res.json({
       code: 200,
@@ -99,7 +112,8 @@ module.exports.create = async (req, res) => {
       data: data
     })
   } catch (err) {
-    logger.error('[Admin] Error creating product:', err)
+    logger.error('[Admin][CreateProduct] ❌ Error:', err.message)
+    logger.error('[Admin][CreateProduct] ❌ Stack:', err.stack)
     res.status(500).json({ error: 'Failed to create product', status: 400 })
   }
 }

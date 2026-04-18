@@ -7,7 +7,6 @@ const productCategorySchema = new mongoose.Schema(
     title: {
       type: String,
       required: true,
-      unique: true,
       trim: true
     },
     parent_id: {
@@ -17,13 +16,26 @@ const productCategorySchema = new mongoose.Schema(
     },
     slug: {
       type: String,
-      unique: true,
-      slug: 'title'
+      slug: 'title',
+      trim: true
     },
-    description: String,
-    thumbnail: String,
-    position: Number,
-    status: String,
+    description: {
+      type: String,
+      default: ''
+    },
+    thumbnail: {
+      type: String,
+      default: ''
+    },
+    position: {
+      type: Number,
+      default: 0
+    },
+    status: {
+      type: String,
+      enum: ['active', 'inactive'],
+      default: 'active'
+    },
     deleted: {
       type: Boolean,
       default: false
@@ -46,5 +58,11 @@ const productCategorySchema = new mongoose.Schema(
   { timestamps: true }
 )
 
+productCategorySchema.index({ slug: 1 }, { unique: true })
+productCategorySchema.index({ title: 1 }, { unique: true })
+productCategorySchema.index({ parent_id: 1, status: 1, deleted: 1 })
+productCategorySchema.index({ status: 1, deleted: 1, position: 1 })
+
 const ProductCategory = mongoose.model('ProductCategory', productCategorySchema, 'product_categories')
+
 module.exports = ProductCategory

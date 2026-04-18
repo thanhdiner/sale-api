@@ -14,24 +14,28 @@ module.exports.index = async (req, res) => {
     const { status = 'active', page = 1, limit = 20 } = req.query
     const cacheKey = `flashsales:list:${status}:${page}:${limit}`
 
-    const result = await cache.getOrSet(cacheKey, async () => {
-      const skip = (page - 1) * limit
-      const flashSalesRaw = await FlashSale.find({}).populate('products').sort({ startAt: -1 }).skip(skip).limit(Number(limit))
+    const result = await cache.getOrSet(
+      cacheKey,
+      async () => {
+        const skip = (page - 1) * limit
+        const flashSalesRaw = await FlashSale.find({}).populate('products').sort({ startAt: -1 }).skip(skip).limit(Number(limit))
 
-      const flashSales = flashSalesRaw
-        .map(fs => {
-          const realStatus = getRealStatus(fs)
-          return { ...fs.toObject(), status: realStatus }
-        })
-        .filter(fs => (status === 'all' ? true : fs.status === status))
+        const flashSales = flashSalesRaw
+          .map(fs => {
+            const realStatus = getRealStatus(fs)
+            return { ...fs.toObject(), status: realStatus }
+          })
+          .filter(fs => (status === 'all' ? true : fs.status === status))
 
-      return {
-        flashSales,
-        total: flashSales.length,
-        currentPage: Number(page),
-        limit: Number(limit)
-      }
-    }, 120) // 2 phút — flash sale có thể đổi trạng thái -> TTL ngắn
+        return {
+          flashSales,
+          total: flashSales.length,
+          currentPage: Number(page),
+          limit: Number(limit)
+        }
+      },
+      120
+    ) // 2 phút — flash sale có thể đổi trạng thái -> TTL ngắn
 
     res.json(result)
   } catch (err) {
@@ -45,12 +49,16 @@ module.exports.detail = async (req, res) => {
     const { id } = req.params
     const cacheKey = `flashsales:detail:${id}`
 
-    const result = await cache.getOrSet(cacheKey, async () => {
-      const flashSale = await FlashSale.findById(id).populate('products', 'name price thumbnail stock')
-      if (!flashSale) return null
-      const realStatus = getRealStatus(flashSale)
-      return { flashSale: { ...flashSale.toObject(), status: realStatus } }
-    }, 120)
+    const result = await cache.getOrSet(
+      cacheKey,
+      async () => {
+        const flashSale = await FlashSale.findById(id).populate('products', 'name price thumbnail stock')
+        if (!flashSale) return null
+        const realStatus = getRealStatus(flashSale)
+        return { flashSale: { ...flashSale.toObject(), status: realStatus } }
+      },
+      120
+    )
 
     if (!result) return res.status(404).json({ message: 'Không tìm thấy flash sale' })
     res.json(result)

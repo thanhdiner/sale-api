@@ -41,7 +41,14 @@ const chatConversationSchema = new mongoose.Schema(
     messageCount: { type: Number, default: 0 },
     // Thời gian
     firstReplyAt: { type: Date, default: null },
-    resolvedAt: { type: Date, default: null }
+    resolvedAt: { type: Date, default: null },
+    // Bot interaction tracking
+    botStats: {
+      messagesHandled: { type: Number, default: 0 },
+      escalated: { type: Boolean, default: false },
+      escalatedAt: { type: Date, default: null },
+      escalationReason: { type: String, default: null }
+    }
   },
   { timestamps: true }
 )

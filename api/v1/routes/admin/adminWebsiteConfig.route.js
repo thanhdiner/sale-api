@@ -14,7 +14,8 @@ router.patch(
   authenticateToken.authenticateToken,
   fileUpload.fields([
     { name: 'logo', maxCount: 1 },
-    { name: 'favicon', maxCount: 1 }
+    { name: 'favicon', maxCount: 1 },
+    { name: 'dailySuggestionBannerImg', maxCount: 1 }
   ]),
   uploadCloud.deleteImageMany,
   uploadCloud.uploadMany,

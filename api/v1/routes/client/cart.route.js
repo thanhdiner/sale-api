@@ -4,13 +4,15 @@ const controller = require('../../controllers/client/carts.controller')
 
 const validate = require('../../middlewares/validate.middleware')
 const cartSchemas = require('../../validations/cart.validation')
+const { createRateLimiter } = require('../../middlewares/client/rateLimit.middleware')
+
+const cartRateLimit = createRateLimiter({ windowMs: 60000, max: 20, message: { message: 'Thao tác giỏ hàng quá nhanh, vui lòng thử lại sau.' } })
 
 router.get('/', controller.index)
-router.post('/add', validate(cartSchemas.addToCart), controller.add)
-router.post('/update', validate(cartSchemas.updateCart), controller.update)
-router.post('/remove', validate(cartSchemas.removeFromCart), controller.remove)
-router.post('/clear', controller.clear)
-router.post('/remove-many', validate(cartSchemas.removeManyFromCart), controller.removeMany)
+router.post('/add', cartRateLimit, validate(cartSchemas.addToCart), controller.add)
+router.post('/update', cartRateLimit, validate(cartSchemas.updateCart), controller.update)
+router.post('/remove', cartRateLimit, validate(cartSchemas.removeFromCart), controller.remove)
+router.post('/clear', cartRateLimit, controller.clear)
+router.post('/remove-many', cartRateLimit, validate(cartSchemas.removeManyFromCart), controller.removeMany)
 
 module.exports = router
-

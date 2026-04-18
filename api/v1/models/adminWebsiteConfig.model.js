@@ -28,6 +28,15 @@ const websiteConfigSchema = new mongoose.Schema(
       metaDescription: { type: String, trim: true, maxlength: 160 },
       keywords: String,
       googleAnalytics: String
+    },
+
+    dailySuggestionBanner: {
+      leftText: String,
+      rightText: String,
+      imageUrl: String,
+      title: String,
+      subtitle: String,
+      link: String
     }
   },
   { timestamps: true }

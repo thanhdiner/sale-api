@@ -16,7 +16,7 @@ const chatMessageSchema = new mongoose.Schema(
     // Loại người gửi
     sender: {
       type: String,
-      enum: ['customer', 'agent', 'system'],
+      enum: ['customer', 'agent', 'system', 'bot'],
       required: true
     },
     senderId: { type: String, default: null },
@@ -37,7 +37,9 @@ const chatMessageSchema = new mongoose.Schema(
     },
     // Chỉ agent thấy (internal note)
     isInternal: { type: Boolean, default: false },
-    isRead: { type: Boolean, default: false }
+    isRead: { type: Boolean, default: false },
+    // Metadata cho bot messages (suggestions, intent, confidence, pendingAction...)
+    metadata: { type: mongoose.Schema.Types.Mixed, default: null }
   },
   { timestamps: true }
 )

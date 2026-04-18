@@ -24,8 +24,12 @@ function getClient() {
   })
 
   client.on('connect', () => logger.info('[Redis] Đã kết nối Redis'))
-  client.on('error', err => logger.warn('[Redis] Lỗi:', err.message))
+  client.on('error', err => logger.warn('[Redis] Lỗi:', err?.message || String(err)))
   client.on('end', () => logger.warn('[Redis] Kết nối Redis đã đóng'))
+
+  // Prevent ioredis internal promise rejections from crashing the process
+  client.on('close', () => {})
+  client.on('reconnecting', () => {})
 
   return client
 }
