@@ -45,6 +45,10 @@ const productSchema = new mongoose.Schema(
       type: String,
       default: ''
     },
+    images: {
+      type: [String],
+      default: []
+    },
     features: {
       type: [String],
       default: []
@@ -72,7 +76,7 @@ const productSchema = new mongoose.Schema(
     slug: {
       type: String,
       trim: true
-      // slug: 'title', //# tự động get slug từ field title
+      // slug: 'title',
     },
     createdBy: {
       by: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminAccount' },

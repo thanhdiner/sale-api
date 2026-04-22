@@ -75,12 +75,12 @@ async function recalculate() {
     }
 
     // Xóa cache recommendations để lần query kế tiếp lấy kết quả mới
-    await require('../../../../config/redis').del('products:recommendations:*')
+    await require('../../../config/redis').del('products:recommendations:*')
 
     const elapsed = Date.now() - startTime
     logger.info(`[RecommendScore] Hoàn tất: ${products.length} sản phẩm, ${elapsed}ms`)
   } catch (err) {
-    logger.error('[RecommendScore] Lỗi:', err.message || err)
+    logger.error('[RecommendScore] Lỗi:', err.stack || err.message || err)
   }
 }
 

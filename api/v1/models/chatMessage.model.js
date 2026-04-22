@@ -13,7 +13,7 @@ const chatMessageSchema = new mongoose.Schema(
       required: true,
       index: true
     },
-    // Loại người gửi
+    // Loai nguoi gui
     sender: {
       type: String,
       enum: ['customer', 'agent', 'system', 'bot'],
@@ -23,19 +23,28 @@ const chatMessageSchema = new mongoose.Schema(
     senderName: { type: String, default: 'Khách' },
     senderAvatar: { type: String, default: null },
 
-    // Loại tin nhắn
+    // Loai tin nhan
     type: {
       type: String,
-      enum: ['text', 'system', 'note'], // note = internal, không visible với customer
+      enum: ['text', 'image', 'system', 'note'],
       default: 'text'
     },
     message: {
       type: String,
-      required: true,
       trim: true,
-      maxlength: 2000
+      maxlength: 2000,
+      default: '',
+      validate: {
+        validator(value) {
+          if (this.type === 'image') return !!this.imageUrl || (Array.isArray(this.imageUrls) && this.imageUrls.length > 0)
+          return typeof value === 'string' && value.trim().length > 0
+        },
+        message: 'Nội dung tin nhắn không hợp lệ'
+      }
     },
-    // Chỉ agent thấy (internal note)
+    imageUrl: { type: String, default: null },
+    imageUrls: { type: [String], default: [] },
+    // Chi agent thay (internal note)
     isInternal: { type: Boolean, default: false },
     isRead: { type: Boolean, default: false },
     // Metadata cho bot messages (suggestions, intent, confidence, pendingAction...)

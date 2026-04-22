@@ -264,3 +264,71 @@ module.exports.cancelOrder = async (req, res) => {
     res.status(500).json({ error: err.message })
   }
 }
+
+//# POST /api/v1/orders/track  (PUBLIC — không cần đăng nhập)
+module.exports.trackOrder = async (req, res) => {
+  try {
+    const { orderCode, phone } = req.body
+
+    if (!orderCode || !phone) {
+      return res.status(400).json({ error: 'Vui lòng nhập mã đơn hàng và số điện thoại.' })
+    }
+
+    // Chuẩn hóa phone: bỏ khoảng trắng, dấu gạch
+    const cleanPhone = phone.replace(/[\s\-\.]/g, '')
+
+    // Chuẩn hóa orderCode: bỏ dấu # và khoảng trắng
+    const cleanOrderCode = orderCode.trim().replace(/^#/, '')
+
+    // Tìm đơn hàng theo _id và số điện thoại liên hệ
+    let order = null
+    try {
+      order = await Order.findOne({
+        _id: cleanOrderCode,
+        'contact.phone': cleanPhone,
+        isDeleted: false
+      }).lean()
+    } catch {
+      // _id không hợp lệ (không phải ObjectId) → không tìm thấy
+      order = null
+    }
+
+    if (!order) {
+      return res.status(404).json({ error: 'Không tìm thấy đơn hàng hoặc số điện thoại không khớp.' })
+    }
+
+    // Chỉ trả về thông tin an toàn, không trả toàn bộ dữ liệu đơn hàng
+    const statusMap = {
+      pending: 'Chờ xác nhận',
+      confirmed: 'Đã xác nhận',
+      shipping: 'Đang giao hàng',
+      completed: 'Hoàn thành',
+      cancelled: 'Đã hủy'
+    }
+
+    const paymentStatusMap = {
+      pending: 'Chưa thanh toán',
+      paid: 'Đã thanh toán',
+      failed: 'Thanh toán thất bại'
+    }
+
+    res.json({
+      success: true,
+      order: {
+        id: order._id,
+        status: order.status,
+        statusLabel: statusMap[order.status] || order.status,
+        paymentStatus: order.paymentStatus,
+        paymentStatusLabel: paymentStatusMap[order.paymentStatus] || order.paymentStatus,
+        paymentMethod: order.paymentMethod,
+        total: order.total,
+        itemCount: order.orderItems?.length || 0,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt
+      }
+    })
+  } catch (err) {
+    logger.error('[Client] trackOrder error:', err)
+    res.status(500).json({ error: 'Lỗi tra cứu đơn hàng' })
+  }
+}

@@ -15,6 +15,15 @@ const REFRESH_SECRET = process.env.REFRESH_SECRET
 const JWT_EXPIRES_IN_ACCESS = process.env.JWT_EXPIRES_IN_ACCESS || '1h'
 const JWT_EXPIRES_IN_REFRESH = process.env.JWT_EXPIRES_IN_REFRESH || '30d'
 
+const serializeAuthUser = user => ({
+  _id: user._id,
+  username: user.username,
+  email: user.email,
+  fullName: user.fullName,
+  avatarUrl: user.avatarUrl || '',
+  lastLogin: user.lastLogin || null
+})
+
 //# POST /api/v1/user/login
 module.exports.login = async (req, res) => {
   try {
@@ -54,13 +63,7 @@ module.exports.login = async (req, res) => {
     res.json({
       message: 'Đăng nhập thành công!',
       clientAccessToken,
-      user: {
-        _id: user._id,
-        username: user.username,
-        email: user.email,
-        fullName: user.fullName,
-        lastLogin: user.lastLogin
-      }
+      user: serializeAuthUser(user)
     })
   } catch (err) {
     res.status(500).json({ error: 'Lỗi server!' })
@@ -124,12 +127,7 @@ module.exports.refreshToken = async (req, res) => {
 
     res.json({
       clientAccessToken: newAccessToken,
-      user: {
-        _id: user._id,
-        username: user.username,
-        email: user.email,
-        fullName: user.fullName
-      }
+      user: serializeAuthUser(user)
     })
   } catch (error) {
     res.status(500).json({ error: 'Có lỗi xảy ra, vui lòng thử lại sau!' })
@@ -210,14 +208,7 @@ module.exports.oauthCodeLogin = async (req, res) => {
 
     res.json({
       clientAccessToken,
-      user: {
-        _id: user._id,
-        username: user.username,
-        email: user.email,
-        fullName: user.fullName,
-        avatarUrl: user.avatarUrl,
-        lastLogin: user.lastLogin
-      }
+      user: serializeAuthUser(user)
     })
   } catch (err) {
     res.status(500).json({ error: 'Có lỗi xảy ra, vui lòng thử lại!' })

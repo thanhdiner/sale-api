@@ -11,6 +11,7 @@ router.post('/:slug/view',
   createRateLimiter({ windowMs: 60000, max: 30, message: { message: 'Quá nhiều lượt xem, vui lòng thử lại sau.' } }),
   controller.trackView
 )
+router.get('/:id/explore-more', controller.exploreMore)
 router.get('/', controller.index)
 router.get('/:slug', controller.detail)
 

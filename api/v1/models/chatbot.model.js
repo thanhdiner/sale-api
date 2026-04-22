@@ -4,7 +4,7 @@ const chatbotConfigSchema = new mongoose.Schema(
   {
     // Cấu hình chung
     isEnabled: { type: Boolean, default: true },
-    aiProvider: { type: String, enum: ['openai', 'deepseek', 'groq'], default: 'openai' },
+    aiProvider: { type: String, enum: ['openai', 'deepseek', 'groq', '9router'], default: 'openai' },
     model: { type: String, default: 'gpt-4o-mini' },
     maxTokens: { type: Number, default: 1000 },
     temperature: { type: Number, default: 0.7 },

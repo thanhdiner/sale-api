@@ -1,12 +1,16 @@
 const Review = require('../../models/review.model')
-const logger = require('../../../../config/logger')
+const ReviewVote = require('../../models/reviewVote.model')
+const { getRequesterUserId, recalcProductRating } = require('../../utils/reviewUtils')
 
-// GET /admin/reviews  – list all reviews (paginated, with search & rating filter)
+// GET /admin/reviews
 module.exports.getReviews = async (req, res) => {
   try {
-    const { page = 1, limit = 20, productId, rating, search } = req.query
+    const { page = 1, limit = 20, productId, hidden, rating } = req.query
     const query = { deleted: false }
+
     if (productId) query.productId = productId
+    if (hidden === 'true') query.hidden = true
+    if (hidden === 'false') query.hidden = { $ne: true }
     if (rating) query.rating = Number(rating)
 
     const skip = (Number(page) - 1) * Number(limit)
@@ -17,27 +21,16 @@ module.exports.getReviews = async (req, res) => {
       .limit(Number(limit))
       .populate('userId', 'fullName avatarUrl username email')
       .populate('productId', 'title thumbnail slug')
+      .populate('hiddenBy', 'fullName username')
 
-    // Post-populate search filter
-    let filtered = reviews
-    if (search && search.trim()) {
-      const s = search.trim().toLowerCase()
-      filtered = reviews.filter(r =>
-        (r.userId?.fullName || '').toLowerCase().includes(s) ||
-        (r.userId?.email || '').toLowerCase().includes(s) ||
-        (r.content || '').toLowerCase().includes(s) ||
-        (r.title || '').toLowerCase().includes(s)
-      )
-    }
-
-    res.json({ reviews: filtered, total })
+    res.json({ reviews, total })
   } catch (err) {
-    logger.error('[Admin] Reviews error:', err)
+    console.error(err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
 
-// PUT /admin/reviews/:reviewId/reply  – seller reply
+// PUT /admin/reviews/:reviewId/reply
 module.exports.replyReview = async (req, res) => {
   try {
     const { reviewId } = req.params
@@ -51,7 +44,7 @@ module.exports.replyReview = async (req, res) => {
 
     res.json({ sellerReply: review.sellerReply })
   } catch (err) {
-    logger.error('[Admin] Reviews error:', err)
+    console.error(err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -68,12 +61,36 @@ module.exports.deleteReply = async (req, res) => {
 
     res.json({ message: 'Reply deleted' })
   } catch (err) {
-    logger.error('[Admin] Reviews error:', err)
+    console.error(err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
 
-// DELETE /admin/reviews/:reviewId  – admin force delete
+// PUT /admin/reviews/:reviewId/hide
+module.exports.hideReview = async (req, res) => {
+  try {
+    const { reviewId } = req.params
+    const { reason = '' } = req.body || {}
+
+    const review = await Review.findOne({ _id: reviewId, deleted: false })
+    if (!review) return res.status(404).json({ error: 'Review not found' })
+
+    review.hidden = true
+    review.hiddenAt = new Date()
+    review.hiddenBy = getRequesterUserId(req.user) || null
+    review.hiddenReason = reason || review.hiddenReason || ''
+    await review.save()
+
+    await recalcProductRating(review.productId)
+
+    res.json({ message: 'Review hidden', review })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+// DELETE /admin/reviews/:reviewId
 module.exports.deleteReview = async (req, res) => {
   try {
     const { reviewId } = req.params
@@ -83,10 +100,13 @@ module.exports.deleteReview = async (req, res) => {
     review.deleted = true
     review.deletedAt = new Date()
     await review.save()
+    await ReviewVote.deleteMany({ reviewId })
+
+    await recalcProductRating(review.productId)
 
     res.json({ message: 'Deleted' })
   } catch (err) {
-    logger.error('[Admin] Reviews error:', err)
+    console.error(err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }

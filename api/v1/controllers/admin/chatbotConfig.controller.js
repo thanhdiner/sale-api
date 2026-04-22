@@ -1,28 +1,76 @@
+const mongoose = require('mongoose')
+
 const ChatbotConfig = require('../../models/chatbot.model')
 const logger = require('../../../../config/logger')
+
+function getValidAdminId(userId) {
+  if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+    return null
+  }
+
+  return userId
+}
 
 // GET /api/v1/admin/chatbot-config
 exports.getConfig = async (req, res) => {
   try {
     let config = await ChatbotConfig.findOne().lean()
     if (!config) {
-      // Tạo config mặc định nếu chưa có
       config = await ChatbotConfig.create({})
       config = config.toObject()
     }
 
-    // Thêm thông tin từ env (không lưu API key vào DB)
-    config.envProvider = process.env.CHATBOT_PROVIDER || 'openai'
-    config.envModel = process.env.CHATBOT_MODEL || 'gpt-4o-mini'
-    config.envEnabled = process.env.CHATBOT_ENABLED !== 'false'
-    config.hasOpenaiKey = !!(process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'sk-your-openai-key-here')
-    config.hasDeepseekKey = !!(process.env.DEEPSEEK_API_KEY && process.env.DEEPSEEK_API_KEY !== 'sk-your-deepseek-key-here')
-    config.hasGroqKey = !!(process.env.GROQ_API_KEY && process.env.GROQ_API_KEY !== 'gsk-your-groq-key-here')
+    const aiService = require('../../services/ai/ai.service')
+
+    config.rawEnvEnabled = process.env.CHATBOT_ENABLED !== 'false'
+    config.rawEnvProvider = (process.env.CHATBOT_PROVIDER || 'openai').toLowerCase()
+    config.rawEnvModel = process.env.CHATBOT_MODEL || null
+    config.rawEnvBaseUrl = process.env.NINEROUTER_BASE_URL || null
+
+    try {
+      const runtimeConfig = await aiService.getRuntimeConfig()
+      config.runtimeEnabled = runtimeConfig.isEnabled
+      config.runtimeProvider = runtimeConfig.provider
+      config.runtimeModel = runtimeConfig.model
+      config.runtimeBaseUrl = runtimeConfig.baseURL
+      config.runtimeConfigError = null
+      config.envEnabled = runtimeConfig.isEnabled
+      config.envProvider = runtimeConfig.provider
+      config.envModel = runtimeConfig.model
+      config.envBaseUrl = runtimeConfig.baseURL
+    } catch (runtimeErr) {
+      config.runtimeEnabled = process.env.CHATBOT_ENABLED !== 'false'
+      config.runtimeProvider = config.aiProvider || config.rawEnvProvider
+      config.runtimeModel = config.model || config.rawEnvModel
+      config.runtimeBaseUrl = config.rawEnvBaseUrl
+      config.runtimeConfigError = runtimeErr.message
+      config.envEnabled = config.runtimeEnabled
+      config.envProvider = config.runtimeProvider
+      config.envModel = config.runtimeModel
+      config.envBaseUrl = config.runtimeBaseUrl
+    }
+
+    config.hasOpenaiKey = !!(
+      process.env.OPENAI_API_KEY
+      && process.env.OPENAI_API_KEY !== 'sk-your-openai-key-here'
+    )
+    config.hasDeepseekKey = !!(
+      process.env.DEEPSEEK_API_KEY
+      && process.env.DEEPSEEK_API_KEY !== 'sk-your-deepseek-key-here'
+    )
+    config.hasGroqKey = !!(
+      process.env.GROQ_API_KEY
+      && process.env.GROQ_API_KEY !== 'gsk-your-groq-key-here'
+    )
+    config.has9routerKey = !!(
+      process.env.NINEROUTER_API_KEY
+      && process.env.NINEROUTER_API_KEY !== 'sk_9router_your_api_key_here'
+    )
 
     res.json({ success: true, data: config })
   } catch (err) {
-    logger.error('[Admin] Get chatbot config error:', err.message)
-    res.status(500).json({ success: false, message: 'Lỗi server' })
+    logger.error(`[Admin] Get chatbot config error: ${err.stack || err.message || err}`)
+    res.status(500).json({ success: false, message: 'Loi server' })
   }
 }
 
@@ -48,7 +96,6 @@ exports.updateConfig = async (req, res) => {
       config = new ChatbotConfig()
     }
 
-    // Cập nhật từng field nếu có gửi lên
     if (isEnabled !== undefined) config.isEnabled = isEnabled
     if (aiProvider) config.aiProvider = aiProvider
     if (model) config.model = model
@@ -61,15 +108,20 @@ exports.updateConfig = async (req, res) => {
     if (maxMessagesPerMinute) config.maxMessagesPerMinute = maxMessagesPerMinute
     if (maxMessagesPerSession) config.maxMessagesPerSession = maxMessagesPerSession
 
-    config.updatedBy = req.user?.id || null
+    const updatedBy = getValidAdminId(req.user?.userId)
+    if (req.user?.userId && !updatedBy) {
+      logger.warn(`[Admin] Invalid admin userId in chatbot config update: ${req.user.userId}`)
+    }
+
+    config.updatedBy = updatedBy
 
     await config.save()
 
-    logger.info(`[Admin] Chatbot config updated by ${req.user?.id}`)
-    res.json({ success: true, message: 'Cập nhật cấu hình chatbot thành công!', data: config })
+    logger.info(`[Admin] Chatbot config updated by ${updatedBy || 'unknown'}`)
+    res.json({ success: true, message: 'Cap nhat cau hinh chatbot thanh cong!', data: config })
   } catch (err) {
-    logger.error('[Admin] Update chatbot config error:', err.message)
-    res.status(500).json({ success: false, message: 'Cập nhật cấu hình thất bại!' })
+    logger.error(`[Admin] Update chatbot config error: ${err.stack || err.message || err}`)
+    res.status(500).json({ success: false, message: err.message || 'Cap nhat cau hinh chatbot that bai!' })
   }
 }
 
@@ -77,19 +129,25 @@ exports.updateConfig = async (req, res) => {
 exports.testConnection = async (req, res) => {
   try {
     const aiService = require('../../services/ai/ai.service')
-    const { provider, model } = aiService.getActiveConfig()
+    const providerOverride = req.body?.aiProvider
+    const modelOverride = req.body?.model
+    const runtimeConfig = await aiService.getRuntimeConfig({
+      provider: providerOverride,
+      model: modelOverride
+    })
+    const { provider, model } = runtimeConfig
 
-    // Gửi một message test đơn giản
     const result = await aiService.processMessage(
       'test_' + Date.now(),
-      'Xin chào, bạn là ai?',
-      { name: 'Admin Test', userId: 'admin' }
+      'Xin chao, ban la ai?',
+      { name: 'Admin Test', userId: 'admin' },
+      runtimeConfig
     )
 
-    if (result && result.text) {
-      res.json({
-        success: true,
-        message: 'Kết nối thành công!',
+    if (result?.metadata?.error) {
+      return res.json({
+        success: false,
+        message: `Loi ket noi: ${result.metadata.error}`,
         data: {
           provider,
           model,
@@ -97,18 +155,31 @@ exports.testConnection = async (req, res) => {
           metadata: result.metadata
         }
       })
-    } else {
-      res.json({
-        success: false,
-        message: 'AI không trả về response',
-        data: { provider, model }
+    }
+
+    if (result && result.text) {
+      return res.json({
+        success: true,
+        message: 'Ket noi thanh cong!',
+        data: {
+          provider,
+          model,
+          response: result.text,
+          metadata: result.metadata
+        }
       })
     }
+
+    return res.json({
+      success: false,
+      message: 'AI khong tra ve response',
+      data: { provider, model }
+    })
   } catch (err) {
-    logger.error('[Admin] Test chatbot connection error:', err.message)
+    logger.error(`[Admin] Test chatbot connection error: ${err.stack || err.message || err}`)
     res.status(500).json({
       success: false,
-      message: `Lỗi kết nối: ${err.message}`,
+      message: `Loi ket noi: ${err.message}`,
       data: { error: err.message }
     })
   }

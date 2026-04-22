@@ -1,9 +1,21 @@
+const mongoose = require('mongoose')
 const Product = require('../../models/products.model')
 const Cart = require('../../models/cart.model')
 const Wishlist = require('../../models/wishlist.model')
 const ProductView = require('../../models/productView.model')
 const productsHelper = require('../../helpers/product')
+const { getCheapDeals } = require('../../helpers/cheapDeals')
 const cache = require('../../../../config/redis')
+const EXPLORE_MORE_SELECT = 'title slug thumbnail price discountPercentage stock soldQuantity rate isTopDeal isFeatured deliveryEstimateDays viewsCount recommendScore createdAt'
+const EXPLORE_MORE_SORT = {
+  isTopDeal: -1,
+  isFeatured: -1,
+  recommendScore: -1,
+  soldQuantity: -1,
+  viewsCount: -1,
+  rate: -1,
+  createdAt: -1
+}
 
 // TTL (giây)
 const TTL_LIST = 180    // 3 phút
@@ -157,6 +169,72 @@ module.exports.detail = async (req, res) => {
   }
 }
 
+//# GET /products/:id/explore-more
+module.exports.exploreMore = async (req, res) => {
+  try {
+    const { id } = req.params
+    const limit = Math.min(Number(req.query.limit) || 8, 20)
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: 'Product khÃ´ng há»£p lá»‡', status: 400 })
+    }
+
+    const currentProduct = await Product.findOne({
+      _id: id,
+      status: 'active',
+      deleted: false
+    }).select('_id productCategory')
+
+    if (!currentProduct) {
+      return res.status(404).json({ error: 'KhÃ´ng tÃ¬m tháº¥y sáº£n pháº©m' })
+    }
+
+    const cacheKey = `products:explore-more:${currentProduct._id}:${limit}`
+
+    const result = await cache.getOrSet(cacheKey, async () => {
+      const sameCategoryProducts = await Product.find({
+        _id: { $ne: currentProduct._id },
+        productCategory: currentProduct.productCategory,
+        status: 'active',
+        deleted: false
+      })
+        .sort(EXPLORE_MORE_SORT)
+        .limit(limit)
+        .select(EXPLORE_MORE_SELECT)
+        .lean()
+
+      let products = sameCategoryProducts
+
+      if (products.length < limit) {
+        const existingIds = products.map(product => product._id)
+
+        const fallbackProducts = await Product.find({
+          _id: {
+            $ne: currentProduct._id,
+            $nin: existingIds
+          },
+          status: 'active',
+          deleted: false
+        })
+          .sort(EXPLORE_MORE_SORT)
+          .limit(limit - products.length)
+          .select(EXPLORE_MORE_SELECT)
+          .lean()
+
+        products = [...products, ...fallbackProducts]
+      }
+
+      return {
+        products: productsHelper.priceNewProducts(products)
+      }
+    }, TTL_LIST)
+
+    res.json(result)
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error', status: 500 })
+  }
+}
+
 //# GET /products/recommendations
 module.exports.recommendations = async (req, res) => {
   try {
@@ -207,8 +285,17 @@ module.exports.recommendations = async (req, res) => {
       }
       sortObj = { recommendScore: -1 }
     } else if (tab === 'cheap-deals') {
-      query.discountPercentage = { $gt: 0 }
-      sortObj = { discountPercentage: -1, recommendScore: -1 }
+      // ── Deal Siêu Rẻ: dùng scoring algorithm riêng ──
+      const fetchCheapDeals = async () => getCheapDeals(page, limit)
+
+      if (isGuest) {
+        const cacheKey = `products:recommendations:cheap-deals-v2:${page}:${limit}`
+        const result = await cache.getOrSet(cacheKey, fetchCheapDeals, TTL_LIST)
+        return res.json(result)
+      }
+
+      const result = await fetchCheapDeals()
+      return res.json(result)
     } else if (tab === 'newest') {
       sortObj = { createdAt: -1 }
     }

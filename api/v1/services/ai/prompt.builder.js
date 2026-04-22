@@ -13,7 +13,7 @@ const knowledgeLoader = require('./knowledge.loader')
  * @returns {string} System prompt
  */
 function buildSystemPrompt(options = {}) {
-  const { customerInfo = {}, customPrompt } = options
+  const { customerInfo = {}, customPrompt, brandVoice } = options
 
   // Nếu admin set custom prompt → dùng luôn
   if (customPrompt && customPrompt.trim()) {
@@ -94,6 +94,28 @@ HÃY CHỦ ĐỘNG sử dụng các khả năng này để trả lời khách, K
  * @param {string} userMessage - Tin nhắn mới từ khách
  * @returns {Array} Messages array
  */
+function normalizeUserContent(userMessage) {
+  if (Array.isArray(userMessage) && userMessage.length > 0) {
+    return userMessage
+  }
+
+  if (userMessage && typeof userMessage === 'object') {
+    if (Array.isArray(userMessage.content) && userMessage.content.length > 0) {
+      return userMessage.content
+    }
+
+    if (typeof userMessage.text === 'string') {
+      return userMessage.text
+    }
+
+    if (typeof userMessage.promptText === 'string') {
+      return userMessage.promptText
+    }
+  }
+
+  return typeof userMessage === 'string' ? userMessage : ''
+}
+
 function buildMessages(systemPrompt, conversationHistory, userMessage) {
   const messages = [
     { role: 'system', content: systemPrompt }
@@ -105,7 +127,7 @@ function buildMessages(systemPrompt, conversationHistory, userMessage) {
   }
 
   // Thêm tin nhắn mới
-  messages.push({ role: 'user', content: userMessage })
+  messages.push({ role: 'user', content: normalizeUserContent(userMessage) })
 
   return messages
 }

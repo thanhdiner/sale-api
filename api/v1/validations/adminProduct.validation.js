@@ -15,6 +15,7 @@ const createProduct = Joi.object({
   }),
   slug: Joi.string().max(500).optional().allow('', null),
   description: Joi.string().max(50000).optional().allow('', null),
+  content: Joi.string().max(50000).optional().allow('', null),
   price: Joi.number().min(0).required().messages({ 'any.required': 'Giá là bắt buộc' }),
   costPrice: Joi.number().min(0).optional().allow(null),
   discountPercentage: Joi.number().min(0).max(100).default(0),
@@ -28,18 +29,26 @@ const createProduct = Joi.object({
   ).optional(),
   features: Joi.alternatives().try(
     Joi.array().items(Joi.string()),
-    Joi.string()
-  ).optional(),
+    Joi.string().allow('')
+  ).optional().allow(null),
   isTopDeal: Joi.alternatives().try(Joi.boolean(), Joi.string()).optional(),
   isFeatured: Joi.alternatives().try(Joi.boolean(), Joi.string()).optional(),
   position: Joi.number().integer().min(0).optional(),
-  deliveryEstimateDays: Joi.number().integer().min(0).optional().allow(null)
+  deliveryEstimateDays: Joi.number().integer().min(0).optional().allow(null),
+  timeStart: Joi.date().iso().optional().allow(null),
+  timeFinish: Joi.date().iso().optional().allow(null)
 })
 
-const editProduct = createProduct.fork(
-  ['title', 'price', 'stock'],
-  schema => schema.optional()
-)
+const editProduct = createProduct
+  .keys({
+    existingImages: Joi.string().allow('', null).optional(),
+    oldImages: Joi.string().allow('', null).optional(),
+    deleteImages: Joi.string().allow('', null).optional()
+  })
+  .fork(
+    ['title', 'price', 'stock'],
+    schema => schema.optional()
+  )
 
 const changeStatusMany = Joi.object({
   ids: Joi.array().items(mongoId.required()).min(1).required().messages({

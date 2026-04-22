@@ -2,6 +2,9 @@ const Cart = require('../../models/cart.model')
 const Product = require('../../models/products.model')
 const logger = require('../../../../config/logger')
 
+const MAX_CART_UNIQUE_ITEMS = 50
+const CART_UNIQUE_LIMIT_MESSAGE = `Gio hang chi chua toi da ${MAX_CART_UNIQUE_ITEMS} san pham khac nhau`
+
 const getUserId = req => req.user?.userId
 
 //# GET /api/v1/cart
@@ -79,6 +82,13 @@ exports.add = async (req, res) => {
       cart.items.splice(idx, 1)
       cart.items.unshift(item)
     } else {
+      if (cart.items.length >= MAX_CART_UNIQUE_ITEMS) {
+        return res.status(400).json({
+          error: CART_UNIQUE_LIMIT_MESSAGE,
+          maxUniqueItems: MAX_CART_UNIQUE_ITEMS
+        })
+      }
+
       cart.items.unshift({
         productId,
         name: product.title,

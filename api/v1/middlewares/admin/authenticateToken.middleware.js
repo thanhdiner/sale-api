@@ -6,6 +6,7 @@ const ACCESS_SECRET = process.env.ACCESS_SECRET
 module.exports.authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization']
   const token = authHeader && authHeader.split(' ')[1]
+
   if (!token) return next(new AppError('Access token is required', 401))
 
   try {
@@ -13,7 +14,6 @@ module.exports.authenticateToken = (req, res, next) => {
     req.user = decoded
     next()
   } catch (err) {
-    // Pass to global errorHandler — translates TokenExpiredError & JsonWebTokenError
     next(err)
   }
 }

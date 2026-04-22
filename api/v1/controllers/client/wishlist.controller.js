@@ -4,27 +4,42 @@ const logger = require('../../../../config/logger')
 
 const getUserId = req => req.user?.userId
 
-//# GET /api/v1/wishlist
+//# GET /api/v1/wishlist?page=1&limit=12
 exports.index = async (req, res) => {
   try {
     const userId = getUserId(req)
     if (!userId) return res.status(401).json({ error: 'Chưa đăng nhập' })
 
+    const page = Math.max(Number(req.query.page) || 1, 1)
+    const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 50)
+    const skip = (page - 1) * limit
+
     let wishlist = await Wishlist.findOne({ userId })
     if (!wishlist) wishlist = await Wishlist.create({ userId, items: [] })
 
-    const productIds = wishlist.items.map(i => i.productId)
-    const products = await Product.find({ _id: { $in: productIds }, deleted: { $ne: true } })
+    // Nếu item mới được push vào cuối mảng, reverse để hiện mới nhất trước
+    const allItems = [...wishlist.items].reverse()
+
+    const totalItems = allItems.length
+    const pagedItems = allItems.slice(skip, skip + limit)
+
+    const productIds = pagedItems.map(i => i.productId)
+
+    const products = await Product.find({
+      _id: { $in: productIds },
+      deleted: { $ne: true }
+    }).lean()
 
     const productMap = {}
     products.forEach(p => {
       productMap[p._id.toString()] = p
     })
 
-    const itemsWithDetails = wishlist.items
+    const itemsWithDetails = pagedItems
       .map(item => {
         const p = productMap[item.productId.toString()]
         if (!p) return null
+
         return {
           productId: item.productId,
           name: p.title,
@@ -40,7 +55,16 @@ exports.index = async (req, res) => {
       })
       .filter(Boolean)
 
-    res.json({ items: itemsWithDetails })
+    res.json({
+      items: itemsWithDetails,
+      pagination: {
+        page,
+        limit,
+        totalItems,
+        totalPages: Math.ceil(totalItems / limit),
+        hasMore: page * limit < totalItems
+      }
+    })
   } catch (err) {
     logger.error('[Wishlist] index error:', err.message)
     res.status(500).json({ error: err.message })
@@ -93,7 +117,6 @@ exports.remove = async (req, res) => {
     wishlist.items = wishlist.items.filter(i => !i.productId.equals(productId))
     await wishlist.save()
 
-    logger.debug('[Wishlist] remove:', { userId, productId })
     res.json({ message: 'Đã xóa khỏi danh sách yêu thích', success: true })
   } catch (err) {
     logger.error('[Wishlist] remove error:', err.message)
