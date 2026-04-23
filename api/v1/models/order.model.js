@@ -9,6 +9,14 @@ const OrderSchema = new mongoose.Schema(
       lastNameNoAccent: { type: String },
       phone: { type: String, required: true },
       email: { type: String },
+      addressLine1: { type: String },
+      provinceCode: { type: String },
+      provinceName: { type: String },
+      districtCode: { type: String },
+      districtName: { type: String },
+      wardCode: { type: String },
+      wardName: { type: String },
+      address: { type: String },
       notes: { type: String }
     },
     orderItems: [

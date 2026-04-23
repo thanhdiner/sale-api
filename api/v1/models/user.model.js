@@ -1,6 +1,35 @@
 const mongoose = require('mongoose')
 const bcrypt = require('bcrypt')
 
+const checkoutProfileSchema = new mongoose.Schema(
+  {
+    firstName: { type: String, trim: true, default: '' },
+    lastName: { type: String, trim: true, default: '' },
+    phone: { type: String, trim: true, default: '' },
+    email: { type: String, trim: true, default: '' },
+    addressLine1: { type: String, trim: true, default: '' },
+    provinceCode: { type: String, trim: true, default: '' },
+    provinceName: { type: String, trim: true, default: '' },
+    districtCode: { type: String, trim: true, default: '' },
+    districtName: { type: String, trim: true, default: '' },
+    wardCode: { type: String, trim: true, default: '' },
+    wardName: { type: String, trim: true, default: '' },
+    address: { type: String, trim: true, default: '' },
+    notes: { type: String, trim: true, default: '' },
+    deliveryMethod: {
+      type: String,
+      enum: ['pickup', 'contact'],
+      default: 'pickup'
+    },
+    paymentMethod: {
+      type: String,
+      enum: ['transfer', 'contact', 'vnpay', 'momo', 'zalopay'],
+      default: 'transfer'
+    }
+  },
+  { _id: false }
+)
+
 const userSchema = new mongoose.Schema(
   {
     username: {
@@ -28,6 +57,10 @@ const userSchema = new mongoose.Schema(
     },
     fullName: String,
     avatarUrl: String,
+    checkoutProfile: {
+      type: checkoutProfileSchema,
+      default: () => ({})
+    },
     deleted: {
       type: Boolean,
       default: false

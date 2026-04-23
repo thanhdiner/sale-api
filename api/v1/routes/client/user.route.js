@@ -53,6 +53,14 @@ router.patch(
   validate(userSchemas.updateProfile),
   controller.updateProfile
 )
+const checkoutProfileHandlers = [
+  authenticateToken.authenticateToken,
+  validate(userSchemas.checkoutProfile),
+  controller.updateCheckoutProfile
+]
+
+router.patch('/checkout-profile', ...checkoutProfileHandlers)
+router.patch('/update-checkout-profile', ...checkoutProfileHandlers)
 router.post(
   '/request-email-update',
   authenticateToken.authenticateToken,

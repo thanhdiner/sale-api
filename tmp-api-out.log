@@ -1,0 +1,305 @@
+
+> sales-api@1.0.0 start
+> node index.js
+
+21:46:12 [32minfo[39m: [32m[RecommendScore] Cron job đã đăng ký: mỗi 10 phút[39m
+21:46:12 [32minfo[39m: [32m🚀 Server started on PORT: 3001[39m
+21:46:13 [32minfo[39m: [32m[Socket] Client connected: sJl_QIGIklizue6sAAAC[39m
+21:46:13 [32minfo[39m: [32m[Socket] Client connected: ep27g2gcSTw9H7KiAAAD[39m
+21:46:13 [32minfo[39m: [32m[Socket] Agent/Admin joined: ep27g2gcSTw9H7KiAAAD[39m
+21:46:13 [32minfo[39m: [32m[Redis] Đã kết nối Redis[39m
+21:46:15 [32minfo[39m: [32m[Mailer] SMTP ready ✓[39m
+21:46:15 [32minfo[39m: [32mConnected to MongoDB successfully![39m
+21:46:22 [32minfo[39m: [32m[RecommendScore] Bắt đầu tính lại...[39m
+21:46:24 [32minfo[39m: [32m[RecommendScore] Hoàn tất: 122 sản phẩm, 1515ms[39m
+21:50:00 [32minfo[39m: [32m[RecommendScore] Bắt đầu tính lại...[39m
+21:50:02 [32minfo[39m: [32m[RecommendScore] Hoàn tất: 122 sản phẩm, 2290ms[39m
+21:51:50 [33mwarn[39m: [33m[ErrorHandler] GET /api/v1/user/me → 401: Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.[39m
+21:51:50 [32minfo[39m: [32mGET /api/v1/user/me 401 9.657ms[39m
+21:51:50 [33mwarn[39m: [33m[ErrorHandler] GET /api/v1/cart → 401: Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.[39m
+21:51:50 [32minfo[39m: [32mGET /api/v1/cart 401 2.126ms[39m
+21:51:50 [33mwarn[39m: [33m[ErrorHandler] GET /api/v1/wishlist?page=1&limit=12 → 401: Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.[39m
+21:51:50 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 401 2.251ms[39m
+21:51:50 [32minfo[39m: [32mPOST /api/v1/user/refresh-token 200 482.899ms[39m
+21:51:50 [32minfo[39m: [32mGET /api/v1/admin/me 200 491.124ms[39m
+21:51:52 [32minfo[39m: [32mGET /api/v1/user/me 200 240.292ms[39m
+21:51:52 [32minfo[39m: [32mGET /api/v1/cart 200 483.190ms[39m
+21:51:52 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 482.548ms[39m
+21:59:30 [32minfo[39m: [32mPATCH /api/v1/user/checkout-profile 200 266.239ms[39m
+21:59:32 [32minfo[39m: [32m[Socket] Client disconnected: sJl_QIGIklizue6sAAAC[39m
+21:59:33 [32minfo[39m: [32m[Socket] Client connected: vLLX9baV4BwzqHP4AAAF[39m
+21:59:34 [32minfo[39m: [32mGET /api/v1/admin/website-config 200 240.346ms[39m
+21:59:34 [32minfo[39m: [32m[Socket] Client disconnected: vLLX9baV4BwzqHP4AAAF[39m
+21:59:34 [32minfo[39m: [32mGET /api/v1/user/me 200 246.452ms[39m
+21:59:34 [32minfo[39m: [32mGET /api/v1/product-categories/tree 200 405.047ms[39m
+21:59:34 [32minfo[39m: [32mGET /api/v1/cart 200 476.513ms[39m
+21:59:34 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 477.768ms[39m
+21:59:36 [32minfo[39m: [32m[Socket] Client connected: j7VxJuAmmPaUSzEuAAAH[39m
+21:59:41 [32minfo[39m: [32mPATCH /api/v1/user/checkout-profile 200 240.481ms[39m
+21:59:42 [32minfo[39m: [32m[Socket] Client disconnected: j7VxJuAmmPaUSzEuAAAH[39m
+21:59:43 [32minfo[39m: [32m[Socket] Client connected: Q8zyBJr9Uh-sDi2KAAAJ[39m
+21:59:44 [32minfo[39m: [32m[Socket] Client disconnected: Q8zyBJr9Uh-sDi2KAAAJ[39m
+21:59:44 [32minfo[39m: [32mGET /api/v1/user/me 200 239.262ms[39m
+21:59:44 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 470.515ms[39m
+21:59:46 [32minfo[39m: [32m[Socket] Client connected: wxI_32sz0GwjFcTgAAAL[39m
+21:59:54 [32minfo[39m: [32mPATCH /api/v1/user/checkout-profile 200 239.438ms[39m
+21:59:54 [32minfo[39m: [32m[Socket] Client disconnected: wxI_32sz0GwjFcTgAAAL[39m
+21:59:55 [32minfo[39m: [32m[Socket] Client connected: r8a6fynOFyfG4m4UAAAN[39m
+21:59:55 [32minfo[39m: [32m[Socket] Client disconnected: r8a6fynOFyfG4m4UAAAN[39m
+21:59:55 [32minfo[39m: [32mGET /api/v1/user/me 200 238.184ms[39m
+21:59:55 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 473.761ms[39m
+21:59:58 [32minfo[39m: [32m[Socket] Client connected: Gd06L3jfXwOdebXnAAAP[39m
+21:59:59 [32minfo[39m: [32mGET /api/v1/cart 200 474.341ms[39m
+22:00:00 [32minfo[39m: [32m[RecommendScore] Bắt đầu tính lại...[39m
+22:00:02 [32minfo[39m: [32m[RecommendScore] Hoàn tất: 122 sản phẩm, 2397ms[39m
+22:00:08 [32minfo[39m: [32m[Socket] Client disconnected: Gd06L3jfXwOdebXnAAAP[39m
+22:00:08 [32minfo[39m: [32m[Socket] Client connected: 8C9XOirvpJk8Er2mAAAR[39m
+22:00:08 [32minfo[39m: [32m[Socket] Client disconnected: 8C9XOirvpJk8Er2mAAAR[39m
+22:00:08 [32minfo[39m: [32mGET /api/v1/user/me 200 235.816ms[39m
+22:00:08 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 473.238ms[39m
+22:00:09 [32minfo[39m: [32mGET /api/v1/cart 200 472.340ms[39m
+22:00:10 [32minfo[39m: [32m[Socket] Client connected: sjxb0jIR9a9g0haOAAAT[39m
+22:00:11 [32minfo[39m: [32mGET /api/v1/cart 200 475.517ms[39m
+22:00:20 [32minfo[39m: [32mGET /api/v1/cart 200 474.089ms[39m
+22:06:58 [32minfo[39m: [32mGET /api/v1/product-categories/tree 200 53.668ms[39m
+22:06:58 [32minfo[39m: [32mGET /api/v1/products?search=&sort=newest&page=1&limit=20 200 869.613ms[39m
+22:07:10 [32minfo[39m: [32mGET /api/v1/widgets 200 370.722ms[39m
+22:07:10 [32minfo[39m: [32mGET /api/v1/banners 200 384.348ms[39m
+22:07:10 [32minfo[39m: [32mGET /api/v1/flash-sales?status=active&limit=1 200 573.167ms[39m
+22:07:10 [32minfo[39m: [32mGET /api/v1/products?isTopDeal=true 200 848.090ms[39m
+22:07:24 [32minfo[39m: [32m[Socket] Client disconnected: ep27g2gcSTw9H7KiAAAD[39m
+22:07:24 [33mwarn[39m: [33m[ErrorHandler] GET /api/v1/admin/chatbot-config → 401: Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.[39m
+22:07:24 [32minfo[39m: [32mGET /api/v1/admin/chatbot-config 401 2.302ms[39m
+22:07:24 [33mwarn[39m: [33m[ErrorHandler] GET /api/v1/admin/me → 401: Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.[39m
+22:07:24 [32minfo[39m: [32mGET /api/v1/admin/me 401 2.160ms[39m
+22:07:24 [32minfo[39m: [32m[Socket] Client connected: vF_A2dROCWRRdoEsAAAV[39m
+22:07:25 [32minfo[39m: [32m[Socket] Agent/Admin joined: vF_A2dROCWRRdoEsAAAV[39m
+22:07:25 [32minfo[39m: [32mPOST /api/v1/admin/auth/refresh-token 200 719.468ms[39m
+22:07:28 [32minfo[39m: [32mGET /api/v1/admin/chatbot-config 200 2901.838ms[39m
+22:07:28 [32minfo[39m: [32mGET /api/v1/admin/me 200 2901.352ms[39m
+22:07:28 [32minfo[39m: [32m[Socket] Agent/Admin joined: vF_A2dROCWRRdoEsAAAV[39m
+22:10:00 [32minfo[39m: [32m[RecommendScore] Bắt đầu tính lại...[39m
+22:10:02 [32minfo[39m: [32m[RecommendScore] Hoàn tất: 122 sản phẩm, 2462ms[39m
+22:20:00 [32minfo[39m: [32m[RecommendScore] Bắt đầu tính lại...[39m
+22:20:02 [32minfo[39m: [32m[RecommendScore] Hoàn tất: 122 sản phẩm, 2476ms[39m
+22:28:48 [32minfo[39m: [32m[Socket] Client disconnected: sjxb0jIR9a9g0haOAAAT[39m
+22:28:50 [32minfo[39m: [32m[Socket] Client connected: av__mPBDKsciCOKHAAAX[39m
+22:28:50 [33mwarn[39m: [33m[ErrorHandler] GET /api/v1/user/me → 401: Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.[39m
+22:28:50 [32minfo[39m: [32mGET /api/v1/user/me 401 3.398ms[39m
+22:28:50 [33mwarn[39m: [33m[ErrorHandler] GET /api/v1/cart → 401: Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.[39m
+22:28:50 [32minfo[39m: [32mGET /api/v1/cart 401 14.702ms[39m
+22:28:50 [33mwarn[39m: [33m[ErrorHandler] GET /api/v1/wishlist?page=1&limit=12 → 401: Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.[39m
+22:28:50 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 401 21.569ms[39m
+22:28:50 [32minfo[39m: [32mGET /api/v1/widgets 200 393.429ms[39m
+22:28:50 [32minfo[39m: [32mGET /api/v1/banners 200 347.476ms[39m
+22:28:50 [32minfo[39m: [32m[Socket] Client disconnected: av__mPBDKsciCOKHAAAX[39m
+22:28:51 [32minfo[39m: [32mGET /api/v1/flash-sales?status=active&limit=1 200 581.302ms[39m
+22:28:51 [32minfo[39m: [32mPOST /api/v1/user/refresh-token 200 478.355ms[39m
+22:28:51 [32minfo[39m: [32mGET /api/v1/products?isTopDeal=true 200 855.341ms[39m
+22:28:51 [32minfo[39m: [32mGET /api/v1/user/me 200 243.154ms[39m
+22:28:52 [32minfo[39m: [32mGET /api/v1/products/recommendations?tab=for-you&limit=8&page=1 200 477.879ms[39m
+22:28:52 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 468.746ms[39m
+22:28:52 [32minfo[39m: [32mGET /api/v1/cart 200 487.819ms[39m
+22:28:52 [32minfo[39m: [32mGET /api/v1/products?isFeatured=true 200 845.969ms[39m
+22:28:53 [32minfo[39m: [32m[Socket] Client connected: l-kLs62_WXjFsd93AAAZ[39m
+22:30:00 [32minfo[39m: [32m[RecommendScore] Bắt đầu tính lại...[39m
+22:30:00 [32minfo[39m: [32mPATCH /api/v1/user/checkout-profile 200 278.336ms[39m
+22:30:02 [32minfo[39m: [32mGET /api/v1/product-categories/tree 200 345.361ms[39m
+22:30:02 [32minfo[39m: [32mGET /api/v1/widgets 200 44.058ms[39m
+22:30:02 [32minfo[39m: [32m[RecommendScore] Hoàn tất: 122 sản phẩm, 2451ms[39m
+22:30:02 [32minfo[39m: [32mGET /api/v1/products?search=&sort=newest&page=1&limit=20 200 877.861ms[39m
+22:30:05 [32minfo[39m: [32mGET /api/v1/cart 200 477.729ms[39m
+22:30:18 [32minfo[39m: [32m[Socket] Client disconnected: l-kLs62_WXjFsd93AAAZ[39m
+22:30:19 [32minfo[39m: [32m[Socket] Client connected: YI9TamK5vOI-XJjwAAAb[39m
+22:30:19 [32minfo[39m: [32mGET /api/v1/product-categories/tree 200 46.470ms[39m
+22:30:19 [32minfo[39m: [32m[Socket] Client disconnected: YI9TamK5vOI-XJjwAAAb[39m
+22:30:20 [32minfo[39m: [32mGET /api/v1/admin/website-config 200 236.112ms[39m
+22:30:20 [32minfo[39m: [32mGET /api/v1/user/me 200 239.275ms[39m
+22:30:20 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 463.681ms[39m
+22:30:22 [32minfo[39m: [32m[Socket] Client connected: gvSfN2m3VfkPffBiAAAd[39m
+22:33:05 [32minfo[39m: [32m[Socket] Client disconnected: gvSfN2m3VfkPffBiAAAd[39m
+22:33:07 [32minfo[39m: [32m[Socket] Client connected: KhZBPFySEH0cUEIvAAAf[39m
+22:33:08 [32minfo[39m: [32mGET /api/v1/user/me 200 238.271ms[39m
+22:33:08 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 471.163ms[39m
+22:33:15 [32minfo[39m: [32m[Socket] Client disconnected: KhZBPFySEH0cUEIvAAAf[39m
+22:33:16 [32minfo[39m: [32m[Socket] Client connected: un0RyFptaGgrEZ5-AAAh[39m
+22:33:16 [32minfo[39m: [32m[Socket] Client disconnected: un0RyFptaGgrEZ5-AAAh[39m
+22:33:16 [32minfo[39m: [32mGET /api/v1/user/me 200 236.188ms[39m
+22:33:17 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 467.300ms[39m
+22:33:18 [32minfo[39m: [32m[Socket] Client connected: nJvFJmXFvzdoXpN3AAAj[39m
+22:34:21 [32minfo[39m: [32m[Socket] Client disconnected: nJvFJmXFvzdoXpN3AAAj[39m
+22:34:21 [32minfo[39m: [32m[Socket] Client connected: zm1jmXGCvloEmBu0AAAl[39m
+22:34:22 [32minfo[39m: [32mGET /api/v1/user/me 200 233.070ms[39m
+22:34:22 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 474.445ms[39m
+22:34:23 [32minfo[39m: [32m[Socket] Client disconnected: zm1jmXGCvloEmBu0AAAl[39m
+22:34:25 [32minfo[39m: [32m[Socket] Client connected: QrZ7lT9HR0bQaW-RAAAn[39m
+22:40:00 [32minfo[39m: [32m[RecommendScore] Bắt đầu tính lại...[39m
+22:40:02 [32minfo[39m: [32m[RecommendScore] Hoàn tất: 122 sản phẩm, 2463ms[39m
+22:41:59 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 473.335ms[39m
+22:42:01 [32minfo[39m: [32mGET /api/v1/cart 200 492.432ms[39m
+22:42:10 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 324.399ms[39m
+22:42:15 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 45.353ms[39m
+22:42:25 [34mdebug[39m: [34m[Mailer] Using contact.email: 73scared@deltajohnsons.com[39m
+22:42:25 [32minfo[39m: [32mPOST /api/v1/orders 200 778.131ms[39m
+22:42:26 [32minfo[39m: [32mPOST /api/v1/cart/remove-many 200 484.625ms[39m
+22:42:26 [32minfo[39m: [32mGET /api/v1/cart 200 470.034ms[39m
+22:42:28 [32minfo[39m: [32m[Mailer] Email sent to 73scared@deltajohnsons.com — messageId: <d29e183b-c59a-8f2a-0264-fd39d42e89fa@gmail.com>[39m
+22:42:33 [32minfo[39m: [32mGET /api/v1/orders/my 200 236.186ms[39m
+22:42:56 [32minfo[39m: [32mGET /api/v1/orders/69e8ec614812ef311a4b49e0 200 243.112ms[39m
+22:43:04 [32minfo[39m: [32mPOST /api/v1/orders/cancel/69e8ec614812ef311a4b49e0 200 478.244ms[39m
+22:43:09 [32minfo[39m: [32m[Socket] Client disconnected: QrZ7lT9HR0bQaW-RAAAn[39m
+22:43:10 [32minfo[39m: [32m[Socket] Client connected: cmoSjCpKSNHbqHwgAAAp[39m
+22:43:10 [32minfo[39m: [32m[Socket] Client disconnected: cmoSjCpKSNHbqHwgAAAp[39m
+22:43:10 [32minfo[39m: [32mGET /api/v1/orders/69e8ec614812ef311a4b49e0 200 242.679ms[39m
+22:43:10 [32minfo[39m: [32mGET /api/v1/user/me 200 237.167ms[39m
+22:43:10 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 471.070ms[39m
+22:43:11 [32minfo[39m: [32m[Socket] Client connected: 4KX-IM9g2U4ngoadAAAr[39m
+22:43:20 [32minfo[39m: [32mGET /api/v1/orders/69e8ec614812ef311a4b49e0 200 240.910ms[39m
+22:43:20 [32minfo[39m: [32mGET /api/v1/orders/my 200 236.916ms[39m
+22:43:23 [32minfo[39m: [32mGET /api/v1/cart 200 470.841ms[39m
+22:43:24 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 469.751ms[39m
+22:43:25 [32minfo[39m: [32mGET /api/v1/cart 200 477.909ms[39m
+22:43:27 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 473.185ms[39m
+22:43:29 [32minfo[39m: [32mGET /api/v1/banners 200 325.516ms[39m
+22:43:29 [32minfo[39m: [32mGET /api/v1/widgets 200 401.029ms[39m
+22:43:29 [32minfo[39m: [32mGET /api/v1/flash-sales?status=active&limit=1 200 572.203ms[39m
+22:43:29 [32minfo[39m: [32mGET /api/v1/products?isTopDeal=true 200 853.756ms[39m
+22:43:31 [32minfo[39m: [32mGET /api/v1/orders/my 200 236.670ms[39m
+22:43:33 [32minfo[39m: [32mGET /api/v1/widgets 200 43.052ms[39m
+22:43:35 [34mdebug[39m: [34m[Cart] add item:[39m {"userId":"69e7c05a63d17536e3bfbbec","items":1}
+22:43:36 [32minfo[39m: [32mPOST /api/v1/cart/add 200 722.925ms[39m
+22:43:36 [32minfo[39m: [32mGET /api/v1/cart 200 470.118ms[39m
+22:43:36 [32minfo[39m: [32mGET /api/v1/cart 200 473.363ms[39m
+22:50:00 [32minfo[39m: [32m[RecommendScore] Bắt đầu tính lại...[39m
+22:50:02 [32minfo[39m: [32m[RecommendScore] Hoàn tất: 122 sản phẩm, 2457ms[39m
+23:00:00 [32minfo[39m: [32m[RecommendScore] Bắt đầu tính lại...[39m
+23:00:02 [32minfo[39m: [32m[RecommendScore] Hoàn tất: 122 sản phẩm, 2472ms[39m
+23:08:31 [32minfo[39m: [32m[Socket] Client disconnected: 4KX-IM9g2U4ngoadAAAr[39m
+23:08:33 [33mwarn[39m: [33m[ErrorHandler] GET /api/v1/user/me → 401: Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.[39m
+23:08:33 [32minfo[39m: [32mGET /api/v1/user/me 401 4.572ms[39m
+23:08:33 [33mwarn[39m: [33m[ErrorHandler] GET /api/v1/cart → 401: Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.[39m
+23:08:33 [32minfo[39m: [32mGET /api/v1/cart 401 2.958ms[39m
+23:08:33 [33mwarn[39m: [33m[ErrorHandler] GET /api/v1/wishlist?page=1&limit=12 → 401: Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.[39m
+23:08:33 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 401 2.528ms[39m
+23:08:33 [32minfo[39m: [32m[Socket] Client connected: KgOWCEM1bZf97C4PAAAt[39m
+23:08:33 [32minfo[39m: [32mGET /api/v1/admin/website-config 200 242.075ms[39m
+23:08:34 [32minfo[39m: [32mGET /api/v1/product-categories/tree 200 403.719ms[39m
+23:08:34 [32minfo[39m: [32mPOST /api/v1/user/refresh-token 200 469.829ms[39m
+23:08:34 [32minfo[39m: [32mGET /api/v1/user/me 200 233.306ms[39m
+23:08:34 [32minfo[39m: [32mGET /api/v1/cart 200 477.572ms[39m
+23:08:34 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 475.533ms[39m
+23:08:39 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 329.308ms[39m
+23:08:39 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 45.927ms[39m
+23:08:39 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 326.802ms[39m
+23:08:39 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 48.084ms[39m
+23:08:39 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 42.966ms[39m
+23:08:39 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 320.433ms[39m
+23:08:39 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 324.578ms[39m
+23:08:39 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 54.298ms[39m
+23:08:39 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 62.628ms[39m
+23:08:39 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 45.672ms[39m
+23:08:39 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 53.903ms[39m
+23:08:39 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 50.302ms[39m
+23:08:39 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 44.748ms[39m
+23:08:39 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 55.912ms[39m
+23:08:39 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 43.486ms[39m
+23:08:39 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 44.850ms[39m
+23:08:39 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 60.727ms[39m
+23:08:40 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 43.694ms[39m
+23:08:40 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 43.419ms[39m
+23:08:40 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 48.246ms[39m
+23:08:40 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 46.329ms[39m
+23:08:40 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 44.509ms[39m
+23:08:40 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 46.261ms[39m
+23:08:40 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 44.681ms[39m
+23:08:40 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 58.329ms[39m
+23:08:40 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 52.286ms[39m
+23:08:40 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 45.736ms[39m
+23:08:40 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 48.181ms[39m
+23:08:40 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 45.031ms[39m
+23:08:40 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 49.447ms[39m
+23:08:40 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 45.093ms[39m
+23:08:40 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 43.085ms[39m
+23:08:41 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 44.240ms[39m
+23:08:41 [32minfo[39m: [32mGET /api/v1/bank-info/active - -[39m
+23:08:41 [32minfo[39m: [32m[Socket] Client disconnected: KgOWCEM1bZf97C4PAAAt[39m
+23:08:42 [32minfo[39m: [32m[Socket] Client connected: 1dwfP7ibAkFiK2AXAAAv[39m
+23:08:42 [32minfo[39m: [32m[Socket] Client disconnected: 1dwfP7ibAkFiK2AXAAAv[39m
+23:08:42 [32minfo[39m: [32mGET /api/v1/user/me 200 240.933ms[39m
+23:08:42 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 470.260ms[39m
+23:08:44 [32minfo[39m: [32m[Socket] Client connected: Y0NzzCqp43r0yq-fAAAx[39m
+23:08:44 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 45.746ms[39m
+23:08:45 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 58.799ms[39m
+23:08:45 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 47.758ms[39m
+23:08:45 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 51.257ms[39m
+23:08:45 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 43.499ms[39m
+23:08:45 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 45.543ms[39m
+23:08:45 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 45.684ms[39m
+23:08:45 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 47.501ms[39m
+23:08:45 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 44.657ms[39m
+23:08:45 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 45.697ms[39m
+23:08:45 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 48.761ms[39m
+23:08:45 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 45.695ms[39m
+23:08:45 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 43.339ms[39m
+23:08:45 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 43.785ms[39m
+23:08:45 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 44.135ms[39m
+23:08:45 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 47.196ms[39m
+23:08:46 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 60.122ms[39m
+23:08:46 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 50.489ms[39m
+23:08:46 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 43.341ms[39m
+23:08:46 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 57.496ms[39m
+23:08:46 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 45.662ms[39m
+23:08:46 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 45.766ms[39m
+23:08:46 [32minfo[39m: [32m[Socket] Client disconnected: Y0NzzCqp43r0yq-fAAAx[39m
+23:08:47 [32minfo[39m: [32m[Socket] Client connected: _q-lArD7tLF3JyOpAAAz[39m
+23:08:47 [32minfo[39m: [32m[Socket] Client disconnected: _q-lArD7tLF3JyOpAAAz[39m
+23:08:47 [32minfo[39m: [32mGET /api/v1/user/me 200 233.302ms[39m
+23:08:48 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 474.087ms[39m
+23:08:50 [32minfo[39m: [32m[Socket] Client connected: ciB0-uWr30p59buTAAA1[39m
+23:10:00 [32minfo[39m: [32m[RecommendScore] Bắt đầu tính lại...[39m
+23:10:02 [32minfo[39m: [32m[RecommendScore] Hoàn tất: 122 sản phẩm, 2608ms[39m
+23:10:18 [32minfo[39m: [32m[Socket] Client disconnected: ciB0-uWr30p59buTAAA1[39m
+23:10:20 [32minfo[39m: [32m[Socket] Client connected: GnuZE9pdXxtW_0aZAAA3[39m
+23:10:21 [32minfo[39m: [32mGET /api/v1/user/me 200 240.217ms[39m
+23:10:21 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 473.813ms[39m
+23:10:21 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 46.392ms[39m
+23:10:32 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 44.450ms[39m
+23:10:34 [32minfo[39m: [32m[Socket] Client disconnected: GnuZE9pdXxtW_0aZAAA3[39m
+23:10:35 [32minfo[39m: [32m[Socket] Client connected: 40x9orlGx23MwCHsAAA5[39m
+23:10:35 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 46.723ms[39m
+23:10:35 [32minfo[39m: [32m[Socket] Client disconnected: 40x9orlGx23MwCHsAAA5[39m
+23:10:35 [32minfo[39m: [32mGET /api/v1/user/me 200 233.016ms[39m
+23:10:36 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 480.936ms[39m
+23:10:38 [32minfo[39m: [32m[Socket] Client connected: oCJUvaHKttb2wyuTAAA7[39m
+23:10:40 [32minfo[39m: [32m[Socket] Client disconnected: oCJUvaHKttb2wyuTAAA7[39m
+23:10:40 [32minfo[39m: [32m[Socket] Client connected: v117iWGTrv3AG2pPAAA9[39m
+23:10:40 [32minfo[39m: [32m[Socket] Client disconnected: v117iWGTrv3AG2pPAAA9[39m
+23:10:40 [32minfo[39m: [32mGET /api/v1/user/me 200 234.365ms[39m
+23:10:40 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 463.107ms[39m
+23:10:43 [32minfo[39m: [32m[Socket] Client connected: JBgyRiqYjf6aEQRVAAA_[39m
+23:13:34 [32minfo[39m: [32m[Socket] Client disconnected: JBgyRiqYjf6aEQRVAAA_[39m
+23:13:37 [32minfo[39m: [32m[Socket] Client connected: FB_ljZI53Z6iKmV8AABB[39m
+23:13:37 [32minfo[39m: [32mGET /api/v1/user/me 200 247.530ms[39m
+23:13:37 [32minfo[39m: [32mGET /api/v1/cart 200 476.663ms[39m
+23:13:37 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 475.871ms[39m
+23:13:38 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 44.986ms[39m
+23:13:41 [32minfo[39m: [32m[Socket] Client disconnected: FB_ljZI53Z6iKmV8AABB[39m
+23:13:42 [32minfo[39m: [32m[Socket] Client connected: QCP6n4VdoYHBiXUqAABD[39m
+23:13:43 [32minfo[39m: [32m[Socket] Client disconnected: QCP6n4VdoYHBiXUqAABD[39m
+23:13:43 [32minfo[39m: [32mGET /api/v1/user/me 200 238.934ms[39m
+23:13:43 [32minfo[39m: [32mGET /api/v1/wishlist?page=1&limit=12 200 471.347ms[39m
+23:13:45 [32minfo[39m: [32mGET /api/v1/bank-info/active 200 330.827ms[39m
+23:13:46 [32minfo[39m: [32m[Socket] Client connected: dsA23PH4kt400aXUAABF[39m
+23:13:51 [32minfo[39m: [32mGET /api/v1/banners 200 324.392ms[39m
+23:13:51 [32minfo[39m: [32mGET /api/v1/widgets 200 328.176ms[39m
+23:13:51 [32minfo[39m: [32mGET /api/v1/flash-sales?status=active&limit=1 200 560.373ms[39m
+23:13:51 [32minfo[39m: [32mGET /api/v1/products?isTopDeal=true 200 812.517ms[39m
+23:14:01 [32minfo[39m: [32mGET /api/v1/widgets 200 45.578ms[39m
+23:17:42 [32minfo[39m: [32mGET /api/v1/products/recommendations?tab=for-you&limit=8&page=1 200 335.600ms[39m
+23:17:42 [32minfo[39m: [32mGET /api/v1/products?isFeatured=true 200 813.764ms[39m
+23:20:00 [32minfo[39m: [32m[RecommendScore] Bắt đầu tính lại...[39m
+23:20:02 [32minfo[39m: [32m[RecommendScore] Hoàn tất: 122 sản phẩm, 2532ms[39m
+23:20:17 [32minfo[39m: [32mGET /api/v1/chat/conversation/chat_1776132050370_c7s74la 304 238.267ms[39m
+23:20:18 [32minfo[39m: [32mGET /api/v1/chat/history/chat_1776132050370_c7s74la?internal=false 304 939.036ms[39m
+23:20:28 [32minfo[39m: [32m[Socket] Client disconnected: vF_A2dROCWRRdoEsAAAV[39m
+23:20:28 [32minfo[39m: [32m[Socket] Client disconnected: dsA23PH4kt400aXUAABF[39m

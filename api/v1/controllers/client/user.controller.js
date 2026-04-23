@@ -8,6 +8,7 @@ const { v4: uuidv4 } = require('uuid')
 const OauthCode = require('../../models/OauthCodeSchema')
 const sendMail = require('../../utils/sendMail')
 const { getVerifyCodeHtml } = require('../../utils/emailTemplates')
+const { normalizeStructuredAddress } = require('../../utils/structuredAddress')
 const logger = require('../../../../config/logger')
 
 const ACCESS_SECRET = process.env.ACCESS_SECRET
@@ -15,13 +16,34 @@ const REFRESH_SECRET = process.env.REFRESH_SECRET
 const JWT_EXPIRES_IN_ACCESS = process.env.JWT_EXPIRES_IN_ACCESS || '1h'
 const JWT_EXPIRES_IN_REFRESH = process.env.JWT_EXPIRES_IN_REFRESH || '30d'
 
+const normalizeStringField = value => (typeof value === 'string' ? value.trim() : '')
+
+const normalizeCheckoutProfile = payload => {
+  const normalizedAddress = normalizeStructuredAddress(payload)
+
+  return {
+    firstName: normalizeStringField(payload?.firstName),
+    lastName: normalizeStringField(payload?.lastName),
+    phone: normalizeStringField(payload?.phone),
+    email: normalizeStringField(payload?.email),
+    ...normalizedAddress,
+    notes: normalizeStringField(payload?.notes),
+    deliveryMethod: payload?.deliveryMethod === 'contact' ? 'contact' : 'pickup',
+    paymentMethod: ['transfer', 'contact', 'vnpay', 'momo', 'zalopay'].includes(payload?.paymentMethod)
+      ? payload.paymentMethod
+      : 'transfer'
+  }
+}
+
 const serializeAuthUser = user => ({
   _id: user._id,
   username: user.username,
   email: user.email,
   fullName: user.fullName,
+  phone: user.phone || '',
   avatarUrl: user.avatarUrl || '',
-  lastLogin: user.lastLogin || null
+  lastLogin: user.lastLogin || null,
+  checkoutProfile: normalizeCheckoutProfile(user.checkoutProfile || {})
 })
 
 //# POST /api/v1/user/login
@@ -350,6 +372,32 @@ module.exports.updateProfile = async (req, res) => {
     })
   } catch (err) {
     res.status(500).json({ message: 'Lỗi máy chủ khi cập nhật profile!' })
+  }
+}
+
+//# PATCH /api/v1/user/checkout-profile
+module.exports.updateCheckoutProfile = async (req, res) => {
+  try {
+    const userId = req.user.userId
+    const checkoutProfile = normalizeCheckoutProfile(req.body || {})
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { checkoutProfile },
+      { new: true }
+    ).select('-passwordHash')
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'Không tìm thấy tài khoản!' })
+    }
+
+    res.status(200).json({
+      message: 'Đã lưu thông tin đặt hàng mặc định!',
+      data: updatedUser
+    })
+  } catch (err) {
+    logger.error('[User] updateCheckoutProfile error:', err)
+    res.status(500).json({ message: 'Lỗi máy chủ khi lưu thông tin đặt hàng!' })
   }
 }
 

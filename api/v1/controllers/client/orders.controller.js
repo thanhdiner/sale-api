@@ -8,6 +8,7 @@ const logger = require('../../../../config/logger')
 const { getIO } = require('../../helpers/socket')
 const { sendMail } = require('../../../../config/mailer')
 const { orderConfirmedTemplate } = require('../../utils/emailTemplates')
+const { normalizeStructuredAddress } = require('../../utils/structuredAddress')
 
 /**
  * Resolve the best email to send the order confirmation to.
@@ -69,11 +70,15 @@ module.exports.createOrder = async (req, res) => {
       }
     })
 
-    contact.firstNameNoAccent = removeAccents(contact.firstName)
-    contact.lastNameNoAccent = removeAccents(contact.lastName)
+    const normalizedContact = {
+      ...contact,
+      ...normalizeStructuredAddress(contact)
+    }
+    normalizedContact.firstNameNoAccent = removeAccents(normalizedContact.firstName)
+    normalizedContact.lastNameNoAccent = removeAccents(normalizedContact.lastName)
 
     const newOrder = new Order({
-      contact,
+      contact: normalizedContact,
       orderItems: populatedOrderItems,
       deliveryMethod,
       paymentMethod,
@@ -182,12 +187,15 @@ module.exports.createPendingOrder = async (req, res) => {
       }
     })
 
-    const removeAccents = require('remove-accents')
-    contact.firstNameNoAccent = removeAccents(contact.firstName)
-    contact.lastNameNoAccent = removeAccents(contact.lastName)
+    const normalizedContact = {
+      ...contact,
+      ...normalizeStructuredAddress(contact)
+    }
+    normalizedContact.firstNameNoAccent = removeAccents(normalizedContact.firstName)
+    normalizedContact.lastNameNoAccent = removeAccents(normalizedContact.lastName)
 
     const newOrder = new Order({
-      contact,
+      contact: normalizedContact,
       orderItems: populatedOrderItems,
       deliveryMethod,
       paymentMethod,

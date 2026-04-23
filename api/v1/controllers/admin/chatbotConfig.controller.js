@@ -1,7 +1,9 @@
 const mongoose = require('mongoose')
 
 const ChatbotConfig = require('../../models/chatbot.model')
+const AgentToolCall = require('../../models/agentToolCall.model')
 const logger = require('../../../../config/logger')
+const { getToolRegistry } = require('../../services/ai/ai.tools')
 
 function getValidAdminId(userId) {
   if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
@@ -9,6 +11,28 @@ function getValidAdminId(userId) {
   }
 
   return userId
+}
+
+function normalizeStringArray(value) {
+  if (!Array.isArray(value)) return []
+
+  return [...new Set(
+    value
+      .map(item => (typeof item === 'string' ? item.trim() : ''))
+      .filter(Boolean)
+  )]
+}
+
+function normalizeToolSettings(toolSettings) {
+  if (!Array.isArray(toolSettings)) return []
+
+  return toolSettings
+    .filter(item => item && typeof item.name === 'string')
+    .map(item => ({
+      name: item.name.trim(),
+      enabled: item.enabled !== false
+    }))
+    .filter(item => item.name)
 }
 
 // GET /api/v1/admin/chatbot-config
@@ -21,34 +45,25 @@ exports.getConfig = async (req, res) => {
     }
 
     const aiService = require('../../services/ai/ai.service')
+    const runtimeConfig = await aiService.getRuntimeConfig().catch(runtimeErr => ({
+      runtimeConfigError: runtimeErr.message
+    }))
 
     config.rawEnvEnabled = process.env.CHATBOT_ENABLED !== 'false'
     config.rawEnvProvider = (process.env.CHATBOT_PROVIDER || 'openai').toLowerCase()
     config.rawEnvModel = process.env.CHATBOT_MODEL || null
     config.rawEnvBaseUrl = process.env.NINEROUTER_BASE_URL || null
 
-    try {
-      const runtimeConfig = await aiService.getRuntimeConfig()
-      config.runtimeEnabled = runtimeConfig.isEnabled
-      config.runtimeProvider = runtimeConfig.provider
-      config.runtimeModel = runtimeConfig.model
-      config.runtimeBaseUrl = runtimeConfig.baseURL
-      config.runtimeConfigError = null
-      config.envEnabled = runtimeConfig.isEnabled
-      config.envProvider = runtimeConfig.provider
-      config.envModel = runtimeConfig.model
-      config.envBaseUrl = runtimeConfig.baseURL
-    } catch (runtimeErr) {
-      config.runtimeEnabled = process.env.CHATBOT_ENABLED !== 'false'
-      config.runtimeProvider = config.aiProvider || config.rawEnvProvider
-      config.runtimeModel = config.model || config.rawEnvModel
-      config.runtimeBaseUrl = config.rawEnvBaseUrl
-      config.runtimeConfigError = runtimeErr.message
-      config.envEnabled = config.runtimeEnabled
-      config.envProvider = config.runtimeProvider
-      config.envModel = config.runtimeModel
-      config.envBaseUrl = config.runtimeBaseUrl
-    }
+    config.runtimeEnabled = runtimeConfig.isEnabled ?? config.rawEnvEnabled
+    config.runtimeProvider = runtimeConfig.provider || config.aiProvider || config.rawEnvProvider
+    config.runtimeModel = runtimeConfig.model || config.model || config.rawEnvModel
+    config.runtimeBaseUrl = runtimeConfig.baseURL || config.rawEnvBaseUrl
+    config.runtimeConfigError = runtimeConfig.runtimeConfigError || null
+    config.envEnabled = config.runtimeEnabled
+    config.envProvider = config.runtimeProvider
+    config.envModel = config.runtimeModel
+    config.envBaseUrl = config.runtimeBaseUrl
+    config.toolRegistry = runtimeConfig.availableTools || getToolRegistry(config.toolSettings)
 
     config.hasOpenaiKey = !!(
       process.env.OPENAI_API_KEY
@@ -78,6 +93,9 @@ exports.getConfig = async (req, res) => {
 exports.updateConfig = async (req, res) => {
   try {
     const {
+      agentName,
+      agentRole,
+      agentTone,
       isEnabled,
       aiProvider,
       model,
@@ -85,10 +103,12 @@ exports.updateConfig = async (req, res) => {
       temperature,
       brandVoice,
       systemPromptOverride,
+      systemRules,
       fallbackMessage,
       autoEscalateKeywords,
       maxMessagesPerMinute,
-      maxMessagesPerSession
+      maxMessagesPerSession,
+      toolSettings
     } = req.body
 
     let config = await ChatbotConfig.findOne()
@@ -96,17 +116,24 @@ exports.updateConfig = async (req, res) => {
       config = new ChatbotConfig()
     }
 
+    if (agentName !== undefined) config.agentName = agentName
+    if (agentRole !== undefined) config.agentRole = agentRole
+    if (agentTone !== undefined) config.agentTone = agentTone
     if (isEnabled !== undefined) config.isEnabled = isEnabled
-    if (aiProvider) config.aiProvider = aiProvider
-    if (model) config.model = model
-    if (maxTokens) config.maxTokens = maxTokens
+    if (aiProvider !== undefined) config.aiProvider = aiProvider
+    if (model !== undefined) config.model = model
+    if (maxTokens !== undefined) config.maxTokens = maxTokens
     if (temperature !== undefined) config.temperature = temperature
     if (brandVoice !== undefined) config.brandVoice = brandVoice
     if (systemPromptOverride !== undefined) config.systemPromptOverride = systemPromptOverride
+    if (systemRules !== undefined) config.systemRules = normalizeStringArray(systemRules)
     if (fallbackMessage !== undefined) config.fallbackMessage = fallbackMessage
-    if (autoEscalateKeywords) config.autoEscalateKeywords = autoEscalateKeywords
-    if (maxMessagesPerMinute) config.maxMessagesPerMinute = maxMessagesPerMinute
-    if (maxMessagesPerSession) config.maxMessagesPerSession = maxMessagesPerSession
+    if (autoEscalateKeywords !== undefined) {
+      config.autoEscalateKeywords = normalizeStringArray(autoEscalateKeywords)
+    }
+    if (maxMessagesPerMinute !== undefined) config.maxMessagesPerMinute = maxMessagesPerMinute
+    if (maxMessagesPerSession !== undefined) config.maxMessagesPerSession = maxMessagesPerSession
+    if (toolSettings !== undefined) config.toolSettings = normalizeToolSettings(toolSettings)
 
     const updatedBy = getValidAdminId(req.user?.userId)
     if (req.user?.userId && !updatedBy) {
@@ -117,11 +144,45 @@ exports.updateConfig = async (req, res) => {
 
     await config.save()
 
+    const data = config.toObject()
+    data.toolRegistry = getToolRegistry(config.toolSettings)
+
     logger.info(`[Admin] Chatbot config updated by ${updatedBy || 'unknown'}`)
-    res.json({ success: true, message: 'Cap nhat cau hinh chatbot thanh cong!', data: config })
+    res.json({ success: true, message: 'Cap nhat cau hinh chatbot thanh cong!', data })
   } catch (err) {
     logger.error(`[Admin] Update chatbot config error: ${err.stack || err.message || err}`)
     res.status(500).json({ success: false, message: err.message || 'Cap nhat cau hinh chatbot that bai!' })
+  }
+}
+
+// GET /api/v1/admin/chatbot-config/tool-logs
+exports.getToolLogs = async (req, res) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100)
+    const toolName = typeof req.query.toolName === 'string' ? req.query.toolName.trim() : ''
+    const sessionId = typeof req.query.sessionId === 'string' ? req.query.sessionId.trim() : ''
+
+    const filter = {}
+    if (toolName) filter.toolName = toolName
+    if (sessionId) filter.sessionId = sessionId
+
+    const [logs, total, errorCount] = await Promise.all([
+      AgentToolCall.find(filter).sort({ createdAt: -1 }).limit(limit).lean(),
+      AgentToolCall.countDocuments(filter),
+      AgentToolCall.countDocuments({ ...filter, outcome: 'error' })
+    ])
+
+    res.json({
+      success: true,
+      data: logs,
+      meta: {
+        total,
+        errorCount
+      }
+    })
+  } catch (err) {
+    logger.error(`[Admin] Get tool logs error: ${err.stack || err.message || err}`)
+    res.status(500).json({ success: false, message: 'Khong the tai tool logs' })
   }
 }
 

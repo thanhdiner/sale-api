@@ -220,7 +220,8 @@ async function saveBotMessage(conversationId, sessionId, botReply) {
       suggestions: botReply.suggestions || [],
       provider: botReply.metadata?.provider,
       intent: botReply.metadata?.intent,
-      responseTime: botReply.metadata?.responseTime
+      responseTime: botReply.metadata?.responseTime,
+      toolsUsed: botReply.metadata?.toolsUsed || []
     },
     isRead: false
   })

@@ -9,7 +9,8 @@ const logger = require('../../../../config/logger')
 const ChatbotConfig = require('../../models/chatbot.model')
 const { buildSystemPrompt, buildMessages } = require('./prompt.builder')
 const conversationMemory = require('./conversation.memory')
-const { toolDefinitions, executeTool } = require('./ai.tools')
+const { getToolDefinitions, getToolRegistry, executeTool } = require('./ai.tools')
+const { recordToolCall } = require('./toolCallLogger')
 
 const DEFAULT_FALLBACK_MESSAGE = process.env.CHATBOT_FALLBACK_MESSAGE
   || 'Xin lỗi, mình gặp chút trục trặc. Để mình chuyển bạn đến nhân viên hỗ trợ nhé!'
@@ -17,6 +18,13 @@ const DEFAULT_FALLBACK_MESSAGE = process.env.CHATBOT_FALLBACK_MESSAGE
 const DEFAULT_ESCALATE_KEYWORDS = [
   'gặp nhân viên', 'nói chuyện với người', 'chuyển nhân viên',
   'hotline', 'khiếu nại', 'kiện', 'tố cáo'
+]
+
+const DEFAULT_SYSTEM_RULES = [
+  'Không tự tạo đơn hàng khi khách chưa xác nhận.',
+  'Không tự sửa địa chỉ giao hàng nếu khách chưa xác nhận.',
+  'Luôn lấy giá và tồn kho từ dữ liệu hệ thống.',
+  'Nếu không chắc chắn, nói rõ giới hạn và đề nghị chuyển nhân viên.'
 ]
 
 // ─── Provider configuration ─────────────────────────────────────────────────
@@ -132,9 +140,16 @@ async function getRuntimeConfig(overrides = {}) {
 
   const maxTokensValue = overrides.maxTokens ?? dbConfig?.maxTokens
   const temperatureValue = overrides.temperature ?? dbConfig?.temperature
+  const toolSettings = Array.isArray(overrides.toolSettings)
+    ? overrides.toolSettings
+    : (Array.isArray(dbConfig?.toolSettings) ? dbConfig.toolSettings : [])
+  const availableTools = getToolRegistry(toolSettings)
 
   return {
     ...activeConfig,
+    agentName: overrides.agentName ?? dbConfig?.agentName ?? 'Trợ lý mua hàng',
+    agentRole: overrides.agentRole ?? dbConfig?.agentRole ?? 'Hỗ trợ tìm sản phẩm, tư vấn, tra cứu khuyến mãi và đơn hàng',
+    agentTone: overrides.agentTone ?? dbConfig?.agentTone ?? 'Thân thiện, ngắn gọn, rõ ràng',
     isEnabled: overrides.isEnabled ?? dbConfig?.isEnabled ?? (process.env.CHATBOT_ENABLED !== 'false'),
     maxTokens: Number.isFinite(Number(maxTokensValue))
       ? Number(maxTokensValue)
@@ -143,13 +158,20 @@ async function getRuntimeConfig(overrides = {}) {
       ? Number(temperatureValue)
       : (parseFloat(process.env.CHATBOT_TEMPERATURE) || 0.7),
     systemPromptOverride: overrides.systemPromptOverride ?? dbConfig?.systemPromptOverride ?? '',
+    systemRules: Array.isArray(overrides.systemRules)
+      ? overrides.systemRules
+      : (Array.isArray(dbConfig?.systemRules) && dbConfig.systemRules.length > 0
+        ? dbConfig.systemRules
+        : DEFAULT_SYSTEM_RULES),
     brandVoice: overrides.brandVoice ?? dbConfig?.brandVoice ?? '',
     fallbackMessage: overrides.fallbackMessage ?? dbConfig?.fallbackMessage ?? DEFAULT_FALLBACK_MESSAGE,
     autoEscalateKeywords: Array.isArray(overrides.autoEscalateKeywords)
       ? overrides.autoEscalateKeywords
       : (Array.isArray(dbConfig?.autoEscalateKeywords) && dbConfig.autoEscalateKeywords.length > 0
         ? dbConfig.autoEscalateKeywords
-      : DEFAULT_ESCALATE_KEYWORDS)
+        : DEFAULT_ESCALATE_KEYWORDS),
+    toolSettings,
+    availableTools
   }
 }
 
@@ -196,12 +218,6 @@ function normalizeUserMessage(userMessage) {
 const FALLBACK_MESSAGE = process.env.CHATBOT_FALLBACK_MESSAGE
   || 'Xin lỗi, mình gặp chút trục trặc. Để mình chuyển bạn đến nhân viên hỗ trợ nhé! 🙏'
 
-// Keywords that trigger auto-escalation to human agent
-const ESCALATE_KEYWORDS = [
-  'gặp nhân viên', 'nói chuyện với người', 'chuyển nhân viên',
-  'hotline', 'khiếu nại', 'kiện', 'tố cáo'
-]
-
 /**
  * Xử lý message từ khách hàng và trả về bot reply
  * Hỗ trợ Function Calling: Bot tự quyết định khi nào cần tra DB
@@ -225,8 +241,15 @@ async function processMessage(sessionId, userMessage, customerInfo = {}, overrid
       temperature,
       autoEscalateKeywords,
       systemPromptOverride,
-      brandVoice
+      brandVoice,
+      agentName,
+      agentRole,
+      agentTone,
+      systemRules,
+      toolSettings,
+      availableTools
     } = runtimeConfig
+    const toolDefinitions = getToolDefinitions(toolSettings)
 
     fallbackMessage = runtimeConfig.fallbackMessage || FALLBACK_MESSAGE
 
@@ -249,11 +272,15 @@ async function processMessage(sessionId, userMessage, customerInfo = {}, overrid
     // ── Build prompt & context ─────────────────────────────────────────
     const baseSystemPrompt = buildSystemPrompt({
       customerInfo,
-      customPrompt: systemPromptOverride
+      customPrompt: systemPromptOverride,
+      brandVoice,
+      agentName,
+      agentRole,
+      agentTone,
+      systemRules,
+      availableTools
     })
-    const systemPrompt = brandVoice && !systemPromptOverride
-      ? `${baseSystemPrompt}\n\n## Brand voice override:\n${brandVoice}`
-      : baseSystemPrompt
+    const systemPrompt = baseSystemPrompt
     const history = await conversationMemory.getContext(sessionId)
     const messages = buildMessages(systemPrompt, history, promptInput)
 
@@ -264,6 +291,11 @@ async function processMessage(sessionId, userMessage, customerInfo = {}, overrid
     let totalTokens = 0
     let toolsUsed = []
     let reply = null
+    const toolContext = {
+      sessionId,
+      customerInfo,
+      userId: customerInfo.userId || null
+    }
 
     // ── Tool Calling Loop ──────────────────────────────────────────────
     // Bot có thể gọi tool nhiều lần (VD: tìm SP rồi lấy chi tiết)
@@ -276,7 +308,7 @@ async function processMessage(sessionId, userMessage, customerInfo = {}, overrid
       }
 
       // Chỉ gửi tools nếu chưa phải vòng cuối
-      if (round < MAX_TOOL_ROUNDS - 1) {
+      if (round < MAX_TOOL_ROUNDS - 1 && toolDefinitions.length > 0) {
         requestParams.tools = toolDefinitions
         requestParams.tool_choice = 'auto'
       }
@@ -294,7 +326,21 @@ async function processMessage(sessionId, userMessage, customerInfo = {}, overrid
           if (parsed) {
             logger.info(`[AI] Groq fallback: parsed failed_generation → ${parsed.name}(${JSON.stringify(parsed.args)})`)
             toolsUsed.push(parsed.name)
-            const toolResult = await executeTool(parsed.name, parsed.args)
+            const toolStartedAt = Date.now()
+            const toolResult = await executeTool(parsed.name, parsed.args, toolContext)
+            await recordToolCall({
+              conversationId: customerInfo.conversationId,
+              sessionId,
+              userId: customerInfo.userId,
+              triggerMessage: promptText,
+              toolName: parsed.name,
+              toolArgs: parsed.args,
+              result: toolResult,
+              durationMs: Date.now() - toolStartedAt,
+              provider,
+              model,
+              round: round + 1
+            })
 
             // Gọi lại AI KHÔNG có tools, kèm dữ liệu từ DB
             messages.push({
@@ -343,7 +389,22 @@ async function processMessage(sessionId, userMessage, customerInfo = {}, overrid
             }
 
             toolsUsed.push(toolName)
-            const result = await executeTool(toolName, args)
+            const toolStartedAt = Date.now()
+            const result = await executeTool(toolName, args, toolContext)
+
+            await recordToolCall({
+              conversationId: customerInfo.conversationId,
+              sessionId,
+              userId: customerInfo.userId,
+              triggerMessage: promptText,
+              toolName,
+              toolArgs: args,
+              result,
+              durationMs: Date.now() - toolStartedAt,
+              provider,
+              model,
+              round: round + 1
+            })
 
             return {
               role: 'tool',

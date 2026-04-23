@@ -178,7 +178,8 @@ function registerHandlers(io) {
         await handleBotReply(io, conv, sessionId, buildBotInput({ type, message, imageUrls }), {
           name: senderName,
           currentPage,
-          userId: senderId
+          userId: senderId,
+          conversationId: conv._id?.toString()
         })
       } catch (err) {
         logger.error(`[Chat] send error: ${err.message}`)

@@ -1,21 +1,48 @@
 /**
- * Prompt Builder — Xây dựng system prompt cho AI chatbot
- * Kết hợp brand voice, FAQ, policies và product guide
+ * Prompt Builder — Xay dung system prompt cho AI chatbot
+ * Ket hop brand voice, FAQ, policies va tool registry runtime.
  */
 
 const knowledgeLoader = require('./knowledge.loader')
 
+function formatToolList(availableTools = []) {
+  if (!Array.isArray(availableTools) || availableTools.length === 0) {
+    return '- Hien tai khong co tool nao duoc bat. Chi duoc tra loi trong pham vi kien thuc san co va moi chuyen nhan vien khi can.'
+  }
+
+  return availableTools
+    .filter(tool => tool?.enabled)
+    .map(tool => `- ${tool.name}: ${tool.description}`)
+    .join('\n')
+}
+
+function formatSystemRules(systemRules = []) {
+  if (!Array.isArray(systemRules) || systemRules.length === 0) {
+    return '- Neu khong chac chan, noi ro gioi han va de nghi chuyen nhan vien.'
+  }
+
+  return systemRules.map(rule => `- ${rule}`).join('\n')
+}
+
 /**
- * Build system prompt đầy đủ cho chatbot
+ * Build system prompt day du cho chatbot
  * @param {Object} options
- * @param {Object} options.customerInfo - Thông tin khách hàng
- * @param {string} options.customPrompt - Override system prompt (từ admin config)
+ * @param {Object} options.customerInfo - Thong tin khach hang
+ * @param {string} options.customPrompt - Override system prompt
  * @returns {string} System prompt
  */
 function buildSystemPrompt(options = {}) {
-  const { customerInfo = {}, customPrompt, brandVoice } = options
+  const {
+    customerInfo = {},
+    customPrompt,
+    brandVoice,
+    agentName = 'Trợ lý mua hàng',
+    agentRole = 'Hỗ trợ tìm sản phẩm và tư vấn mua sắm',
+    agentTone = 'Thân thiện, ngắn gọn',
+    systemRules = [],
+    availableTools = []
+  } = options
 
-  // Nếu admin set custom prompt → dùng luôn
   if (customPrompt && customPrompt.trim()) {
     return customPrompt
   }
@@ -23,77 +50,60 @@ function buildSystemPrompt(options = {}) {
   const kb = knowledgeLoader.loadKnowledge()
 
   const customerContext = customerInfo.name
-    ? `Khách hàng hiện tại: ${customerInfo.name}${customerInfo.userId ? ' (đã đăng nhập)' : ' (chưa đăng nhập)'}`
-    : 'Khách hàng chưa đăng nhập.'
+    ? `Khach hang hien tai: ${customerInfo.name}${customerInfo.userId ? ' (da dang nhap)' : ' (chua dang nhap)'}`
+    : 'Khach hang chua dang nhap.'
 
   const currentPage = customerInfo.currentPage
-    ? `Khách đang xem trang: ${customerInfo.currentPage}`
-    : ''
+    ? `Khach dang xem trang: ${customerInfo.currentPage}`
+    : 'Khong co thong tin trang hien tai.'
 
-  return `Bạn là SmartMall Bot — trợ lý mua sắm AI thông minh của SmartMall.
-Bạn có khả năng TỰ TRA CỨU thông tin sản phẩm, đơn hàng và khuyến mãi từ hệ thống.
+  const communicationStyle = brandVoice || kb.brandVoice || `- Tra loi bang tieng Viet, than thien va ngan gon
+- Dung "minh" va "ban" khi giao tiep
+- Khong bia thong tin san pham, gia ca, ton kho
+- Neu khong chac chan, noi ro gioi han va de nghi chuyen nhan vien
+- Khong tu xu ly giao dich tai chinh nhay cam`
 
-## Nguyên tắc giao tiếp:
-${kb.brandVoice || `- Trả lời bằng tiếng Việt, thân thiện, ngắn gọn (tối đa 3 đoạn)
-- Dùng "mình" và "bạn" khi giao tiếp
-- Dùng emoji vừa phải (1-2 emoji/câu trả lời)
-- KHÔNG bịa thông tin sản phẩm hoặc giá cả
-- Nếu không chắc → nói rõ "Mình chưa có thông tin này" và đề nghị chuyển nhân viên
-- KHÔNG xử lý giao dịch tài chính (hoàn tiền, thanh toán)`}
+  return `Ban la ${agentName} cua SmartMall.
+Vai tro chinh: ${agentRole}
+Giong dieu mac dinh: ${agentTone}
 
-## Kiến thức FAQ:
-${kb.faq || 'Không có dữ liệu FAQ.'}
+## Nguyen tac giao tiep
+${communicationStyle}
 
-## Chính sách cửa hàng:
-${kb.policies || 'Không có dữ liệu chính sách.'}
+## Quy tac he thong
+${formatSystemRules(systemRules)}
 
-## Thông tin phiên:
+## Thong tin phien
 ${customerContext}
 ${currentPage}
 
-## Khả năng của bạn:
-Bạn có thể TỰ ĐỘNG tra cứu dữ liệu thực từ hệ thống SmartMall bao gồm:
-- Tìm kiếm sản phẩm theo tên/thương hiệu (CHÚ Ý: Chỉ trích xuất TÊN LÕI thương hiệu/sản phẩm để tìm kiếm, KHÔNG bao gồm các từ rác hoặc câu lệnh mô tả. Ví dụ: Khách nói 'Tôi muốn mua tài khoản chatgpt', hãy gọi tool với keyword 'chat gpt'. Khách nói 'ACC netflix rẻ', gọi keyword 'netflix').
-- Duyệt sản phẩm theo danh mục/lĩnh vực (khi khách hỏi chung chung: "giải trí", "học tập", "design", "có gì hay ko")
-- Xem sản phẩm bán chạy/nổi bật (khi khách muốn gợi ý, đề xuất, best seller)
-- Xem chi tiết một sản phẩm cụ thể (ưu tiên dùng slug từ kết quả tìm kiếm trước đó)
-- Kiểm tra trạng thái đơn hàng theo mã đơn
-- Xem danh sách sản phẩm đang giảm giá/Flash Sale
+## Tool duoc phep su dung
+${formatToolList(availableTools)}
 
-HÃY CHỦ ĐỘNG sử dụng các khả năng này để trả lời khách, KHÔNG bao giờ nói "bạn tự tìm trên web".
+## Cach hanh dong
+- Chi su dung cac tool dang duoc phep o tren. Khong duoc tu tao them hanh dong.
+- Khi khach hoi ve san pham, gia, ton kho, ma giam gia, khuyen mai, don hang, gio hang hoac danh gia san pham, uu tien dung tool de lay du lieu that.
+- Neu tool tra ve khong tim thay ket qua, noi ro dieu do va goi y cach hoi lai.
+- Luon kem link san pham khi gioi thieu neu du lieu co san.
+- Khong tu suy doan review, diem danh gia hay dieu kien ma giam gia khi chua goi tool hoac tool khong tra ve du lieu.
+- Khi khach muon thao tac gio hang, chi dung tool write khi da xac dinh dung san pham va so luong.
+- Voi tool can xac nhan, phai hoi lai ro rang. Chi thuc thi sau khi khach dong y va lan goi tool thuc thi phai truyen confirmed=true.
+- Neu yeu cau vuot qua quyen hien tai hoac can xac nhan them, phai hoi lai hoac moi chuyen nhan vien.
 
-## Quy tắc chọn tool:
-1. Khách hỏi tên sản phẩm/thương hiệu cụ thể (Netflix, Canva, ChatGPT...) → searchProducts
-2. Khách hỏi chung về lĩnh vực/chủ đề (giải trí, học tập, làm việc...) hoặc "có gì hay" → browseByCategory  
-3. Khách muốn gợi ý, đề xuất, bán chạy, nổi bật → getPopularProducts
-4. Khách hỏi chi tiết 1 sản phẩm đã biết → getProductDetail (dùng slug)
-5. Khách hỏi khuyến mãi/giảm giá → getFlashSales
-6. Khách hỏi đơn hàng → checkOrderStatus
+## Kien thuc FAQ
+${kb.faq || 'Khong co du lieu FAQ.'}
 
-## Quy tắc trả lời:
-1. Khi khách hỏi về sản phẩm, giá cả, tồn kho → tìm kiếm và trả lời DỰA TRÊN DỮ LIỆU THỰC
-2. Khi khách cho mã đơn hàng → kiểm tra và trả lời chính xác trạng thái
-3. Khi khách hỏi khuyến mãi / deal → lấy danh sách và giới thiệu sản phẩm đang giảm
-4. Nếu khách muốn khiếu nại / hoàn tiền mà đơn đã giao → chuyển nhân viên ngay
-5. Nếu khách muốn huỷ đơn → kiểm tra trạng thái, nếu đơn "Chờ xác nhận" thì hướng dẫn vào trang Account để huỷ, nếu đã xử lý rồi thì chuyển nhân viên
-6. Nếu không tìm thấy kết quả → nói rõ "Mình không tìm thấy...", gợi ý từ khoá khác
-7. LUÔN kèm link sản phẩm (url) khi giới thiệu để khách bấm vào xem
-8. Cuối mỗi câu trả lời, gợi ý 2-3 câu hỏi liên quan ngắn gọn
+## Chinh sach cua hang
+${kb.policies || 'Khong co du lieu chinh sach.'}
 
-## Định dạng response:
-- Trả lời text thuần, ngắn gọn, dễ đọc trên chat widget nhỏ
-- KHÔNG dùng markdown heading (#), bold (**) hoặc code block
-- Có thể dùng bullet list ngắn nếu cần liệt kê
-- Giá tiền format: 299.000₫`
+## Dinh dang response
+- Tra loi text thuan, ngan gon, de doc tren chat widget nho
+- Khong dung markdown heading, code block hoac format qua dai
+- Co the dung bullet list ngan neu can liet ke
+- Cuoi moi cau tra loi co the goi y 2-3 cau hoi lien quan ngan gon
+- Gia tien format: 299.000₫`
 }
 
-/**
- * Build messages array cho OpenAI API
- * @param {string} systemPrompt
- * @param {Array} conversationHistory - [{role, content}]
- * @param {string} userMessage - Tin nhắn mới từ khách
- * @returns {Array} Messages array
- */
 function normalizeUserContent(userMessage) {
   if (Array.isArray(userMessage) && userMessage.length > 0) {
     return userMessage
@@ -121,12 +131,10 @@ function buildMessages(systemPrompt, conversationHistory, userMessage) {
     { role: 'system', content: systemPrompt }
   ]
 
-  // Thêm conversation history
   if (conversationHistory && conversationHistory.length > 0) {
     messages.push(...conversationHistory)
   }
 
-  // Thêm tin nhắn mới
   messages.push({ role: 'user', content: normalizeUserContent(userMessage) })
 
   return messages
