@@ -7,6 +7,7 @@ const handleSlug = require('../../utils/handleSlug')
 const mongoose = require('mongoose')
 const removeAccents = require('remove-accents')
 const logger = require('../../../../config/logger')
+const { syncProductStock } = require('../../services/digitalDelivery.service')
 
 const getUploadedFileUrl = file => {
   if (!file) return ''
@@ -83,6 +84,8 @@ const summarizeProductBody = body => ({
   isTopDeal: body.isTopDeal,
   isFeatured: body.isFeatured,
   deliveryEstimateDays: body.deliveryEstimateDays,
+  deliveryType: body.deliveryType,
+  deliveryInstructionsLength: body.deliveryInstructions?.length || 0,
   thumbnail: body.thumbnail,
   imagesCount: Array.isArray(body.images) ? body.images.length : 0,
   featuresCount: Array.isArray(body.features) ? body.features.length : body.features ? 1 : 0,
@@ -172,6 +175,8 @@ module.exports.create = async (req, res) => {
     logger.debug('[Admin][CreateProduct] req.user', { user: req.user })
 
     parseIntegerFields(req.body, ['price', 'costPrice', 'discountPercentage', 'stock', 'deliveryEstimateDays'])
+    req.body.deliveryType = req.body.deliveryType || 'manual'
+    if (req.body.deliveryInstructions == null) req.body.deliveryInstructions = ''
 
     logger.debug('[Admin][CreateProduct] After parseIntegerFields', {
       price: req.body.price,
@@ -240,6 +245,10 @@ module.exports.create = async (req, res) => {
 
     const product = new Product(req.body)
     const data = await product.save()
+
+    if (data.deliveryType === 'instant_account') {
+      data.stock = await syncProductStock(data._id)
+    }
 
     logger.debug('[Admin][CreateProduct] ✅ Saved product _id:', data._id)
 
@@ -448,6 +457,8 @@ module.exports.edit = async (req, res) => {
     logger.debug('[Admin][EditProduct] req.user', { user: req.user })
 
     parseIntegerFields(req.body, ['price', 'costPrice', 'discountPercentage', 'stock', 'position', 'deliveryEstimateDays'])
+    if (req.body.deliveryType == null) req.body.deliveryType = 'manual'
+    if (req.body.deliveryInstructions == null) req.body.deliveryInstructions = ''
 
     logger.debug('[Admin][EditProduct] After parseIntegerFields', {
       price: req.body.price,
@@ -553,6 +564,10 @@ module.exports.edit = async (req, res) => {
       new: true,
       runValidators: true
     }).populate('updateBy.by', 'fullName avatarUrl')
+
+    if (updatedProduct?.deliveryType === 'instant_account') {
+      updatedProduct.stock = await syncProductStock(updatedProduct._id)
+    }
 
     logger.debug('[Admin][EditProduct] Updated product', {
       productId: updatedProduct ? String(updatedProduct._id) : null,

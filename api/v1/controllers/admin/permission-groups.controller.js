@@ -1,13 +1,23 @@
-const PermissionGroups = require('../../models/permission-group.model')
-const Permissions = require('../../models/permission.model')
 const logger = require('../../../../config/logger')
+const permissionGroupsService = require('../../services/admin/permissionGroups.service')
+
+const handleKnownControllerError = (res, error) => {
+  if (!error?.statusCode) {
+    return false
+  }
+
+  res.status(error.statusCode).json({
+    error: error.message,
+    message: error.message
+  })
+  return true
+}
 
 //# GET /api/v1/admin/permission-groups
-module.exports.index = async (req, res) => {
+module.exports.index = async (_req, res) => {
   try {
-    const find = { deleted: false }
-    const permissionGroups = await PermissionGroups.find(find)
-    res.json({ data: permissionGroups })
+    const result = await permissionGroupsService.listPermissionGroups()
+    res.json(result)
   } catch (err) {
     logger.error('[Admin] Error getting permission groups:', err)
     res.status(500).json({ error: 'Internal server error' })
@@ -17,22 +27,10 @@ module.exports.index = async (req, res) => {
 //# POST /api/v1/admin/permission-groups/create
 module.exports.create = async (req, res) => {
   try {
-    const { label, value, description, isActive } = req.body
-    if (!label || !value) return res.status(400).json({ error: 'Label, value are required' })
-    const exists = await PermissionGroups.findOne({ value, deleted: false })
-    if (exists) return res.status(400).json({ message: 'Group value already exists' })
-    if (!/^[a-z0-9_]+$/.test(value)) return res.status(400).json({ error: 'Only a-z, 0-9, and _' })
-
-    const permissionGroups = new PermissionGroups({
-      label,
-      value,
-      description,
-      isActive
-    })
-    await permissionGroups.save()
-
-    res.status(201).json({ message: 'Created', data: permissionGroups })
+    const result = await permissionGroupsService.createPermissionGroup(req.body)
+    res.status(201).json(result)
   } catch (err) {
+    if (handleKnownControllerError(res, err)) return
     logger.error('[Admin] Error creating permission group:', err)
     return res.status(500).json({ error: 'Internal server error', message: 'Created unsuccessful', status: 500 })
   }
@@ -41,16 +39,11 @@ module.exports.create = async (req, res) => {
 //# PATCH /api/v1/admin/permissions/edit/:id
 module.exports.edit = async (req, res) => {
   try {
-    const { id } = req.params
-    const { label, description, isActive } = req.body
-
-    if (!label) return res.status(400).json({ error: 'Label is required' })
-
-    const updated = await PermissionGroups.findByIdAndUpdate(id, { label, description, isActive }, { new: true })
-    if (!updated) return res.status(404).json({ error: 'Permission group not found' })
-
-    res.status(200).json({ message: 'Updated', data: updated })
+    const result = await permissionGroupsService.editPermissionGroup(req.params.id, req.body)
+    res.status(200).json(result)
   } catch (err) {
+    if (handleKnownControllerError(res, err)) return
+    logger.error('[Admin] Error editing permission group:', err)
     return res.status(500).json({ error: 'Internal server error', message: 'Updated unsuccessful', status: 500 })
   }
 }
@@ -58,23 +51,11 @@ module.exports.edit = async (req, res) => {
 //# PATCH /api/v1/admin/permission-groups/delete/:id
 module.exports.delete = async (req, res) => {
   try {
-    const { id } = req.params
-
-    const group = await PermissionGroups.findById(id)
-    if (!group || group.deleted) return res.status(404).json({ message: 'Permission group not found' })
-
-    const permissionCount = await Permissions.countDocuments({ group: group.value, deleted: false })
-    if (permissionCount > 0) {
-      return res.status(400).json({
-        message: `Không thể xoá nhóm quyền vì còn ${permissionCount} permission liên kết!`
-      })
-    }
-
-    group.deleted = true
-    await group.save()
-
-    res.status(200).json({ message: 'Permission group deleted successfully' })
+    const result = await permissionGroupsService.deletePermissionGroup(req.params.id)
+    res.status(200).json(result)
   } catch (err) {
+    if (handleKnownControllerError(res, err)) return
+    logger.error('[Admin] Error deleting permission group:', err)
     res.status(500).json({ error: 'Internal server error', status: 500 })
   }
 }
@@ -82,18 +63,14 @@ module.exports.delete = async (req, res) => {
 //# PATCH /api/v1/admin/permissions/toggle-active/:id
 module.exports.toggleActive = async (req, res) => {
   try {
-    const { id } = req.params
-    const { isActive } = req.body
-
-    const isBoolean = 'isActive is required and must be boolean'
-    const notfound = 'Permission group not found'
-    if (typeof isActive !== 'boolean') return res.status(400).json({ error: isBoolean, message: isBoolean })
-
-    const updated = await PermissionGroups.findByIdAndUpdate(id, { isActive }, { new: true })
-    if (!updated) return res.status(404).json({ error: notfound, message: notfound })
-
-    res.status(200).json({ message: 'Updated', data: updated })
+    const result = await permissionGroupsService.togglePermissionGroupActive(
+      req.params.id,
+      req.body.isActive
+    )
+    res.status(200).json(result)
   } catch (err) {
+    if (handleKnownControllerError(res, err)) return
+    logger.error('[Admin] Error toggling permission group active state:', err)
     return res.status(500).json({ error: 'Internal server error', message: 'Updated unsuccessful', status: 500 })
   }
 }

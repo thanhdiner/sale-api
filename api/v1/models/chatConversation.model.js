@@ -53,4 +53,7 @@ const chatConversationSchema = new mongoose.Schema(
   { timestamps: true }
 )
 
+chatConversationSchema.index({ status: 1, lastMessageAt: -1, createdAt: -1 })
+chatConversationSchema.index({ 'assignedAgent.agentId': 1, status: 1, lastMessageAt: -1 })
+
 module.exports = mongoose.model('ChatConversation', chatConversationSchema)

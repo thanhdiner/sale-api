@@ -1,12 +1,23 @@
-const Role = require('../../models/roles.model')
 const logger = require('../../../../config/logger')
+const rolesService = require('../../services/admin/roles.service')
+
+const handleKnownControllerError = (res, error) => {
+  if (!error?.statusCode) {
+    return false
+  }
+
+  res.status(error.statusCode).json({
+    error: error.message,
+    message: error.message
+  })
+  return true
+}
 
 //# GET /api/v1/admin/roles
-module.exports.index = async (req, res) => {
+module.exports.index = async (_req, res) => {
   try {
-    const find = { deleted: false }
-    const roles = await Role.find(find)
-    res.json({ data: roles })
+    const result = await rolesService.listRoles()
+    res.json(result)
   } catch (err) {
     logger.error('[Admin] Error getting roles:', err)
     res.status(500).json({ error: 'Internal server error' })
@@ -16,21 +27,10 @@ module.exports.index = async (req, res) => {
 //# POST /api/v1/admin/roles/create
 module.exports.create = async (req, res) => {
   try {
-    const { label, description, permissions = [], isActive } = req.body
-    if (!label) return res.status(400).json({ error: 'Role name (label) is required' })
-    const exists = await Role.findOne({ label, deleted: false })
-    if (exists) return res.status(400).json({ message: 'Role name (label) already exists' })
-
-    const roles = new Role({
-      label,
-      description,
-      permissions,
-      isActive
-    })
-    await roles.save()
-
-    res.status(201).json({ message: 'Created', data: roles })
+    const result = await rolesService.createRole(req.body)
+    res.status(201).json(result)
   } catch (err) {
+    if (handleKnownControllerError(res, err)) return
     logger.error('[Admin] Error creating role:', err)
     return res.status(500).json({ error: 'Internal server error', message: 'Created unsuccessful' })
   }
@@ -39,19 +39,11 @@ module.exports.create = async (req, res) => {
 //# PATCH /api/v1/admin/roles/edit/:id
 module.exports.edit = async (req, res) => {
   try {
-    const { id } = req.params
-    const { label, description, permissions, isActive } = req.body
-
-    if (!label) return res.status(400).json({ error: 'Role name (label) is required' })
-
-    const exists = await Role.findOne({ label, _id: { $ne: id }, deleted: false })
-    if (exists) return res.status(400).json({ error: 'Role name (label) already exists' })
-
-    const updated = await Role.findByIdAndUpdate(id, { label, description, permissions, isActive }, { new: true })
-    if (!updated) return res.status(404).json({ error: 'Role group not found' })
-
-    res.status(200).json({ message: 'Updated', data: updated })
+    const result = await rolesService.editRole(req.params.id, req.body)
+    res.status(200).json(result)
   } catch (err) {
+    if (handleKnownControllerError(res, err)) return
+    logger.error('[Admin] Error editing role:', err)
     return res.status(500).json({ error: 'Internal server error', message: 'Updated unsuccessful' })
   }
 }
@@ -59,15 +51,11 @@ module.exports.edit = async (req, res) => {
 //# DELETE /api/v1/admin/roles/delete/:id
 module.exports.delete = async (req, res) => {
   try {
-    const { id } = req.params
-
-    //@ sau làm phần check nếu còn liên kết vs user thì ko cho xóa ^^
-
-    const deleted = await Role.findByIdAndUpdate(id, { deleted: true }, { new: true })
-    if (!deleted) return res.status(404).json({ error: 'Role not found' })
-
-    res.status(200).json({ message: 'Role deleted!', data: deleted })
+    const result = await rolesService.deleteRole(req.params.id)
+    res.status(200).json(result)
   } catch (err) {
+    if (handleKnownControllerError(res, err)) return
+    logger.error('[Admin] Error deleting role:', err)
     res.status(500).json({ error: 'Internal server error' })
   }
 }
@@ -75,15 +63,11 @@ module.exports.delete = async (req, res) => {
 //# PATCH /api/v1/admin/roles/toggle-active/:id
 module.exports.toggleActive = async (req, res) => {
   try {
-    const { id } = req.params
-    const role = await Role.findById(id)
-    if (!role) return res.status(404).json({ error: 'Role not found' })
-
-    role.isActive = !role.isActive
-    await role.save()
-
-    res.status(200).json({ message: 'Toggled status', data: role })
+    const result = await rolesService.toggleRoleActive(req.params.id)
+    res.status(200).json(result)
   } catch (err) {
+    if (handleKnownControllerError(res, err)) return
+    logger.error('[Admin] Error toggling role active:', err)
     res.status(500).json({ error: 'Internal server error', detail: err.message })
   }
 }

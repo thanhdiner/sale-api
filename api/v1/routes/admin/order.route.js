@@ -5,7 +5,7 @@ const { invalidateDashboard } = require('../../middlewares/cacheInvalidation.mid
 
 router.get('/', controller.getAllOrders)
 router.get('/:id', controller.getOrderDetailAdmin)
-router.patch('/:id', controller.updateOrderStatus, invalidateDashboard)
-router.patch('/delete/:id', controller.deleteOrder, invalidateDashboard)
+router.patch('/:id', invalidateDashboard, controller.updateOrderStatus)
+router.patch('/delete/:id', invalidateDashboard, controller.deleteOrder)
 
 module.exports = router

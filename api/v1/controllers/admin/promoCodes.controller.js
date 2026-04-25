@@ -1,31 +1,34 @@
-const PromoCode = require('../../models/promoCode.model')
 const logger = require('../../../../config/logger')
+const promoCodesService = require('../../services/admin/promoCodes.service')
+
+const handleKnownControllerError = (res, error) => {
+  if (!error?.statusCode) {
+    return false
+  }
+
+  res.status(error.statusCode).json({ error: error.message })
+  return true
+}
 
 //# GET /api/v1/admin/promo-codes
 module.exports.listPromoCodes = async (req, res) => {
   try {
-    const { page = 1, limit = 20, search = '' } = req.query
-    const query = search ? { code: { $regex: search, $options: 'i' } } : {}
-    const promoCodes = await PromoCode.find(query)
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(Number(limit))
-    const total = await PromoCode.countDocuments(query)
-    res.json({ promoCodes, total })
+    const result = await promoCodesService.listPromoCodes(req.query)
+    res.json(result)
   } catch (err) {
-    res.status(500).json({ error: 'Lỗi lấy danh sách mã giảm giá' })
+    logger.error('[Admin] Error listing promo codes:', err)
+    res.status(500).json({ error: 'Loi lay danh sach ma giam gia' })
   }
 }
 
 //# POST /api/v1/admin/promo-codes/create
 module.exports.createPromoCode = async (req, res) => {
   try {
-    const data = req.body
-    // Optional: toUpperCase mã
-    data.code = data.code.trim().toUpperCase()
-    const newPromo = await PromoCode.create(data)
-    res.json({ success: true, promoCode: newPromo })
+    const result = await promoCodesService.createPromoCode(req.body)
+    res.json(result)
   } catch (err) {
+    if (handleKnownControllerError(res, err)) return
+    logger.error('[Admin] Error creating promo code:', err)
     res.status(400).json({ error: err.message })
   }
 }
@@ -33,22 +36,22 @@ module.exports.createPromoCode = async (req, res) => {
 //# GET /api/v1/admin/promo-codes/:id
 module.exports.getPromoCode = async (req, res) => {
   try {
-    const promo = await PromoCode.findById(req.params.id)
-    if (!promo) return res.status(404).json({ error: 'Không tìm thấy mã' })
-    res.json({ promoCode: promo })
+    const result = await promoCodesService.getPromoCodeById(req.params.id)
+    res.json(result)
   } catch (err) {
-    res.status(400).json({ error: 'Lỗi lấy chi tiết' })
+    if (handleKnownControllerError(res, err)) return
+    logger.error('[Admin] Error getting promo code detail:', err)
+    res.status(400).json({ error: 'Loi lay chi tiet' })
   }
 }
 
 //# PATCH /api/v1/admin/promo-codes/update/:id
 module.exports.updatePromoCode = async (req, res) => {
   try {
-    const data = req.body
-    if (data.code) data.code = data.code.trim().toUpperCase()
-    const promo = await PromoCode.findByIdAndUpdate(req.params.id, data, { new: true })
-    res.json({ success: true, promoCode: promo })
+    const result = await promoCodesService.updatePromoCode(req.params.id, req.body)
+    res.json(result)
   } catch (err) {
+    if (handleKnownControllerError(res, err)) return
     logger.error('[Admin] UPDATE PROMO ERROR:', err)
     res.status(400).json({ error: err.message })
   }
@@ -57,9 +60,11 @@ module.exports.updatePromoCode = async (req, res) => {
 //# DELETE /api/v1/admin/promo-codes/delete/:id
 module.exports.deletePromoCode = async (req, res) => {
   try {
-    await PromoCode.findByIdAndDelete(req.params.id)
-    res.json({ success: true })
+    const result = await promoCodesService.deletePromoCode(req.params.id)
+    res.json(result)
   } catch (err) {
-    res.status(400).json({ error: 'Lỗi xoá mã' })
+    if (handleKnownControllerError(res, err)) return
+    logger.error('[Admin] Error deleting promo code:', err)
+    res.status(400).json({ error: 'Loi xoa ma' })
   }
 }

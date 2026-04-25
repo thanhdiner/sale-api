@@ -1,14 +1,20 @@
-const Permission = require('../../models/permission.model')
 const logger = require('../../../../config/logger')
+const permissionsService = require('../../services/admin/permissions.service')
+
+const handleKnownControllerError = (res, error) => {
+  if (!error?.statusCode) {
+    return false
+  }
+
+  res.status(error.statusCode).json({ error: error.message })
+  return true
+}
 
 //# GET /api/v1/admin/permissions
 module.exports.index = async (req, res) => {
   try {
-    const { group } = req.query
-    const query = { deleted: false }
-    if (group) query.group = group
-    const permissions = await Permission.find(query)
-    res.json({ data: permissions })
+    const result = await permissionsService.listPermissions(req.query)
+    res.json(result)
   } catch (err) {
     logger.error('[Admin] Error getting permissions:', err)
     res.status(500).json({ error: 'Internal server error' })
@@ -18,22 +24,10 @@ module.exports.index = async (req, res) => {
 //# POST /api/v1/admin/permissions/create
 module.exports.create = async (req, res) => {
   try {
-    const { name, title, description, group } = req.body
-    if (!name || !title || !group) return res.status(400).json({ error: 'Name, title and group are required' })
-    if (!/^[a-z0-9_]+$/.test(name)) return res.status(400).json({ error: 'Only a-z, 0-9, and _' })
-    const existingPermission = await Permission.findOne({ name, deleted: false })
-    if (existingPermission) return res.status(400).json({ error: 'Permission with this name already exists' })
-
-    const permission = new Permission({
-      name,
-      title,
-      description,
-      group
-    })
-    await permission.save()
-
-    res.status(201).json({ message: 'Created', data: permission })
+    const result = await permissionsService.createPermission(req.body)
+    res.status(201).json(result)
   } catch (err) {
+    if (handleKnownControllerError(res, err)) return
     logger.error('[Admin] Error creating permission:', err)
     return res.status(500).json({ error: 'Internal server error', message: 'Created unsuccessful', status: 500 })
   }
@@ -42,16 +36,11 @@ module.exports.create = async (req, res) => {
 //# PATCH /api/v1/admin/permissions/edit/:id
 module.exports.edit = async (req, res) => {
   try {
-    const { id } = req.params
-    const { title, description, group } = req.body
-
-    if (!title || !group) return res.status(400).json({ error: 'Title and group are required' })
-
-    const updated = await Permission.findByIdAndUpdate(id, { title, description, group }, { new: true })
-    if (!updated) return res.status(404).json({ error: 'Permission not found' })
-
-    res.status(200).json({ message: 'Updated', data: updated })
+    const result = await permissionsService.editPermission(req.params.id, req.body)
+    res.status(200).json(result)
   } catch (err) {
+    if (handleKnownControllerError(res, err)) return
+    logger.error('[Admin] Error editing permission:', err)
     return res.status(500).json({ error: 'Internal server error', message: 'Updated unsuccessful', status: 500 })
   }
 }
@@ -59,12 +48,10 @@ module.exports.edit = async (req, res) => {
 //# DELETE /api/v1/admin/permissions/delete/:id
 module.exports.delete = async (req, res) => {
   try {
-    const { id } = req.params
-    const deleted = await Permission.findByIdAndUpdate(id, { deleted: true }, { new: true })
-    if (!deleted) return res.status(404).json({ error: 'Permission not found' })
-
-    res.status(200).json({ message: 'Deleted', data: deleted })
+    const result = await permissionsService.deletePermission(req.params.id)
+    res.status(200).json(result)
   } catch (err) {
+    if (handleKnownControllerError(res, err)) return
     logger.error('[Admin] Error deleting permission:', err)
     res.status(500).json({ error: 'Internal server error', status: 500 })
   }

@@ -5,12 +5,12 @@
  * Hỗ trợ: searchProduct, getProductDetail, checkOrderStatus, getFlashSales
  */
 
-const Product = require('../../models/products.model')
-const ProductCategory = require('../../models/product-category.model')
-const Order = require('../../models/order.model')
-const Cart = require('../../models/cart.model')
-const PromoCode = require('../../models/promoCode.model')
-const Review = require('../../models/review.model')
+const productRepository = require('../../repositories/product.repository')
+const productCategoryRepository = require('../../repositories/productCategory.repository')
+const orderRepository = require('../../repositories/order.repository')
+const cartRepository = require('../../repositories/cart.repository')
+const promoCodeRepository = require('../../repositories/promoCode.repository')
+const reviewRepository = require('../../repositories/review.repository')
 const logger = require('../../../../config/logger')
 
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000'
@@ -419,12 +419,12 @@ async function searchProducts({ keyword }) {
       }
     }
 
-    const products = await Product
-      .find(query)
-      .select('title price discountPercentage stock thumbnail slug features rate soldQuantity')
-      .sort({ soldQuantity: -1 }) // Ưu tiên sản phẩm bán chạy
-      .limit(limit)
-      .lean()
+    const products = await productRepository.findByQuery(query, {
+      select: 'title price discountPercentage stock thumbnail slug features rate soldQuantity',
+      sort: { soldQuantity: -1 },
+      limit,
+      lean: true
+    })
 
     if (products.length === 0) {
       return JSON.stringify({
@@ -471,18 +471,24 @@ async function searchProducts({ keyword }) {
 async function getProductDetail({ slug }) {
   try {
     // 1. Tìm chính xác bằng slug
-    let product = await Product.findOne({ slug, deleted: false }).populate('productCategory', 'title').lean()
+    let product = await productRepository.findOne(
+      { slug, deleted: false },
+      { populate: { path: 'productCategory', select: 'title' }, lean: true }
+    )
 
     // 2. Fallback: tìm bằng regex exact title
     if (!product) {
       const escaped = slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      product = await Product.findOne({
+      product = await productRepository.findOne({
         $or: [
           { title: { $regex: escaped, $options: 'i' } },
           { titleNoAccent: { $regex: escaped, $options: 'i' } }
         ],
         deleted: false
-      }).populate('productCategory', 'title').lean()
+      }, {
+        populate: { path: 'productCategory', select: 'title' },
+        lean: true
+      })
     }
 
     // 3. Fallback: fuzzy multi-word AND (giống searchProducts)
@@ -507,7 +513,10 @@ async function getProductDetail({ slug }) {
             }
           })
         }
-        product = await Product.findOne(query).populate('productCategory', 'title').lean()
+        product = await productRepository.findOne(query, {
+          populate: { path: 'productCategory', select: 'title' },
+          lean: true
+        })
       }
     }
 
@@ -558,14 +567,17 @@ async function checkOrderStatus({ orderId }) {
     // Thử tìm bằng _id (MongoDB ObjectId)
     let order = null
     if (/^[0-9a-fA-F]{24}$/.test(cleanId)) {
-      order = await Order.findOne({ _id: cleanId, isDeleted: false }).lean()
+      order = await orderRepository.findOne({ _id: cleanId, isDeleted: false }, { lean: true })
     }
 
     // Nếu không tìm được, thử tìm đuôi ID (khách thường chỉ nhớ 4-6 ký tự cuối)
     if (!order && cleanId.length >= 4) {
-      order = await Order.findOne({
+      order = await orderRepository.findOne({
         isDeleted: false
-      }).sort({ createdAt: -1 }).lean()
+      }, {
+        sort: { createdAt: -1 },
+        lean: true
+      })
 
       // Kiểm tra đuôi ID
       if (order && !order._id.toString().endsWith(cleanId.toLowerCase())) {
@@ -630,17 +642,17 @@ async function getFlashSales(args) {
     const maxLimit = 5
 
     // Lấy sản phẩm có discountPercentage > 0, ưu tiên giảm giá cao nhất
-    const products = await Product
-      .find({
-        deleted: false,
-        status: 'active',
-        discountPercentage: { $gt: 0 },
-        stock: { $gt: 0 }
-      })
-      .select('title price discountPercentage stock thumbnail slug soldQuantity')
-      .sort({ discountPercentage: -1 })
-      .limit(maxLimit)
-      .lean()
+    const products = await productRepository.findByQuery({
+      deleted: false,
+      status: 'active',
+      discountPercentage: { $gt: 0 },
+      stock: { $gt: 0 }
+    }, {
+      select: 'title price discountPercentage stock thumbnail slug soldQuantity',
+      sort: { discountPercentage: -1 },
+      limit: maxLimit,
+      lean: true
+    })
 
     if (products.length === 0) {
       return JSON.stringify({
@@ -687,31 +699,37 @@ async function browseByCategory({ categoryKeyword }) {
     const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
     // Tìm danh mục khớp keyword
-    const categories = await ProductCategory.find({
+    const categories = await productCategoryRepository.findAll({
       $or: [
         { title: { $regex: escaped, $options: 'i' } },
         { description: { $regex: escaped, $options: 'i' } }
       ],
       deleted: false
-    }).select('_id title slug').lean()
+    }, {
+      select: '_id title slug',
+      lean: true
+    })
 
     let products = []
 
     if (categories.length > 0) {
       // Có danh mục khớp → lấy sản phẩm thuộc danh mục
       const categoryIds = categories.map(c => c._id)
-      products = await Product
-        .find({ productCategory: { $in: categoryIds }, deleted: false, status: 'active' })
-        .select('title price discountPercentage stock slug soldQuantity rate')
-        .sort({ soldQuantity: -1 })
-        .limit(6)
-        .lean()
+      products = await productRepository.findByQuery(
+        { productCategory: { $in: categoryIds }, deleted: false, status: 'active' },
+        {
+          select: 'title price discountPercentage stock slug soldQuantity rate',
+          sort: { soldQuantity: -1 },
+          limit: 6,
+          lean: true
+        }
+      )
     }
 
     // Fallback: tìm trong description hoặc features của sản phẩm
     if (products.length === 0) {
-      products = await Product
-        .find({
+      products = await productRepository.findByQuery(
+        {
           deleted: false,
           status: 'active',
           $or: [
@@ -719,16 +737,22 @@ async function browseByCategory({ categoryKeyword }) {
             { features: { $regex: escaped, $options: 'i' } },
             { title: { $regex: escaped, $options: 'i' } }
           ]
-        })
-        .select('title price discountPercentage stock slug soldQuantity rate')
-        .sort({ soldQuantity: -1 })
-        .limit(6)
-        .lean()
+        },
+        {
+          select: 'title price discountPercentage stock slug soldQuantity rate',
+          sort: { soldQuantity: -1 },
+          limit: 6,
+          lean: true
+        }
+      )
     }
 
     if (products.length === 0) {
       // Gợi ý danh mục có sẵn
-      const allCats = await ProductCategory.find({ deleted: false }).select('title').limit(10).lean()
+      const allCats = await productCategoryRepository.findAll(
+        { deleted: false },
+        { select: 'title', limit: 10, lean: true }
+      )
       return JSON.stringify({
         found: false,
         message: `Mình chưa tìm thấy sản phẩm nào trong lĩnh vực "${keyword}".`,
@@ -771,16 +795,24 @@ async function getPopularProducts({ limit } = {}) {
     const max = Math.min(limit || 5, 10)
 
     const [bestsellers, featured] = await Promise.all([
-      Product.find({ deleted: false, status: 'active' })
-        .select('title price discountPercentage stock slug soldQuantity rate')
-        .sort({ soldQuantity: -1 })
-        .limit(max)
-        .lean(),
-      Product.find({ deleted: false, status: 'active', isFeatured: true })
-        .select('title price discountPercentage stock slug soldQuantity rate')
-        .sort({ soldQuantity: -1 })
-        .limit(max)
-        .lean()
+      productRepository.findByQuery(
+        { deleted: false, status: 'active' },
+        {
+          select: 'title price discountPercentage stock slug soldQuantity rate',
+          sort: { soldQuantity: -1 },
+          limit: max,
+          lean: true
+        }
+      ),
+      productRepository.findByQuery(
+        { deleted: false, status: 'active', isFeatured: true },
+        {
+          select: 'title price discountPercentage stock slug soldQuantity rate',
+          sort: { soldQuantity: -1 },
+          limit: max,
+          lean: true
+        }
+      )
     ])
 
     // Gộp và loại trùng
@@ -879,8 +911,8 @@ async function addToCart({ productId, productQuery, quantity = 1 } = {}, context
       })
     }
 
-    let cart = await Cart.findOne({ userId })
-    if (!cart) cart = await Cart.create({ userId, items: [] })
+    let cart = await cartRepository.findByUserId(userId)
+    if (!cart) cart = await cartRepository.createForUser(userId)
 
     const existingIndex = cart.items.findIndex(item => item.productId.equals(product._id))
     if (existingIndex >= 0) {
@@ -926,7 +958,7 @@ async function addToCart({ productId, productQuery, quantity = 1 } = {}, context
     }
 
     cart.updatedAt = new Date()
-    await cart.save()
+    await cartRepository.save(cart)
 
     return JSON.stringify({
       success: true,
@@ -958,7 +990,7 @@ async function updateCartQuantity({ productId, productQuery, quantity } = {}, co
       })
     }
 
-    const cart = await Cart.findOne({ userId })
+    const cart = await cartRepository.findByUserId(userId)
     if (!cart || !Array.isArray(cart.items) || cart.items.length === 0) {
       return JSON.stringify({
         success: false,
@@ -976,7 +1008,7 @@ async function updateCartQuantity({ productId, productQuery, quantity } = {}, co
     }
 
     const targetItem = cart.items[cartItemIndex]
-    const targetProduct = product || await Product.findById(targetItem.productId).lean()
+    const targetProduct = product || await productRepository.findById(targetItem.productId, { lean: true })
 
     if (!isSellableProduct(targetProduct)) {
       return JSON.stringify({
@@ -995,7 +1027,7 @@ async function updateCartQuantity({ productId, productQuery, quantity } = {}, co
 
     cart.items[cartItemIndex].quantity = normalizedQuantity
     cart.updatedAt = new Date()
-    await cart.save()
+    await cartRepository.save(cart)
 
     return JSON.stringify({
       success: true,
@@ -1019,7 +1051,7 @@ async function removeFromCart({ productId, productQuery } = {}, context = {}) {
       })
     }
 
-    const cart = await Cart.findOne({ userId })
+    const cart = await cartRepository.findByUserId(userId)
     if (!cart || !Array.isArray(cart.items) || cart.items.length === 0) {
       return JSON.stringify({
         success: false,
@@ -1041,7 +1073,7 @@ async function removeFromCart({ productId, productQuery } = {}, context = {}) {
 
     cart.items.splice(cartItemIndex, 1)
     cart.updatedAt = new Date()
-    await cart.save()
+    await cartRepository.save(cart)
 
     return JSON.stringify({
       success: true,
@@ -1091,7 +1123,7 @@ async function clearCart(args = {}, context = {}) {
       })
     }
 
-    const cart = await Cart.findOne({ userId })
+    const cart = await cartRepository.findByUserId(userId)
     if (!cart || !Array.isArray(cart.items) || cart.items.length === 0) {
       return JSON.stringify({
         success: true,
@@ -1101,7 +1133,7 @@ async function clearCart(args = {}, context = {}) {
 
     cart.items = []
     cart.updatedAt = new Date()
-    await cart.save()
+    await cartRepository.save(cart)
 
     return JSON.stringify({
       success: true,
@@ -1115,7 +1147,7 @@ async function clearCart(args = {}, context = {}) {
 }
 
 async function buildCartSnapshot(userId, { promoCode } = {}) {
-  const cart = await Cart.findOne({ userId }).lean()
+  const cart = await cartRepository.findByUserId(userId, { lean: true })
 
   if (!cart || !Array.isArray(cart.items) || cart.items.length === 0) {
     return {
@@ -1133,9 +1165,13 @@ async function buildCartSnapshot(userId, { promoCode } = {}) {
   }
 
   const productIds = cart.items.map(item => item.productId)
-  const products = await Product.find({ _id: { $in: productIds } })
-    .select('title price discountPercentage stock thumbnail slug status deleted')
-    .lean()
+  const products = await productRepository.findByQuery(
+    { _id: { $in: productIds } },
+    {
+      select: 'title price discountPercentage stock thumbnail slug status deleted',
+      lean: true
+    }
+  )
 
   const productMap = new Map(products.map(product => [product._id.toString(), product]))
   const items = cart.items.map((item, index) => {
@@ -1254,10 +1290,11 @@ async function getAvailablePromoCodes({ subtotal } = {}, context = {}) {
         : [{ userId: null }]
     }
 
-    const promos = await PromoCode.find(promoQuery)
-      .sort({ createdAt: -1 })
-      .limit(20)
-      .lean()
+    const promos = await promoCodeRepository.findAll(promoQuery, {
+      sort: { createdAt: -1 },
+      limit: 20,
+      lean: true
+    })
 
     const visiblePromos = promos.filter(promo =>
       !isPromoExpired(promo, now)
@@ -1313,7 +1350,7 @@ async function checkPromoCode({ code, subtotal } = {}, context = {}) {
 
     const userId = normalizeUserId(context)
     const normalizedSubtotal = normalizeSubtotal(subtotal)
-    const promo = await PromoCode.findOne({ code: normalizedCode, isActive: true }).lean()
+    const promo = await promoCodeRepository.findOne({ code: normalizedCode, isActive: true }, { lean: true })
 
     if (!promo) {
       return JSON.stringify({
@@ -1406,22 +1443,23 @@ async function getProductReviewSummary({ productQuery } = {}) {
     }
 
     const [summaryAgg, highlights, sellerReplyCount] = await Promise.all([
-      Review.aggregate([
+      reviewRepository.aggregate([
         { $match: reviewFilter },
         { $group: { _id: '$rating', count: { $sum: 1 } } }
       ]),
-      Review.find({
+      reviewRepository.find({
         ...reviewFilter,
         $or: [
           { title: { $ne: '' } },
           { content: { $ne: '' } }
         ]
-      })
-        .sort({ helpfulCount: -1, createdAt: -1 })
-        .limit(3)
-        .populate('userId', 'fullName username')
-        .lean(),
-      Review.countDocuments({
+      }, {
+        sort: { helpfulCount: -1, createdAt: -1 },
+        limit: 3,
+        populate: { path: 'userId', select: 'fullName username' },
+        lean: true
+      }),
+      reviewRepository.countByQuery({
         ...reviewFilter,
         'sellerReply.content': { $exists: true, $ne: '' }
       })
@@ -1495,28 +1533,30 @@ async function findProductByQuery(productQuery) {
   const rawQuery = String(productQuery || '').trim()
   if (!rawQuery) return null
 
-  let product = await Product.findOne({ slug: rawQuery, deleted: false })
-    .populate('productCategory', 'title')
-    .lean()
+  let product = await productRepository.findOne(
+    { slug: rawQuery, deleted: false },
+    { populate: { path: 'productCategory', select: 'title' }, lean: true }
+  )
   if (product) return product
 
   const exactRegex = escapeRegExp(rawQuery)
-  product = await Product.findOne({
+  product = await productRepository.findOne({
     deleted: false,
     $or: [
       { title: { $regex: exactRegex, $options: 'i' } },
       { titleNoAccent: { $regex: exactRegex, $options: 'i' } }
     ]
+  }, {
+    populate: { path: 'productCategory', select: 'title' },
+    lean: true
   })
-    .populate('productCategory', 'title')
-    .lean()
   if (product) return product
 
   const cleaned = normalizeSearchTerms(rawQuery)
   const terms = cleaned.split(/\s+/).filter(term => term.length > 1)
   if (terms.length === 0) return null
 
-  return Product.findOne({
+  return productRepository.findOne({
     deleted: false,
     $and: terms.map(term => {
       const escaped = escapeRegExp(term)
@@ -1527,9 +1567,10 @@ async function findProductByQuery(productQuery) {
         ]
       }
     })
+  }, {
+    populate: { path: 'productCategory', select: 'title' },
+    lean: true
   })
-    .populate('productCategory', 'title')
-    .lean()
 }
 
 function normalizeUserId(context = {}) {
@@ -1550,7 +1591,7 @@ function normalizeQuantity(quantity, fallback = null) {
 
 async function resolveProductForCartInput({ productId, productQuery } = {}) {
   if (typeof productId === 'string' && /^[0-9a-f\d]{24}$/i.test(productId.trim())) {
-    const product = await Product.findById(productId.trim()).lean()
+    const product = await productRepository.findById(productId.trim(), { lean: true })
     if (product) return product
   }
 

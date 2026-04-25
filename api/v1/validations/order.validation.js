@@ -90,10 +90,10 @@ const createOrder = Joi.object({
   }),
   deliveryMethod: Joi.string().valid('pickup', 'contact').default('pickup'),
   paymentMethod: Joi.string().valid('transfer', 'contact', 'vnpay', 'momo', 'zalopay').default('transfer'),
-  subtotal: Joi.number().min(0).required().messages({ 'any.required': 'subtotal la bat buoc' }),
+  subtotal: Joi.number().min(0).optional(),
   discount: Joi.number().min(0).default(0),
   shipping: Joi.number().min(0).default(0),
-  total: Joi.number().min(0).required().messages({ 'any.required': 'total la bat buoc' }),
+  total: Joi.number().min(0).optional(),
   promo: Joi.alternatives().try(
     Joi.string().max(50),
     Joi.object({ code: Joi.string().max(50) })

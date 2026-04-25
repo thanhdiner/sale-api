@@ -35,6 +35,8 @@ const createProduct = Joi.object({
   isFeatured: Joi.alternatives().try(Joi.boolean(), Joi.string()).optional(),
   position: Joi.number().integer().min(0).optional(),
   deliveryEstimateDays: Joi.number().integer().min(0).optional().allow(null),
+  deliveryType: Joi.string().valid('manual', 'instant_account').default('manual'),
+  deliveryInstructions: Joi.string().max(5000).optional().allow('', null),
   timeStart: Joi.date().iso().optional().allow(null),
   timeFinish: Joi.date().iso().optional().allow(null)
 })

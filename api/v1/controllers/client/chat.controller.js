@@ -1,206 +1,126 @@
-const cloudinary = require('cloudinary').v2
-const streamifier = require('streamifier')
+const logger = require('../../../../config/logger')
+const { getIO } = require('../../helpers/socket')
+const { ROOMS, EVENTS } = require('../../socket/constants')
+const chatService = require('../../services/client/chat.service')
 
-const ChatMessage = require('../../models/chatMessage.model')
-const ChatConversation = require('../../models/chatConversation.model')
+function emitConversationUpdate(sessionId, result, { emitResolved = false } = {}) {
+  if (!result?.body?.success || !result.body.data) return
 
-cloudinary.config({
-  cloud_name: process.env.CLOUD_NAME,
-  api_key: process.env.API_KEY,
-  api_secret: process.env.API_SECRET,
-  secure: true
-})
+  try {
+    const io = getIO()
+    const conversation = typeof result.body.data.toObject === 'function'
+      ? result.body.data.toObject()
+      : result.body.data
+    const systemMessage = result.body.systemMessage
+      ? (typeof result.body.systemMessage.toObject === 'function'
+          ? result.body.systemMessage.toObject()
+          : result.body.systemMessage)
+      : null
 
-const uploadBuffer = buffer =>
-  new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      { folder: 'chat/images', resource_type: 'image' },
-      (error, result) => {
-        if (result) resolve(result)
-        else reject(error)
-      }
-    )
+    if (systemMessage) {
+      io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_MESSAGE, systemMessage)
+      io.to(ROOMS.AGENTS).emit(EVENTS.CHAT_MESSAGE, systemMessage)
+    }
 
-    streamifier.createReadStream(buffer).pipe(stream)
-  })
+    if (emitResolved) {
+      io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_RESOLVED)
+    }
 
-async function createSystemMessage(conversationId, sessionId, text) {
-  return ChatMessage.create({
-    conversationId,
-    sessionId,
-    sender: 'system',
-    type: 'system',
-    senderName: 'System',
-    message: text
-  })
+    io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_CONVERSATION_UPDATED, conversation)
+    io.to(ROOMS.AGENTS).emit(EVENTS.CHAT_CONVERSATION_UPDATED, conversation)
+  } catch (error) {
+    logger.error('[Client][Chat] emitConversationUpdate error:', error)
+  }
 }
 
-function getUploadFiles(req) {
-  return [
-    ...(req.files?.images || []),
-    ...(req.files?.image || [])
-  ].filter(file => file?.buffer)
+function sendServiceResult(res, result) {
+  if (typeof result?.statusCode === 'number') {
+    return res.status(result.statusCode).json(result.body)
+  }
+
+  return res.json(result)
 }
 
-// GET /api/v1/chat/history/:sessionId
+function handleUnexpectedError(res, message, err, fallbackMessage = 'Lỗi server') {
+  logger.error(message, err)
+  return res.status(500).json({ success: false, message: fallbackMessage })
+}
+
 const getHistory = async (req, res) => {
   try {
-    const { sessionId } = req.params
-    const showInternal = req.query.internal === 'true'
-    const query = { sessionId }
-    if (!showInternal) query.isInternal = { $ne: true }
-
-    const messages = await ChatMessage.find(query).sort({ createdAt: 1 }).limit(200).lean()
-    res.json({ success: true, data: messages })
-  } catch {
-    res.status(500).json({ success: false, message: 'Lỗi server' })
+    const result = await chatService.getHistory({
+      sessionId: req.params.sessionId,
+      showInternal: req.query.internal === 'true'
+    })
+    return sendServiceResult(res, result)
+  } catch (err) {
+    return handleUnexpectedError(res, '[Client][Chat] getHistory error:', err)
   }
 }
 
-// GET /api/v1/chat/conversation/:sessionId
 const getConversation = async (req, res) => {
   try {
-    const { sessionId } = req.params
-    const conv = await ChatConversation.findOne({ sessionId }).lean()
-    res.json({ success: true, data: conv })
-  } catch {
-    res.status(500).json({ success: false, message: 'Lỗi server' })
+    const result = await chatService.getConversation(req.params.sessionId)
+    return sendServiceResult(res, result)
+  } catch (err) {
+    return handleUnexpectedError(res, '[Client][Chat] getConversation error:', err)
   }
 }
 
-// GET /api/v1/chat/conversations
 const getConversations = async (req, res) => {
   try {
-    const { status, agentId, limit = 50, skip = 0 } = req.query
-    const filter = {}
-    if (status) filter.status = status
-    if (agentId) filter['assignedAgent.agentId'] = agentId
-
-    const conversations = await ChatConversation.find(filter)
-      .sort({ lastMessageAt: -1 })
-      .limit(Number(limit))
-      .skip(Number(skip))
-      .lean()
-
-    res.json({ success: true, data: conversations })
-  } catch {
-    res.status(500).json({ success: false, message: 'Lỗi server' })
+    const result = await chatService.getConversations(req.query)
+    return sendServiceResult(res, result)
+  } catch (err) {
+    return handleUnexpectedError(res, '[Client][Chat] getConversations error:', err)
   }
 }
 
-// POST /api/v1/chat/upload
 const uploadImage = async (req, res) => {
   try {
-    const files = getUploadFiles(req)
-
-    if (files.length === 0) {
-      return res.status(400).json({ success: false, message: 'Vui lòng chọn ít nhất 1 file ảnh hợp lệ' })
-    }
-
-    if (files.length > 10) {
-      return res.status(400).json({ success: false, message: 'Tối đa 10 ảnh một lần gửi' })
-    }
-
-    const results = await Promise.all(files.map(file => uploadBuffer(file.buffer)))
-    const imageUrls = results.map(result => result.secure_url).filter(Boolean)
-
-    if (imageUrls.length === 0) {
-      return res.status(500).json({ success: false, message: 'Không thể upload ảnh chat' })
-    }
-
-    return res.status(201).json({
-      success: true,
-      data: {
-        imageUrl: imageUrls[0],
-        imageUrls
-      }
-    })
-  } catch {
-    return res.status(500).json({ success: false, message: 'Không thể upload ảnh chat' })
+    const result = await chatService.uploadImage(req.files)
+    return sendServiceResult(res, result)
+  } catch (err) {
+    return handleUnexpectedError(res, '[Client][Chat] uploadImage error:', err, 'Không thể upload ảnh chat')
   }
 }
 
-// PATCH /api/v1/chat/assign/:sessionId
 const assignConversation = async (req, res) => {
   try {
-    const { sessionId } = req.params
-    const { agentId, agentName, agentAvatar } = req.body
-
-    const conv = await ChatConversation.findOneAndUpdate(
-      { sessionId },
-      {
-        $set: {
-          status: 'open',
-          'assignedAgent.agentId': agentId,
-          'assignedAgent.agentName': agentName,
-          'assignedAgent.agentAvatar': agentAvatar || null,
-          'assignedAgent.assignedAt': new Date()
-        }
-      },
-      { new: true }
-    )
-
-    if (!conv) return res.status(404).json({ success: false, message: 'Không tìm thấy' })
-
-    await createSystemMessage(conv._id, sessionId, `${agentName} đã tham gia cuộc trò chuyện`)
-    return res.json({ success: true, data: conv })
-  } catch {
-    return res.status(500).json({ success: false, message: 'Lỗi server' })
+    const result = await chatService.assignConversation(req.params.sessionId, req.body)
+    emitConversationUpdate(req.params.sessionId, result)
+    return sendServiceResult(res, result)
+  } catch (err) {
+    return handleUnexpectedError(res, '[Client][Chat] assignConversation error:', err)
   }
 }
 
-// PATCH /api/v1/chat/resolve/:sessionId
 const resolveConversation = async (req, res) => {
   try {
-    const { sessionId } = req.params
-    const conv = await ChatConversation.findOneAndUpdate(
-      { sessionId },
-      { $set: { status: 'resolved', resolvedAt: new Date() } },
-      { new: true }
-    )
-
-    if (!conv) return res.status(404).json({ success: false, message: 'Không tìm thấy' })
-
-    await createSystemMessage(conv._id, sessionId, 'Cuộc trò chuyện đã được đánh dấu giải quyết')
-    return res.json({ success: true, data: conv })
-  } catch {
-    return res.status(500).json({ success: false, message: 'Lỗi server' })
+    const result = await chatService.resolveConversation(req.params.sessionId)
+    emitConversationUpdate(req.params.sessionId, result, { emitResolved: true })
+    return sendServiceResult(res, result)
+  } catch (err) {
+    return handleUnexpectedError(res, '[Client][Chat] resolveConversation error:', err)
   }
 }
 
-// PATCH /api/v1/chat/reopen/:sessionId
 const reopenConversation = async (req, res) => {
   try {
-    const { sessionId } = req.params
-    const conv = await ChatConversation.findOneAndUpdate(
-      { sessionId },
-      { $set: { status: 'open', resolvedAt: null } },
-      { new: true }
-    )
-
-    if (!conv) return res.status(404).json({ success: false, message: 'Không tìm thấy' })
-
-    await createSystemMessage(conv._id, sessionId, 'Cuộc trò chuyện được mở lại')
-    return res.json({ success: true, data: conv })
-  } catch {
-    return res.status(500).json({ success: false, message: 'Lỗi server' })
+    const result = await chatService.reopenConversation(req.params.sessionId)
+    emitConversationUpdate(req.params.sessionId, result)
+    return sendServiceResult(res, result)
+  } catch (err) {
+    return handleUnexpectedError(res, '[Client][Chat] reopenConversation error:', err)
   }
 }
 
-// PATCH /api/v1/chat/read/:sessionId
 const markRead = async (req, res) => {
   try {
-    const { sessionId } = req.params
-    const { reader } = req.body
-
-    await ChatMessage.updateMany({ sessionId, isRead: false }, { $set: { isRead: true } })
-
-    const update = reader === 'agent' ? { $set: { unreadByAgent: 0 } } : { $set: { unreadByCustomer: 0 } }
-    await ChatConversation.updateOne({ sessionId }, update)
-
-    return res.json({ success: true })
-  } catch {
-    return res.status(500).json({ success: false, message: 'Lỗi server' })
+    const result = await chatService.markRead(req.params.sessionId, req.body.reader)
+    return sendServiceResult(res, result)
+  } catch (err) {
+    return handleUnexpectedError(res, '[Client][Chat] markRead error:', err)
   }
 }
 

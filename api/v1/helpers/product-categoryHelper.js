@@ -1,4 +1,4 @@
-const ProductCategory = require('../models/product-category.model')
+const productCategoryRepository = require('../repositories/productCategory.repository')
 
 const buildTree = (categories, parent = null) => {
   return categories
@@ -18,14 +18,14 @@ const buildTree = (categories, parent = null) => {
 const validateParentId = async (parentId, currentId = null) => {
   if (!parentId) return { ok: true }
   if (currentId && parentId === currentId) return { ok: false, error: 'A category cannot be its own parent' }
-  const parent = await ProductCategory.findOne({ _id: parentId, deleted: false })
+  const parent = await productCategoryRepository.findOne({ _id: parentId, deleted: false })
   if (!parent) return { ok: false, error: 'Parent category does not exist' }
   return { ok: true }
 }
 
 const setDefaultPosition = async body => {
   if (body.position === undefined || body.position === null || isNaN(body.position)) {
-    const countProductCategories = await ProductCategory.countDocuments()
+    const countProductCategories = await productCategoryRepository.countByQuery()
     body.position = countProductCategories + 1
   } else body.position = parseInt(body.position)
 }

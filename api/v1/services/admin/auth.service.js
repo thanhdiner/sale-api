@@ -1,22 +1,35 @@
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
 const speakeasy = require('speakeasy')
-const AdminAccount = require('../../models/adminAccount.model')
-const RefreshToken = require('../../models/refreshToken.model')
-const TrustedDevice = require('../../models/adminTrustedDevice.model')
+const adminAccountRepository = require('../../repositories/adminAccount.repository')
+const refreshTokenRepository = require('../../repositories/refreshToken.repository')
+const adminTrustedDeviceRepository = require('../../repositories/adminTrustedDevice.repository')
 const AppError = require('../../utils/AppError')
 
 const ACCESS_SECRET = process.env.ACCESS_SECRET
 const REFRESH_SECRET = process.env.REFRESH_SECRET
 const JWT_EXPIRES_IN_ACCESS = process.env.JWT_EXPIRES_IN_ACCESS || '1h'
 
-const populateAdminRole = query => query.populate({
-  path: 'role_id',
-  select: 'label permissions'
-})
+async function findAdminWithRole(query) {
+  return adminAccountRepository.findOne(query, {
+    populate: {
+      path: 'role_id',
+      select: 'label permissions'
+    }
+  })
+}
+
+async function findAdminByIdWithRole(userId) {
+  return adminAccountRepository.findById(userId, {
+    populate: {
+      path: 'role_id',
+      select: 'label permissions'
+    }
+  })
+}
 
 async function loginAdmin({ username, password, deviceId }) {
-  const admin = await populateAdminRole(AdminAccount.findOne({ username }))
+  const admin = await findAdminWithRole({ username })
 
   if (!admin) {
     throw new AppError('Sai tài khoản hoặc mật khẩu', 401)
@@ -30,7 +43,7 @@ async function loginAdmin({ username, password, deviceId }) {
 
   if (admin.twoFAEnabled) {
     if (deviceId) {
-      const trustedDevice = await TrustedDevice.findOne({ userId: admin._id, deviceId })
+      const trustedDevice = await adminTrustedDeviceRepository.findOne({ userId: admin._id, deviceId })
 
       if (trustedDevice) {
         trustedDevice.lastUsed = new Date()
@@ -54,7 +67,7 @@ async function loginAdmin({ username, password, deviceId }) {
 }
 
 async function verifyAdminLogin2FA({ userId, code, type }) {
-  const admin = await populateAdminRole(AdminAccount.findById(userId))
+  const admin = await findAdminByIdWithRole(userId)
 
   if (!admin?.twoFAEnabled || !admin?.twoFASecret) {
     throw new AppError('Không hợp lệ', 400)
@@ -101,14 +114,14 @@ async function refreshAdminAccessToken(refreshToken) {
     throw new AppError('Không có refresh token', 401)
   }
 
-  const dbToken = await RefreshToken.findOne({ token: refreshToken })
+  const dbToken = await refreshTokenRepository.findOne({ token: refreshToken })
 
   if (!dbToken) {
     throw new AppError('Refresh token không hợp lệ', 403)
   }
 
   if (dbToken.expiresAt < new Date()) {
-    await RefreshToken.deleteOne({ token: refreshToken })
+    await refreshTokenRepository.deleteOne({ token: refreshToken })
     throw new AppError('Refresh token đã hết hạn', 403)
   }
 
@@ -120,7 +133,7 @@ async function refreshAdminAccessToken(refreshToken) {
     throw new AppError('Refresh token không hợp lệ hoặc đã hết hạn', 401)
   }
 
-  const admin = await populateAdminRole(AdminAccount.findById(decoded.userId))
+  const admin = await findAdminByIdWithRole(decoded.userId)
 
   if (!admin) {
     throw new AppError('Không tìm thấy tài khoản', 401)
@@ -137,7 +150,7 @@ async function refreshAdminAccessToken(refreshToken) {
 
 async function logoutAdmin(refreshToken) {
   if (refreshToken) {
-    await RefreshToken.deleteOne({ token: refreshToken })
+    await refreshTokenRepository.deleteOne({ token: refreshToken })
   }
 
   return { clearedRefreshToken: !!refreshToken }

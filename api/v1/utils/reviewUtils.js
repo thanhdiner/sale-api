@@ -1,8 +1,8 @@
 const mongoose = require('mongoose')
 
-const Order = require('../models/order.model')
-const Product = require('../models/products.model')
-const Review = require('../models/review.model')
+const orderRepository = require('../repositories/order.repository')
+const productRepository = require('../repositories/product.repository')
+const reviewRepository = require('../repositories/review.repository')
 
 const REVIEW_EDIT_LIMIT = 2
 const REVIEW_USER_POPULATE = 'fullName avatarUrl username'
@@ -31,12 +31,17 @@ const serializeReview = (review, { currentUserId = null, votedSet = new Set() } 
 }
 
 const recalcProductRating = async productId => {
-  const all = await Review.find({ productId, deleted: false, hidden: { $ne: true } }, 'rating')
+  const all = await reviewRepository.find(
+    { productId, deleted: false, hidden: { $ne: true } },
+    { select: 'rating' }
+  )
   const avg = all.length ? all.reduce((sum, review) => sum + review.rating, 0) / all.length : 0
 
-  await Product.findByIdAndUpdate(productId, {
-    rate: all.length ? Math.round(avg * 10) / 10 : 0
-  })
+  const product = await productRepository.findById(productId)
+  if (product) {
+    product.rate = all.length ? Math.round(avg * 10) / 10 : 0
+    await product.save()
+  }
 }
 
 const getReviewEligibility = async ({ productId, userId }) => {
@@ -55,28 +60,27 @@ const getReviewEligibility = async ({ productId, userId }) => {
     }
   }
 
-  const myReview = await Review.findOne({
+  const myReview = await reviewRepository.findOne({
     productId: normalizedProductId,
     userId,
     deleted: false
-  }).populate('userId', REVIEW_USER_POPULATE)
+  }, {
+    populate: { path: 'userId', select: REVIEW_USER_POPULATE }
+  })
 
-  const completedOrder = await Order.findOne({
+  const completedOrder = await orderRepository.findOne({
     userId,
     isDeleted: false,
     status: 'completed',
     'orderItems.productId': normalizedProductId
   })
-    .sort({ createdAt: -1 })
-    .select('_id status createdAt')
 
-  const latestOrder = completedOrder || await Order.findOne({
+  const latestOrder = completedOrder || await orderRepository.findOne({
     userId,
     isDeleted: false,
     'orderItems.productId': normalizedProductId
   })
-    .sort({ createdAt: -1 })
-    .select('_id status createdAt')
+
 
   const hasPurchased = !!latestOrder
   const hasCompletedOrder = !!completedOrder

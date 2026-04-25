@@ -1,6 +1,6 @@
-const generateUniqueSlug = async (Model, baseSlug) => {
+const generateUniqueSlug = async (source, baseSlug) => {
   const regex = new RegExp(`^${baseSlug}(-\\d+)?$`, 'i')
-  const existingSlugs = await Model.find({ slug: regex }).select('slug')
+  const existingSlugs = await source.find({ slug: regex }).select('slug')
 
   if (!existingSlugs.length) return baseSlug
 

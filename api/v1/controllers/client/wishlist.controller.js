@@ -1,197 +1,107 @@
-const Wishlist = require('../../models/wishlist.model')
-const Product = require('../../models/products.model')
 const logger = require('../../../../config/logger')
+const wishlistService = require('../../services/client/wishlist.service')
 
-const getUserId = req => req.user?.userId
+const handleKnownControllerError = (res, error) => {
+  if (!error?.statusCode) {
+    return false
+  }
+
+  res.status(error.statusCode).json({ error: error.message })
+  return true
+}
 
 //# GET /api/v1/wishlist?page=1&limit=12
-exports.index = async (req, res) => {
+module.exports.index = async (req, res) => {
   try {
-    const userId = getUserId(req)
-    if (!userId) return res.status(401).json({ error: 'Chưa đăng nhập' })
-
-    const page = Math.max(Number(req.query.page) || 1, 1)
-    const limit = Math.min(Math.max(Number(req.query.limit) || 12, 1), 50)
-    const skip = (page - 1) * limit
-
-    let wishlist = await Wishlist.findOne({ userId })
-    if (!wishlist) wishlist = await Wishlist.create({ userId, items: [] })
-
-    // Nếu item mới được push vào cuối mảng, reverse để hiện mới nhất trước
-    const allItems = [...wishlist.items].reverse()
-
-    const totalItems = allItems.length
-    const pagedItems = allItems.slice(skip, skip + limit)
-
-    const productIds = pagedItems.map(i => i.productId)
-
-    const products = await Product.find({
-      _id: { $in: productIds },
-      deleted: { $ne: true }
-    }).lean()
-
-    const productMap = {}
-    products.forEach(p => {
-      productMap[p._id.toString()] = p
+    const result = await wishlistService.getWishlist({
+      userId: req.user?.userId,
+      page: req.query.page,
+      limit: req.query.limit
     })
 
-    const itemsWithDetails = pagedItems
-      .map(item => {
-        const p = productMap[item.productId.toString()]
-        if (!p) return null
-
-        return {
-          productId: item.productId,
-          name: p.title,
-          price: p.price * (1 - (p.discountPercentage || 0) / 100),
-          originalPrice: p.price,
-          discountPercentage: p.discountPercentage || 0,
-          image: p.thumbnail,
-          slug: p.slug,
-          stock: p.stock,
-          inStock: p.stock > 0,
-          rate: p.rate
-        }
-      })
-      .filter(Boolean)
-
-    res.json({
-      items: itemsWithDetails,
-      pagination: {
-        page,
-        limit,
-        totalItems,
-        totalPages: Math.ceil(totalItems / limit),
-        hasMore: page * limit < totalItems
-      }
-    })
+    res.json(result)
   } catch (err) {
-    logger.error('[Wishlist] index error:', err.message)
-    res.status(500).json({ error: err.message })
+    if (handleKnownControllerError(res, err)) return
+    logger.error('[Wishlist] index error:', err)
+    res.status(500).json({ error: 'Internal server error' })
   }
 }
 
 //# POST /api/v1/wishlist/add
-exports.add = async (req, res) => {
+module.exports.add = async (req, res) => {
   try {
-    const userId = getUserId(req)
-    if (!userId) return res.status(401).json({ error: 'Chưa đăng nhập' })
+    const result = await wishlistService.addWishlistItem({
+      userId: req.user?.userId,
+      productId: req.body?.productId
+    })
 
-    const { productId } = req.body
-    if (!productId) return res.status(400).json({ error: 'Thiếu productId' })
-
-    const product = await Product.findOne({ _id: productId, deleted: { $ne: true } })
-    if (!product) return res.status(404).json({ error: 'Không tìm thấy sản phẩm' })
-
-    let wishlist = await Wishlist.findOne({ userId })
-    if (!wishlist) wishlist = await Wishlist.create({ userId, items: [] })
-
-    const exists = wishlist.items.some(i => i.productId.equals(productId))
-    if (exists) {
-      return res.json({ message: 'Sản phẩm đã có trong danh sách yêu thích', alreadyExists: true })
-    }
-
-    wishlist.items.unshift({ productId })
-    await wishlist.save()
-
-    logger.debug('[Wishlist] add:', { userId, productId })
-    res.json({ message: 'Đã thêm vào danh sách yêu thích', success: true })
+    res.json(result)
   } catch (err) {
-    logger.error('[Wishlist] add error:', err.message)
-    res.status(500).json({ error: err.message })
+    if (handleKnownControllerError(res, err)) return
+    logger.error('[Wishlist] add error:', err)
+    res.status(500).json({ error: 'Internal server error' })
   }
 }
 
 //# POST /api/v1/wishlist/remove
-exports.remove = async (req, res) => {
+module.exports.remove = async (req, res) => {
   try {
-    const userId = getUserId(req)
-    if (!userId) return res.status(401).json({ error: 'Chưa đăng nhập' })
+    const result = await wishlistService.removeWishlistItem({
+      userId: req.user?.userId,
+      productId: req.body?.productId
+    })
 
-    const { productId } = req.body
-    if (!productId) return res.status(400).json({ error: 'Thiếu productId' })
-
-    const wishlist = await Wishlist.findOne({ userId })
-    if (!wishlist) return res.status(404).json({ error: 'Chưa có danh sách yêu thích' })
-
-    wishlist.items = wishlist.items.filter(i => !i.productId.equals(productId))
-    await wishlist.save()
-
-    res.json({ message: 'Đã xóa khỏi danh sách yêu thích', success: true })
+    res.json(result)
   } catch (err) {
-    logger.error('[Wishlist] remove error:', err.message)
-    res.status(500).json({ error: err.message })
+    if (handleKnownControllerError(res, err)) return
+    logger.error('[Wishlist] remove error:', err)
+    res.status(500).json({ error: 'Internal server error' })
   }
 }
 
 //# POST /api/v1/wishlist/toggle
-exports.toggle = async (req, res) => {
+module.exports.toggle = async (req, res) => {
   try {
-    const userId = getUserId(req)
-    if (!userId) return res.status(401).json({ error: 'Chưa đăng nhập' })
-
-    const { productId } = req.body
-    if (!productId) return res.status(400).json({ error: 'Thiếu productId' })
-
-    let wishlist = await Wishlist.findOne({ userId })
-    if (!wishlist) wishlist = await Wishlist.create({ userId, items: [] })
-
-    const idx = wishlist.items.findIndex(i => i.productId.equals(productId))
-    let added = false
-    if (idx >= 0) {
-      wishlist.items.splice(idx, 1)
-      added = false
-    } else {
-      const product = await Product.findOne({ _id: productId, deleted: { $ne: true } })
-      if (!product) return res.status(404).json({ error: 'Không tìm thấy sản phẩm' })
-      wishlist.items.unshift({ productId })
-      added = true
-    }
-
-    await wishlist.save()
-    logger.debug('[Wishlist] toggle:', { userId, productId, added })
-    res.json({
-      message: added ? 'Đã thêm vào danh sách yêu thích' : 'Đã xóa khỏi danh sách yêu thích',
-      added,
-      success: true
+    const result = await wishlistService.toggleWishlistItem({
+      userId: req.user?.userId,
+      productId: req.body?.productId
     })
+
+    res.json(result)
   } catch (err) {
-    logger.error('[Wishlist] toggle error:', err.message)
-    res.status(500).json({ error: err.message })
+    if (handleKnownControllerError(res, err)) return
+    logger.error('[Wishlist] toggle error:', err)
+    res.status(500).json({ error: 'Internal server error' })
   }
 }
 
 //# POST /api/v1/wishlist/clear
-exports.clear = async (req, res) => {
+module.exports.clear = async (req, res) => {
   try {
-    const userId = getUserId(req)
-    if (!userId) return res.status(401).json({ error: 'Chưa đăng nhập' })
+    const result = await wishlistService.clearWishlist({
+      userId: req.user?.userId
+    })
 
-    const wishlist = await Wishlist.findOne({ userId })
-    if (!wishlist) return res.status(404).json({ error: 'Chưa có danh sách yêu thích' })
-
-    wishlist.items = []
-    await wishlist.save()
-
-    res.json({ message: 'Đã xóa toàn bộ danh sách yêu thích', success: true })
+    res.json(result)
   } catch (err) {
-    logger.error('[Wishlist] clear error:', err.message)
-    res.status(500).json({ error: err.message })
+    if (handleKnownControllerError(res, err)) return
+    logger.error('[Wishlist] clear error:', err)
+    res.status(500).json({ error: 'Internal server error' })
   }
 }
 
 //# GET /api/v1/wishlist/check/:productId
-exports.check = async (req, res) => {
+module.exports.check = async (req, res) => {
   try {
-    const userId = getUserId(req)
-    if (!userId) return res.json({ inWishlist: false })
+    const result = await wishlistService.checkWishlistItem({
+      userId: req.user?.userId,
+      productId: req.params.productId
+    })
 
-    const { productId } = req.params
-    const wishlist = await Wishlist.findOne({ userId })
-
-    const inWishlist = wishlist ? wishlist.items.some(i => i.productId.equals(productId)) : false
-    res.json({ inWishlist })
+    res.json(result)
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    if (handleKnownControllerError(res, err)) return
+    logger.error('[Wishlist] check error:', err)
+    res.status(500).json({ error: 'Internal server error' })
   }
 }

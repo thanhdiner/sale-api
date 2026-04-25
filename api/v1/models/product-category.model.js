@@ -62,6 +62,7 @@ productCategorySchema.index({ slug: 1 }, { unique: true })
 productCategorySchema.index({ title: 1 }, { unique: true })
 productCategorySchema.index({ parent_id: 1, status: 1, deleted: 1 })
 productCategorySchema.index({ status: 1, deleted: 1, position: 1 })
+productCategorySchema.index({ deleted: 1, status: 1, createdAt: -1 })
 
 const ProductCategory = mongoose.model('ProductCategory', productCategorySchema, 'product_categories')
 

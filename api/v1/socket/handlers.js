@@ -86,6 +86,27 @@ function buildBotInput({ type, message, imageUrls = [] }) {
   }
 }
 
+function toPlainConversation(conversation) {
+  return typeof conversation?.toObject === 'function' ? conversation.toObject() : conversation
+}
+
+function notifyResolvedConversation(io, socket, sessionId, conversation, callback) {
+  const payload = toPlainConversation(conversation)
+
+  socket.join(ROOMS.chat(sessionId))
+  io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_RESOLVED)
+  io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_CONVERSATION_UPDATED, payload)
+
+  if (typeof callback === 'function') {
+    callback({
+      success: false,
+      code: 'CHAT_RESOLVED',
+      message: 'Conversation is resolved. Start a new conversation.',
+      conversation: payload
+    })
+  }
+}
+
 /**
  * Register all socket handlers for one connection
  * @param {import('socket.io').Server} io
@@ -116,7 +137,7 @@ function registerHandlers(io) {
     })
 
     // Customer sends message
-    socket.on(EVENTS.CHAT_SEND, async data => {
+    socket.on(EVENTS.CHAT_SEND, async (data, callback) => {
       try {
         const sessionId = validateSessionId(data.sessionId)
         const { type, message, imageUrl, imageUrls } = parseChatPayload(data)
@@ -144,6 +165,11 @@ function registerHandlers(io) {
           avatar: senderAvatar,
           currentPage
         })
+
+        if (!isNew && conv.status === 'resolved') {
+          notifyResolvedConversation(io, socket, sessionId, conv, callback)
+          return
+        }
 
         const msg = await chatService.saveCustomerMessage(conv._id, {
           sessionId,
@@ -175,6 +201,10 @@ function registerHandlers(io) {
           io.to(ROOMS.AGENTS).emit(EVENTS.CHAT_NEW_MESSAGE, { ...payload, sessionId })
         }
 
+        if (typeof callback === 'function') {
+          callback({ success: true, sessionId, messageId: msg._id?.toString() })
+        }
+
         await handleBotReply(io, conv, sessionId, buildBotInput({ type, message, imageUrls }), {
           name: senderName,
           currentPage,
@@ -183,6 +213,9 @@ function registerHandlers(io) {
         })
       } catch (err) {
         logger.error(`[Chat] send error: ${err.message}`)
+        if (typeof callback === 'function') {
+          callback({ success: false, message: err.message || 'Send failed' })
+        }
       }
     })
 
@@ -194,6 +227,10 @@ function registerHandlers(io) {
 
         const conv = await chatService.getConversation(sessionId)
         if (!conv) return
+        if (conv.status === 'resolved') {
+          notifyResolvedConversation(io, socket, sessionId, conv)
+          return
+        }
 
         const escalationReason = reason || 'Khách yêu cầu chuyển nhân viên'
         await chatService.markEscalation(sessionId, escalationReason)
@@ -225,6 +262,10 @@ function registerHandlers(io) {
         const sessionId = validateSessionId(data.sessionId)
         const conv = await chatService.getConversation(sessionId)
         if (!conv) return
+        if (conv.status === 'resolved') {
+          notifyResolvedConversation(io, socket, sessionId, conv)
+          return
+        }
 
         await chatService.switchToBot(sessionId)
 
@@ -301,7 +342,7 @@ function registerHandlers(io) {
     })
 
     // Agent assigns conversation
-    socket.on(EVENTS.CHAT_ASSIGN, async data => {
+    socket.on(EVENTS.CHAT_ASSIGN, async (data, callback) => {
       try {
         const sessionId = validateSessionId(data.sessionId)
         const agentId = validateObjectId(data.agentId, 'agentId')
@@ -330,13 +371,19 @@ function registerHandlers(io) {
         io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_MESSAGE, sysMsg.toObject())
         io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_CONVERSATION_UPDATED, conv.toObject())
         io.to(ROOMS.AGENTS).emit(EVENTS.CHAT_CONVERSATION_UPDATED, conv.toObject())
+        if (typeof callback === 'function') {
+          callback({ success: true, conversation: conv.toObject() })
+        }
       } catch (err) {
         logger.error(`[Chat] assign error: ${err.message}`)
+        if (typeof callback === 'function') {
+          callback({ success: false, message: err.message || 'Assign failed' })
+        }
       }
     })
 
     // Agent resolves conversation
-    socket.on(EVENTS.CHAT_RESOLVE, async data => {
+    socket.on(EVENTS.CHAT_RESOLVE, async (data, callback) => {
       try {
         const sessionId = validateSessionId(data.sessionId)
         const agentName = validateString(data.agentName, 'agentName', {
@@ -357,8 +404,14 @@ function registerHandlers(io) {
         io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_RESOLVED)
         io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_CONVERSATION_UPDATED, conv.toObject())
         io.to(ROOMS.AGENTS).emit(EVENTS.CHAT_CONVERSATION_UPDATED, conv.toObject())
+        if (typeof callback === 'function') {
+          callback({ success: true, conversation: conv.toObject() })
+        }
       } catch (err) {
         logger.error(`[Chat] resolve error: ${err.message}`)
+        if (typeof callback === 'function') {
+          callback({ success: false, message: err.message || 'Resolve failed' })
+        }
       }
     })
 

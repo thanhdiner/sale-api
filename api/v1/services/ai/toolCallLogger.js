@@ -1,4 +1,4 @@
-const AgentToolCall = require('../../models/agentToolCall.model')
+const agentToolCallRepository = require('../../repositories/agentToolCall.repository')
 const logger = require('../../../../config/logger')
 const { getToolByName } = require('./ai.tools')
 
@@ -52,7 +52,7 @@ async function recordToolCall(payload = {}) {
 
     const toolMeta = getToolByName(payload.toolName)
 
-    await AgentToolCall.create({
+    await agentToolCallRepository.create({
       conversationId: payload.conversationId || null,
       sessionId: payload.sessionId,
       userId: payload.userId || null,

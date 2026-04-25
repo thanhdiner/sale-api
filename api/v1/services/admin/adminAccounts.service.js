@@ -1,8 +1,8 @@
 const bcrypt = require('bcrypt')
 const QRCode = require('qrcode')
 const speakeasy = require('speakeasy')
-const AdminAccount = require('../../models/adminAccount.model')
-const TrustedDevice = require('../../models/adminTrustedDevice.model')
+const adminAccountRepository = require('../../repositories/adminAccount.repository')
+const adminTrustedDeviceRepository = require('../../repositories/adminTrustedDevice.repository')
 const AppError = require('../../utils/AppError')
 const generateBackupCodes = require('../../utils/generateBackupCodes')
 
@@ -18,7 +18,7 @@ const isProtectedAdminAccount = account =>
   String(account?.role_id) === 'superadmin' || account?.username === 'superadmin'
 
 const getAdminAccountByIdOrThrow = async (id, message = 'Account not found') => {
-  const account = await AdminAccount.findById(id)
+  const account = await adminAccountRepository.findById(id)
 
   if (!account) {
     throw new AppError(message, 404)
@@ -28,7 +28,7 @@ const getAdminAccountByIdOrThrow = async (id, message = 'Account not found') => 
 }
 
 const getAdminByUserIdOrThrow = async (userId, message = 'Not found') => {
-  const admin = await AdminAccount.findById(userId)
+  const admin = await adminAccountRepository.findById(userId)
 
   if (!admin) {
     throw new AppError(message, 404)
@@ -38,13 +38,16 @@ const getAdminByUserIdOrThrow = async (userId, message = 'Not found') => {
 }
 
 async function listAccounts() {
-  return AdminAccount.find({ deleted: false }).select('-passwordHash')
+  return adminAccountRepository.findByQuery(
+    { deleted: false },
+    { select: '-passwordHash' }
+  )
 }
 
 async function createAccount(payload) {
   const { username, email, password, fullName, role_id, status, avatarUrl } = payload
 
-  const existingAccount = await AdminAccount.findOne({
+  const existingAccount = await adminAccountRepository.findOne({
     $or: [{ username }, { email }]
   })
 
@@ -62,7 +65,7 @@ async function createAccount(payload) {
   if (!fullName) throw new AppError('Tên đầy đủ là bắt buộc!', 400)
 
   const passwordHash = await bcrypt.hash(password, 10)
-  const newAccount = await AdminAccount.create({
+  const newAccount = await adminAccountRepository.create({
     username,
     email,
     fullName,
@@ -82,7 +85,7 @@ async function editAccount(id, payload) {
     throw new AppError('Email là bắt buộc!', 400)
   }
 
-  const existingAccount = await AdminAccount.findOne({ _id: { $ne: id }, email })
+  const existingAccount = await adminAccountRepository.findOne({ _id: { $ne: id }, email })
 
   if (existingAccount) {
     throw new AppError('Email đã tồn tại.', 400)
@@ -94,7 +97,7 @@ async function editAccount(id, payload) {
     updateData.passwordHash = await bcrypt.hash(newPassword, 10)
   }
 
-  const updated = await AdminAccount.findByIdAndUpdate(id, updateData, { new: true })
+  const updated = await adminAccountRepository.updateById(id, updateData)
 
   if (!updated) {
     throw new AppError('Account not found', 404)
@@ -110,11 +113,10 @@ async function deleteAccount(id) {
     throw new AppError('Không thể xoá tài khoản Super Admin!', 403)
   }
 
-  await AdminAccount.findByIdAndUpdate(
-    id,
-    { deleted: true, deletedAt: new Date() },
-    { new: true }
-  )
+  await adminAccountRepository.updateById(id, {
+    deleted: true,
+    deletedAt: new Date()
+  })
 }
 
 async function changeAccountStatus(id, status) {
@@ -128,7 +130,7 @@ async function changeAccountStatus(id, status) {
     throw new AppError('Không thể đổi trạng thái Super Admin!', 403)
   }
 
-  const updated = await AdminAccount.findByIdAndUpdate(id, { status }, { new: true })
+  const updated = await adminAccountRepository.updateById(id, { status })
   return toPlainAdminAccount(updated)
 }
 
@@ -137,7 +139,7 @@ async function updateAccountAvatar(id, avatarUrl) {
     throw new AppError('Thiếu hoặc sai định dạng avatarUrl!', 400)
   }
 
-  const account = await AdminAccount.findByIdAndUpdate(id, { avatarUrl }, { new: true })
+  const account = await adminAccountRepository.updateById(id, { avatarUrl })
 
   if (!account) {
     throw new AppError('Không tìm thấy tài khoản!', 404)
@@ -151,11 +153,11 @@ async function updateAccountProfile(id, fullName) {
     throw new AppError('Họ tên là bắt buộc!', 400)
   }
 
-  const updated = await AdminAccount.findByIdAndUpdate(
+  const updated = await adminAccountRepository.updateById(
     id,
     { fullName: fullName.trim() },
-    { new: true }
-  ).populate('role_id', 'label')
+    { populate: { path: 'role_id', select: 'label' } }
+  )
 
   if (!updated) {
     throw new AppError('Không tìm thấy tài khoản!', 404)
@@ -260,10 +262,10 @@ async function regenerateBackupCodes(userId) {
 async function trustDevice(userId, payload) {
   const { deviceId, name, browser, location } = payload
 
-  let device = await TrustedDevice.findOne({ userId, deviceId })
+  let device = await adminTrustedDeviceRepository.findOne({ userId, deviceId })
 
   if (!device) {
-    device = await TrustedDevice.create({
+    device = await adminTrustedDeviceRepository.create({
       userId,
       deviceId,
       name,
@@ -282,7 +284,10 @@ async function trustDevice(userId, payload) {
 }
 
 async function getTrustedDevices(userId, currentDeviceId) {
-  const devices = await TrustedDevice.find({ userId }).sort({ updatedAt: -1 })
+  const devices = await adminTrustedDeviceRepository.findByQuery(
+    { userId },
+    { sort: { updatedAt: -1 } }
+  )
 
   return {
     devices: devices.map(device => ({
@@ -297,7 +302,7 @@ async function removeTrustedDevice(userId, deviceId) {
     throw new AppError('Thiếu deviceId trong URL', 400)
   }
 
-  const deleted = await TrustedDevice.findOneAndDelete({ userId, deviceId })
+  const deleted = await adminTrustedDeviceRepository.findOneAndDelete({ userId, deviceId })
 
   if (!deleted) {
     throw new AppError('Không tìm thấy thiết bị phù hợp', 404)

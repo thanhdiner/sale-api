@@ -1,16 +1,25 @@
-const Banner = require('../../models/banner.model')
-const mongoose = require('mongoose')
-const { deleteImageFromCloudinary } = require('../../utils/cloudinaryUtils')
 const logger = require('../../../../config/logger')
+const bannersService = require('../../services/admin/banners.service')
+
+const handleKnownControllerError = (res, error) => {
+  if (!error?.statusCode) {
+    return false
+  }
+
+  const payload = { message: error.message }
+  if (error.details) {
+    payload.details = error.details
+  }
+
+  res.status(error.statusCode).json(payload)
+  return true
+}
 
 //# GET /api/v1/admin/banners
-module.exports.index = async (req, res) => {
+module.exports.index = async (_req, res) => {
   try {
-    const banners = await Banner.find({}).sort({ order: 1 })
-    res.status(200).json({
-      message: 'Banners fetched successfully',
-      data: banners
-    })
+    const result = await bannersService.listBanners()
+    res.status(200).json(result)
   } catch (err) {
     logger.error('[Admin] Error fetching banners:', err)
     res.status(500).json({ error: 'Internal server error' })
@@ -20,33 +29,10 @@ module.exports.index = async (req, res) => {
 //# POST /api/v1/admin/banners
 module.exports.create = async (req, res) => {
   try {
-    const { title, link, order, isActive } = req.body
-
-    if (!title) {
-      return res.status(400).json({ message: 'Title is required' })
-    }
-
-    const imgUrl = req.body.img
-    if (!imgUrl) {
-      return res.status(400).json({ message: 'Image is required' })
-    }
-
-    const banner = new Banner({
-      title,
-      img: imgUrl,
-      link: link || '',
-      order: order ? Number(order) : 0,
-      isActive: isActive !== undefined ? Boolean(isActive) : true,
-      createdBy: req.user?.userId || null
-    })
-
-    const savedBanner = await banner.save()
-
-    res.status(201).json({
-      message: 'Banner created successfully',
-      data: savedBanner
-    })
+    const result = await bannersService.createBanner(req.body, req.user)
+    res.status(201).json(result)
   } catch (err) {
+    if (handleKnownControllerError(res, err)) return
     logger.error('[Admin] Error creating banner:', err)
     res.status(500).json({ error: 'Failed to create banner' })
   }
@@ -55,43 +41,10 @@ module.exports.create = async (req, res) => {
 //# PATCH /api/v1/admin/banners/:id
 module.exports.edit = async (req, res) => {
   try {
-    const { id } = req.params
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: 'Invalid banner ID' })
-    }
-
-    const allowedFields = ['title', 'link', 'order', 'isActive']
-    const updateData = {}
-
-    allowedFields.forEach(field => {
-      if (field in req.body) {
-        updateData[field] = req.body[field]
-      }
-    })
-
-    const imgUrl = req.file?.path || req.file?.location
-    if (imgUrl) {
-      updateData.img = imgUrl
-    }
-
-    updateData.updatedAt = new Date()
-    updateData.updatedBy = req.user?.userId || null
-
-    const updatedBanner = await Banner.findByIdAndUpdate(id, updateData, {
-      new: true,
-      runValidators: true
-    })
-
-    if (!updatedBanner) {
-      return res.status(404).json({ message: 'Banner not found' })
-    }
-
-    res.status(200).json({
-      message: 'Banner updated successfully',
-      data: updatedBanner
-    })
+    const result = await bannersService.updateBanner(req.params.id, req.body, req.user)
+    res.status(200).json(result)
   } catch (err) {
+    if (handleKnownControllerError(res, err)) return
     logger.error('[Admin] Error updating banner:', err)
     res.status(500).json({ error: 'Failed to update banner' })
   }
@@ -100,21 +53,10 @@ module.exports.edit = async (req, res) => {
 //# DELETE /api/v1/admin/banners/:id
 module.exports.delete = async (req, res) => {
   try {
-    const { id } = req.params
-
-    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ message: 'Invalid banner ID' })
-
-    const banner = await Banner.findById(id)
-    if (!banner) return res.status(404).json({ message: 'Banner not found' })
-
-    if (banner.img) await deleteImageFromCloudinary(banner.img)
-
-    await Banner.findByIdAndDelete(id)
-
-    res.status(200).json({
-      message: 'Banner deleted successfully'
-    })
+    const result = await bannersService.deleteBanner(req.params.id)
+    res.status(200).json(result)
   } catch (err) {
+    if (handleKnownControllerError(res, err)) return
     logger.error('[Admin] Error deleting banner:', err)
     res.status(500).json({ error: 'Failed to delete banner' })
   }

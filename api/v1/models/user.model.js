@@ -113,4 +113,6 @@ userSchema.virtual('hasPassword').get(function () {
 userSchema.set('toJSON', { virtuals: true })
 userSchema.set('toObject', { virtuals: true })
 
+userSchema.index({ deleted: 1, status: 1, createdAt: -1 })
+
 module.exports = mongoose.model('User', userSchema, 'users')

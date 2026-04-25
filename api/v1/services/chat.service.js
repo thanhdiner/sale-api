@@ -2,8 +2,8 @@
  * Chat Service - DB logic for chat system
  */
 
-const ChatMessage = require('../models/chatMessage.model')
-const ChatConversation = require('../models/chatConversation.model')
+const chatMessageRepository = require('../repositories/chatMessage.repository')
+const chatConversationRepository = require('../repositories/chatConversation.repository')
 
 function normalizeImageUrls(payload = {}) {
   const urls = []
@@ -37,11 +37,11 @@ function getConversationPreview(type, message, { isInternal = false } = {}) {
  * @returns {{ conversation, isNew: boolean }}
  */
 async function getOrCreateConversation(sessionId, customer) {
-  let conversation = await ChatConversation.findOne({ sessionId })
+  let conversation = await chatConversationRepository.findOne({ sessionId })
   const isNew = !conversation
 
   if (!conversation) {
-    conversation = await ChatConversation.create({
+    conversation = await chatConversationRepository.create({
       sessionId,
       status: 'unassigned',
       customer: {
@@ -60,7 +60,7 @@ async function getOrCreateConversation(sessionId, customer) {
  * Cap nhat lastMessage sau khi customer gui
  */
 async function updateConversationForCustomer(sessionId, message, senderName, senderAvatar, type = 'text') {
-  await ChatConversation.updateOne(
+  await chatConversationRepository.updateOne(
     { sessionId },
     {
       $set: {
@@ -79,7 +79,7 @@ async function updateConversationForCustomer(sessionId, message, senderName, sen
  * Cap nhat lastMessage sau khi bot reply
  */
 async function updateConversationForBot(sessionId, botText) {
-  await ChatConversation.updateOne(
+  await chatConversationRepository.updateOne(
     { sessionId },
     {
       $set: {
@@ -104,7 +104,7 @@ async function updateConversationForAgent(sessionId, message, isInternal, hasFir
 
   if (!hasFirstReply && !isInternal) updateFields.firstReplyAt = new Date()
 
-  await ChatConversation.updateOne(
+  await chatConversationRepository.updateOne(
     { sessionId },
     {
       $set: updateFields,
@@ -117,15 +117,17 @@ async function updateConversationForAgent(sessionId, message, isInternal, hasFir
  * Assign agent vao conversation
  */
 async function assignAgent(sessionId, agent) {
-  return ChatConversation.findOneAndUpdate(
+  return chatConversationRepository.findOneAndUpdate(
     { sessionId },
     {
       $set: {
         status: 'open',
-        'assignedAgent.agentId': agent.agentId,
-        'assignedAgent.agentName': agent.agentName,
-        'assignedAgent.agentAvatar': agent.agentAvatar || null,
-        'assignedAgent.assignedAt': new Date()
+        assignedAgent: {
+          agentId: agent.agentId,
+          agentName: agent.agentName,
+          agentAvatar: agent.agentAvatar || null,
+          assignedAt: new Date()
+        }
       }
     },
     { new: true }
@@ -136,7 +138,7 @@ async function assignAgent(sessionId, agent) {
  * Resolve conversation
  */
 async function resolveConversation(sessionId) {
-  return ChatConversation.findOneAndUpdate(
+  return chatConversationRepository.findOneAndUpdate(
     { sessionId },
     { $set: { status: 'resolved', resolvedAt: new Date() } },
     { new: true }
@@ -147,7 +149,7 @@ async function resolveConversation(sessionId) {
  * Danh dau escalation
  */
 async function markEscalation(sessionId, reason) {
-  await ChatConversation.updateOne(
+  await chatConversationRepository.updateOne(
     { sessionId },
     {
       $set: {
@@ -163,13 +165,18 @@ async function markEscalation(sessionId, reason) {
  * Chuyen lai sang bot
  */
 async function switchToBot(sessionId) {
-  await ChatConversation.updateOne(
+  await chatConversationRepository.updateOne(
     { sessionId },
     {
       $set: {
         'botStats.escalated': false,
         status: 'unassigned',
-        assignedAgent: null
+        assignedAgent: {
+          agentId: null,
+          agentName: null,
+          agentAvatar: null,
+          assignedAt: null
+        }
       }
     }
   )
@@ -179,7 +186,7 @@ async function switchToBot(sessionId) {
  * Lay conversation lean theo sessionId
  */
 async function getConversation(sessionId) {
-  return ChatConversation.findOne({ sessionId }).lean()
+  return chatConversationRepository.findOne({ sessionId }, { lean: true })
 }
 
 // Message
@@ -190,7 +197,7 @@ async function getConversation(sessionId) {
 async function saveCustomerMessage(conversationId, data) {
   const imageUrls = normalizeImageUrls(data)
 
-  return ChatMessage.create({
+  return chatMessageRepository.create({
     conversationId,
     sessionId: data.sessionId,
     sender: 'customer',
@@ -209,7 +216,7 @@ async function saveCustomerMessage(conversationId, data) {
  * Luu message tu bot
  */
 async function saveBotMessage(conversationId, sessionId, botReply) {
-  return ChatMessage.create({
+  return chatMessageRepository.create({
     conversationId,
     sessionId,
     sender: 'bot',
@@ -233,7 +240,7 @@ async function saveBotMessage(conversationId, sessionId, botReply) {
 async function saveAgentMessage(conversationId, data) {
   const imageUrls = normalizeImageUrls(data)
 
-  return ChatMessage.create({
+  return chatMessageRepository.create({
     conversationId,
     sessionId: data.sessionId,
     sender: 'agent',
@@ -253,7 +260,7 @@ async function saveAgentMessage(conversationId, data) {
  * Tao system message
  */
 async function saveSystemMessage(conversationId, sessionId, text) {
-  return ChatMessage.create({
+  return chatMessageRepository.create({
     conversationId,
     sessionId,
     sender: 'system',

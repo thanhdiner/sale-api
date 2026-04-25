@@ -39,6 +39,8 @@ const invalidateProducts = invalidateAfter(
   'products:list:*',
   'products:detail:*',
   'products:suggest:*',
+  'products:recommendations:*',
+  'products:explore-more:*',
   'categories:slug:*',   // category pages hiển thị sản phẩm
   'dashboard:*'          // dashboard counts products
 )

@@ -71,6 +71,15 @@ const productSchema = new mongoose.Schema(
       default: 0
     },
     deliveryEstimateDays: { type: Number, default: 0, min: 0 },
+    deliveryType: {
+      type: String,
+      enum: ['manual', 'instant_account'],
+      default: 'manual'
+    },
+    deliveryInstructions: {
+      type: String,
+      default: ''
+    },
     viewsCount: { type: Number, default: 0 },
     recommendScore: { type: Number, default: 0 },
     slug: {
@@ -103,8 +112,11 @@ const productSchema = new mongoose.Schema(
 productSchema.index({ slug: 1 }, { unique: true })
 productSchema.index({ productCategory: 1, status: 1, deleted: 1 })
 productSchema.index({ status: 1, deleted: 1, createdAt: -1 })
+productSchema.index({ deleted: 1, status: 1, createdAt: -1 })
 productSchema.index({ isFeatured: 1, status: 1, deleted: 1 })
 productSchema.index({ isTopDeal: 1, status: 1, deleted: 1 })
+productSchema.index({ deleted: 1, isTopDeal: 1, soldQuantity: -1 })
+productSchema.index({ deleted: 1, productCategory: 1 })
 productSchema.index({ status: 1, deleted: 1, recommendScore: -1 })
 
 const Product = mongoose.model('Product', productSchema, 'products')

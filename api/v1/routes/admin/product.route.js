@@ -27,36 +27,36 @@ router.post(
   productImageUpload,
   uploadCloud.uploadMany,
   validate(productSchemas.createProduct),
-  controller.create,
-  invalidateProducts
+  invalidateProducts,
+  controller.create
 )
 
-router.patch('/delete/:id', checkPermission.checkPermission('delete_product'), controller.delete, invalidateProducts)
+router.patch('/delete/:id', checkPermission.checkPermission('delete_product'), invalidateProducts, controller.delete)
 
 router.patch(
   '/delete-many',
   checkPermission.checkPermission('delete_product'),
   validate(productSchemas.deleteMany),
-  controller.deleteMany,
-  invalidateProducts
+  invalidateProducts,
+  controller.deleteMany
 )
 
-router.patch('/changeStatus/:id', checkPermission.checkPermission('edit_product'), controller.changeStatus, invalidateProducts)
+router.patch('/changeStatus/:id', checkPermission.checkPermission('edit_product'), invalidateProducts, controller.changeStatus)
 
 router.patch(
   '/change-status-many',
   checkPermission.checkPermission('edit_product'),
   validate(productSchemas.changeStatusMany),
-  controller.changeStatusMany,
-  invalidateProducts
+  invalidateProducts,
+  controller.changeStatusMany
 )
 
 router.patch(
   '/change-position-many',
   checkPermission.checkPermission('edit_product'),
   validate(productSchemas.changePositionMany),
-  controller.changePositionMany,
-  invalidateProducts
+  invalidateProducts,
+  controller.changePositionMany
 )
 
 router.patch(
@@ -67,8 +67,8 @@ router.patch(
   uploadCloud.deleteImageMany,
   uploadCloud.uploadMany,
   validate(productSchemas.editProduct),
-  controller.edit,
-  invalidateProducts
+  invalidateProducts,
+  controller.edit
 )
 
 module.exports = router

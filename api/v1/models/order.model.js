@@ -32,7 +32,23 @@ const OrderSchema = new mongoose.Schema(
         discountPercentage: { type: Number },
         flashSaleId: { type: mongoose.Schema.Types.ObjectId, ref: 'FlashSale' },
         quantity: { type: Number, required: true },
-        category: { type: String }
+        category: { type: String },
+        deliveryType: { type: String, enum: ['manual', 'instant_account'], default: 'manual' },
+        deliveryInstructions: { type: String, default: '' },
+        credentialIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'ProductCredential' }],
+        digitalDeliveries: [
+          {
+            credentialId: { type: mongoose.Schema.Types.ObjectId, ref: 'ProductCredential' },
+            username: String,
+            password: String,
+            email: String,
+            licenseKey: String,
+            loginUrl: String,
+            notes: String,
+            instructions: String,
+            deliveredAt: Date
+          }
+        ]
       }
     ],
 
@@ -40,6 +56,12 @@ const OrderSchema = new mongoose.Schema(
     paymentMethod: { type: String, enum: ['transfer', 'contact', 'vnpay', 'momo', 'zalopay'], required: true },
     paymentStatus: { type: String, enum: ['pending', 'paid', 'failed'], default: 'pending' },
     paymentTransactionId: { type: String },
+    reservationExpiresAt: { type: Date },
+    paymentExpiredAt: { type: Date },
+    cancelledAt: { type: Date },
+    promoApplied: { type: Boolean, default: false },
+    stockApplied: { type: Boolean, default: false },
+    hasDigitalDelivery: { type: Boolean, default: false },
     subtotal: { type: Number, required: true },
     discount: { type: Number, default: 0 },
     shipping: { type: Number, default: 0 },
@@ -66,5 +88,11 @@ const OrderSchema = new mongoose.Schema(
     timestamps: true
   }
 )
+
+OrderSchema.index({ isDeleted: 1, status: 1, createdAt: -1 })
+OrderSchema.index({ userId: 1, createdAt: -1 })
+OrderSchema.index({ isDeleted: 1, createdAt: -1 })
+OrderSchema.index({ createdAt: -1 })
+OrderSchema.index({ status: 1, paymentStatus: 1, createdAt: -1 })
 
 module.exports = mongoose.model('Order', OrderSchema, 'orders')
