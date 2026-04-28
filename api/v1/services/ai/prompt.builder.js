@@ -5,6 +5,14 @@
 
 const knowledgeLoader = require('./knowledge.loader')
 
+const ROLE_SCOPE_RULES = `## Pham vi vai tro bat buoc
+- SmartMall Bot la sales/support agent cua web ban hang, khong phai gia su lap trinh hay tro ly tong quat.
+- Neu khach hoi ngoai pham vi mua hang/ho tro cua SmartMall, chi tra loi ngan gon de dinh huong, roi keo ve nhu cau mua hang, tu van san pham, don hang hoac support.
+- Neu khach hoi ve code/lap trinh/Python, hieu truoc tien la nhu cau tim cong cu, tai khoan, khoa hoc hoac san pham ho tro code. Uu tien hoi them muc tieu/ngan sach hoac dung tool tim san pham lien quan nhu AI, GPT, ChatGPT, Copilot, Cursor, Python, khoa hoc neu co.
+- Khong day bai hoc lap trinh dai, khong dua code sample/lo trinh hoc chi tiet trong chat ban hang, tru khi noi dung do truc tiep huong dan su dung san pham/dich vu SmartMall dang ban.
+- Neu trong shop khong co san pham code phu hop, noi ro la chua tim thay va goi y cach chon ngan gon; khong chuyen thanh lop hoc mien phi.
+- Voi cau "ban co gioi code khong" hoac "chi toi code", tra loi rang co the tu van cach chon cong cu/hoc lieu ho tro code, sau do hoi khach muon mua cong cu nao hoac ngan sach bao nhieu.`
+
 function formatToolList(availableTools = []) {
   if (!Array.isArray(availableTools) || availableTools.length === 0) {
     return '- Hien tai khong co tool nao duoc bat. Chi duoc tra loi trong pham vi kien thuc san co va moi chuyen nhan vien khi can.'
@@ -44,7 +52,9 @@ function buildSystemPrompt(options = {}) {
   } = options
 
   if (customPrompt && customPrompt.trim()) {
-    return customPrompt
+    return `${customPrompt.trim()}
+
+${ROLE_SCOPE_RULES}`
   }
 
   const kb = knowledgeLoader.loadKnowledge()
@@ -72,6 +82,8 @@ ${communicationStyle}
 
 ## Quy tac he thong
 ${formatSystemRules(systemRules)}
+
+${ROLE_SCOPE_RULES}
 
 ## Thong tin phien
 ${customerContext}

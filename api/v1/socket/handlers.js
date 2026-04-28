@@ -4,6 +4,10 @@
 
 const logger = require('../../../config/logger')
 const chatService = require('../services/chat.service')
+const {
+  markCustomerTyping,
+  scheduleBotReply
+} = require('../services/ai/botReplyScheduler.service')
 const { ROOMS, EVENTS } = require('./constants')
 const { validateString, validateSessionId, validateObjectId, validateReactionEmoji } = require('./validators')
 
@@ -222,12 +226,17 @@ function registerHandlers(io) {
           callback({ success: true, sessionId, messageId: msg._id?.toString() })
         }
 
-        await handleBotReply(io, conv, sessionId, buildBotInput({ type, message, imageUrls }), {
-          name: senderName,
-          currentPage,
-          ip: getSocketClientIp(socket),
-          userId: senderId,
-          conversationId: conv._id?.toString()
+        scheduleBotReply({
+          io,
+          conversation: conv,
+          sessionId,
+          message: buildBotInput({ type, message, imageUrls }),
+          customer: {
+            name: senderName,
+            currentPage,
+            ip: getSocketClientIp(socket),
+            userId: senderId
+          }
         })
       } catch (err) {
         logger.error(`[Chat] send error: ${err.message}`)
@@ -506,6 +515,7 @@ function registerHandlers(io) {
         if (role === 'agent') {
           socket.to(ROOMS.chat(id)).emit(EVENTS.CHAT_TYPING, { isTyping, role: 'agent' })
         } else {
+          markCustomerTyping({ sessionId: id, isTyping: !!isTyping })
           socket.to(ROOMS.AGENTS).emit(EVENTS.CHAT_CUSTOMER_TYPING, { sessionId: id, isTyping })
         }
       } catch {
@@ -518,55 +528,6 @@ function registerHandlers(io) {
       logger.info(`[Socket] Client disconnected: ${socket.id}`)
     })
   })
-}
-
-async function handleBotReply(io, conv, sessionId, message, customer) {
-  const hasAgent = conv.assignedAgent && conv.assignedAgent.agentId
-  const isEscalated = conv.botStats?.escalated === true
-
-  if (hasAgent || isEscalated) return
-
-  try {
-    const aiService = require('../services/ai/ai.service')
-    const runtimeConfig = await aiService.getRuntimeConfig()
-    if (!runtimeConfig.isEnabled) return
-
-    io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_BOT_TYPING, { isTyping: true })
-
-    const botReply = await aiService.processMessage(sessionId, message, customer, {
-      ...runtimeConfig,
-      onActivity: activity => {
-        io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_BOT_ACTIVITY, {
-          sessionId,
-          ...activity
-        })
-      }
-    })
-
-    io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_BOT_TYPING, { isTyping: false })
-
-    if (!botReply || !botReply.text) return
-
-    const botMsg = await chatService.saveBotMessage(conv._id, sessionId, botReply)
-    await chatService.updateConversationForBot(sessionId, botReply.text)
-
-    io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_MESSAGE, botMsg.toObject())
-
-    if (botReply.escalate) {
-      await chatService.markEscalation(sessionId, botReply.escalateReason)
-      const escalatedConv = await chatService.getConversation(sessionId)
-      io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_CONVERSATION_UPDATED, escalatedConv)
-      io.to(ROOMS.AGENTS).emit(EVENTS.CHAT_ESCALATION, {
-        sessionId,
-        reason: botReply.escalateReason,
-        conversation: escalatedConv
-      })
-      io.to(ROOMS.AGENTS).emit(EVENTS.CHAT_CONVERSATION_UPDATED, escalatedConv)
-    }
-  } catch (botErr) {
-    logger.error('[Chat] Bot processing error:', botErr.stack || botErr.message || botErr)
-    io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_BOT_TYPING, { isTyping: false })
-  }
 }
 
 module.exports = { registerHandlers }
