@@ -9,6 +9,7 @@ const { paymentSuccessTemplate } = require('../../utils/emailTemplates')
 const orderRepository = require('../../repositories/order.repository')
 const userRepository = require('../../repositories/user.repository')
 const ordersService = require('./orders.service')
+const notificationsService = require('./notifications.service')
 const digitalDeliveryService = require('../digitalDelivery.service')
 
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000'
@@ -37,6 +38,7 @@ function emitOrderConfirmed(order) {
       createdAt: order.createdAt
     })
     if (order.userId) {
+      notificationsService.createOrderStatusNotification(order)
       io.to(`user_${order.userId}`).emit('order_status_updated', {
         _id: order._id,
         status: order.status,
@@ -119,6 +121,10 @@ function isPaymentAmountMatched(order, paidAmount) {
     && normalizedPaidAmount === normalizedOrderTotal
 }
 
+function isPaymentMethodMatched(order, method) {
+  return !!order && order.paymentMethod === method
+}
+
 async function finalizeSuccessfulPayment(order, transactionId, paidAmount = null) {
   if (!order || order.paymentStatus === 'paid') {
     return false
@@ -194,6 +200,11 @@ async function handleVNPayReturn(query) {
       return { redirectUrl: `${CLIENT_URL}/order-success?status=failed&reason=order_expired&orderId=${orderId}` }
     }
 
+    if (!isPaymentMethodMatched(order, 'vnpay')) {
+      logger.warn(`[Payment] VNPay callback ignored for order ${orderId}: current method=${order?.paymentMethod}`)
+      return { redirectUrl: `${CLIENT_URL}/order-success?status=failed&reason=payment_method_changed&orderId=${orderId}` }
+    }
+
     const finalized = await finalizeSuccessfulPayment(order, transactionId, amount)
     return {
       redirectUrl: finalized
@@ -238,11 +249,18 @@ async function handleMoMoCallback(payload) {
   }
 
   if (isSuccess) {
+    if (!isPaymentMethodMatched(order, 'momo')) {
+      logger.warn(`[Payment] MoMo callback ignored for order ${orderId}: current method=${order?.paymentMethod}`)
+      return { statusCode: 204, body: null }
+    }
+
     if (!isClosedForPayment(order)) {
       await finalizeSuccessfulPayment(order, transactionId, amount)
     }
   } else {
-    await failPayment(order)
+    if (isPaymentMethodMatched(order, 'momo')) {
+      await failPayment(order)
+    }
   }
 
   return { statusCode: 204, body: null }
@@ -280,11 +298,18 @@ async function handleZaloPayCallback(payload) {
   }
 
   if (isSuccess) {
+    if (!isPaymentMethodMatched(order, 'zalopay')) {
+      logger.warn(`[Payment] ZaloPay callback ignored for order ${orderId}: current method=${order?.paymentMethod}`)
+      return { statusCode: 200, body: { return_code: 1, return_message: 'success' } }
+    }
+
     if (!isClosedForPayment(order)) {
       await finalizeSuccessfulPayment(order, transactionId, amount)
     }
   } else {
-    await failPayment(order)
+    if (isPaymentMethodMatched(order, 'zalopay')) {
+      await failPayment(order)
+    }
   }
 
   return { statusCode: 200, body: { return_code: 1, return_message: 'success' } }

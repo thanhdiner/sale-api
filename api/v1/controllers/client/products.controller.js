@@ -112,3 +112,20 @@ module.exports.notifyWhenBackInStock = async (req, res) => {
     res.status(500).json({ error: 'Internal server error', status: 500 })
   }
 }
+
+module.exports.unsubscribeWhenBackInStock = async (req, res) => {
+  try {
+    const result = await backInStockService.unregisterBackInStockNotification({
+      productId: req.params.id,
+      email: req.body?.email,
+      user: req.user,
+      lang: getRequestLanguage(req)
+    })
+
+    res.json(result)
+  } catch (error) {
+    if (handleKnownControllerError(res, error)) return
+    logger.error('[Products] unsubscribeWhenBackInStock error:', error)
+    res.status(500).json({ error: 'Internal server error', status: 500 })
+  }
+}

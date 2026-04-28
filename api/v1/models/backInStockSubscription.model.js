@@ -32,6 +32,7 @@ const backInStockSubscriptionSchema = new mongoose.Schema(
       default: Date.now
     },
     notifiedAt: Date,
+    cancelledAt: Date,
     productSnapshot: {
       title: { type: String, default: '' },
       slug: { type: String, default: '' }

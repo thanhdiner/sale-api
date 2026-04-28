@@ -8,6 +8,23 @@ async function findPendingByProductAndEmail(productId, email) {
   })
 }
 
+async function cancelPendingByProductAndEmail(productId, email) {
+  return BackInStockSubscription.findOneAndUpdate(
+    {
+      productId,
+      email,
+      status: 'pending'
+    },
+    {
+      $set: {
+        status: 'cancelled',
+        cancelledAt: new Date()
+      }
+    },
+    { new: true }
+  )
+}
+
 async function findPendingByProductId(productId) {
   return BackInStockSubscription.find({
     productId,
@@ -37,6 +54,7 @@ async function markNotified(subscriptionIds = []) {
 
 module.exports = {
   findPendingByProductAndEmail,
+  cancelPendingByProductAndEmail,
   findPendingByProductId,
   create,
   markNotified

@@ -29,13 +29,28 @@ const MESSAGES = {
   }
 }
 
+const FALLBACK_MESSAGES = {
+  vi: {
+    notRegistered: 'Email nay chua co dang ky cho san pham.',
+    unsubscribed: 'Da huy dang ky bao khi co hang.'
+  },
+  en: {
+    notRegistered: 'This email is not registered for this product.',
+    unsubscribed: 'Back-in-stock notification cancelled.'
+  }
+}
+
 function normalizeLanguage(lang) {
   return String(lang || '').toLowerCase().startsWith('en') ? 'en' : 'vi'
 }
 
 function message(lang, key) {
   const normalizedLang = normalizeLanguage(lang)
-  return MESSAGES[normalizedLang][key] || MESSAGES.vi[key] || key
+  return MESSAGES[normalizedLang][key]
+    || FALLBACK_MESSAGES[normalizedLang]?.[key]
+    || MESSAGES.vi[key]
+    || FALLBACK_MESSAGES.vi[key]
+    || key
 }
 
 function normalizeEmail(value) {
@@ -179,6 +194,38 @@ async function registerBackInStockNotification({ productId, email, user, lang = 
   }
 }
 
+async function unregisterBackInStockNotification({ productId, email, user, lang = 'vi' }) {
+  const product = await getActiveProduct(productId, lang)
+  const notificationEmail = await resolveNotificationEmail({ email, user })
+
+  if (!notificationEmail) {
+    throw new AppError(message(lang, 'emailRequired'), 400)
+  }
+
+  if (!EMAIL_REGEX.test(notificationEmail)) {
+    throw new AppError(message(lang, 'emailInvalid'), 400)
+  }
+
+  const subscription = await backInStockSubscriptionRepository.cancelPendingByProductAndEmail(product._id, notificationEmail)
+
+  if (!subscription) {
+    return {
+      success: true,
+      status: 'not_registered',
+      notRegistered: true,
+      message: message(lang, 'notRegistered')
+    }
+  }
+
+  return {
+    success: true,
+    status: 'unsubscribed',
+    unsubscribed: true,
+    message: message(lang, 'unsubscribed'),
+    subscription: serializeSubscription(subscription)
+  }
+}
+
 async function notifyBackInStockForProduct(productId) {
   if (!isValidObjectId(productId)) {
     return { success: false, sent: 0, failed: 0, reason: 'invalid_product_id' }
@@ -228,5 +275,6 @@ async function notifyBackInStockForProduct(productId) {
 
 module.exports = {
   registerBackInStockNotification,
+  unregisterBackInStockNotification,
   notifyBackInStockForProduct
 }

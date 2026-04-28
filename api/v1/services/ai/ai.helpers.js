@@ -12,6 +12,18 @@ function extractTextFromContent(content) {
     .join(' ')
 }
 
+function extractImageUrlsFromContent(content) {
+  if (!Array.isArray(content)) return []
+
+  return content
+    .filter(part => part && part.type === 'image_url')
+    .map(part => {
+      if (typeof part.image_url === 'string') return part.image_url
+      return part.image_url?.url
+    })
+    .filter(url => typeof url === 'string' && url.trim())
+}
+
 function normalizeUserMessage(userMessage) {
   if (userMessage && typeof userMessage === 'object') {
     const promptInput = Array.isArray(userMessage.content) && userMessage.content.length > 0
@@ -25,11 +37,18 @@ function normalizeUserMessage(userMessage) {
     const memoryInput = typeof userMessage.memoryText === 'string'
       ? userMessage.memoryText
       : (promptText || extractTextFromContent(promptInput))
+    const imageUrls = [
+      ...(Array.isArray(userMessage.imageUrls) ? userMessage.imageUrls : []),
+      ...(typeof userMessage.imageUrl === 'string' ? [userMessage.imageUrl] : []),
+      ...extractImageUrlsFromContent(promptInput)
+    ]
+      .filter(url => typeof url === 'string' && url.trim())
 
     return {
       promptInput,
       promptText,
-      memoryInput
+      memoryInput,
+      imageUrls: [...new Set(imageUrls)]
     }
   }
 
@@ -37,7 +56,8 @@ function normalizeUserMessage(userMessage) {
   return {
     promptInput: promptText,
     promptText,
-    memoryInput: promptText
+    memoryInput: promptText,
+    imageUrls: []
   }
 }
 
@@ -116,6 +136,7 @@ function removeSuggestionLines(text) {
 
 module.exports = {
   extractTextFromContent,
+  extractImageUrlsFromContent,
   normalizeUserMessage,
   parseFailedGeneration,
   extractSuggestions,

@@ -14,10 +14,14 @@ const productRepository = require('../../repositories/product.repository')
 const flashSaleRepository = require('../../repositories/flashSale.repository')
 const userRepository = require('../../repositories/user.repository')
 const digitalDeliveryService = require('../digitalDelivery.service')
+const notificationsService = require('./notifications.service')
 const { notifyBackInStockForProduct } = require('../backInStock.service')
 
 const ONLINE_PAYMENT_METHODS = ['vnpay', 'momo', 'zalopay', 'sepay']
 const DEFAULT_PENDING_ONLINE_ORDER_TTL_MINUTES = 60
+const FREE_SHIPPING_THRESHOLD = 100000
+const DEFAULT_SHIPPING_FEE = 50000
+const ORDER_DELIVERY_METHODS = ['pickup', 'contact']
 const ORDER_ADDRESS_FIELDS = [
   'addressLine1',
   'provinceCode',
@@ -281,6 +285,22 @@ function calculateOrderTotals(orderItems = [], discount = 0, shipping = 0) {
   }
 }
 
+function normalizeOrderDeliveryMethod(value) {
+  const normalized = String(value || '').trim().toLowerCase()
+  return ORDER_DELIVERY_METHODS.includes(normalized) ? normalized : null
+}
+
+function calculatePendingOrderDeliveryShipping(deliveryMethod, subtotal, shipping) {
+  const explicitShipping = Number(shipping)
+  if (Number.isFinite(explicitShipping) && explicitShipping >= 0) {
+    return explicitShipping
+  }
+
+  if (deliveryMethod === 'pickup') return 0
+
+  return Number(subtotal || 0) > FREE_SHIPPING_THRESHOLD ? 0 : DEFAULT_SHIPPING_FEE
+}
+
 async function updateFlashSaleStats(orderItems = []) {
   for (const item of orderItems) {
     if (item.isFlashSale && item.flashSaleId) {
@@ -500,6 +520,7 @@ async function cancelOrder(userId, orderId) {
   order.status = 'cancelled'
   order.cancelledAt = new Date()
   await order.save()
+  notificationsService.createOrderStatusNotification(order)
 
   return { success: true, order }
 }
@@ -687,6 +708,7 @@ function normalizeOrderItemsUpdatePayload(payload = {}) {
 
 function buildOrderSnapshot(order) {
   return {
+    deliveryMethod: order.deliveryMethod,
     orderItems: clonePlain(order.orderItems) || [],
     subtotal: order.subtotal,
     discount: order.discount,
@@ -795,6 +817,173 @@ async function updatePendingOrderItems(userId, orderId, payload = {}) {
   }
 }
 
+function ensurePendingOrderPromoEditable(order) {
+  if (order.status !== 'pending' || order.paymentStatus !== 'pending') {
+    throw new AppError('Chi co the sua ma giam gia cua don pending chua thanh toan', 400)
+  }
+  if (order.reservationExpiresAt && new Date(order.reservationExpiresAt).getTime() <= Date.now()) {
+    throw new AppError('Don hang da het han thanh toan, vui long tao don moi', 400)
+  }
+  if (order.promoApplied) {
+    throw new AppError('Ma giam gia cua don da duoc ghi nhan su dung, khong the thay doi', 400)
+  }
+}
+
+function buildPromoOrderChangePrevious(order) {
+  return {
+    promo: order.promo || '',
+    subtotal: order.subtotal,
+    discount: order.discount,
+    shipping: order.shipping,
+    total: order.total
+  }
+}
+
+function recalculatePendingOrderTotals(order, promoCodeDoc = null) {
+  const orderItems = Array.isArray(order.orderItems) ? order.orderItems : []
+  const subtotal = calculateItemsSubtotal(orderItems)
+  if (promoCodeDoc) ensurePromoMinimumOrder(promoCodeDoc, subtotal)
+
+  return calculateOrderTotals(
+    orderItems,
+    calculatePromoDiscount(promoCodeDoc, subtotal),
+    order.shipping
+  )
+}
+
+async function applyPromoCodeToPendingOrder(userId, orderId, code) {
+  const normalizedCode = String(code || '').trim().toUpperCase()
+  if (!normalizedCode) {
+    throw new AppError('Vui long cung cap ma giam gia can ap', 400)
+  }
+
+  const order = await orderRepository.findOne({ _id: orderId, userId, isDeleted: false })
+  if (!order) {
+    throw new AppError('Khong tim thay don hang', 404)
+  }
+  ensurePendingOrderPromoEditable(order)
+
+  const previous = buildPromoOrderChangePrevious(order)
+  const promoCodeDoc = await resolvePromoCode(normalizedCode, userId)
+  const totals = recalculatePendingOrderTotals(order, promoCodeDoc)
+
+  order.subtotal = totals.subtotal
+  order.discount = totals.discount
+  order.shipping = totals.shipping
+  order.total = totals.total
+  order.promo = promoCodeDoc ? promoCodeDoc.code : ''
+  order.promoApplied = false
+  order.paymentTransactionId = ''
+
+  await order.save()
+
+  return {
+    success: true,
+    order,
+    promo: promoCodeDoc,
+    previous
+  }
+}
+
+async function removePromoCodeFromPendingOrder(userId, orderId) {
+  const order = await orderRepository.findOne({ _id: orderId, userId, isDeleted: false })
+  if (!order) {
+    throw new AppError('Khong tim thay don hang', 404)
+  }
+  ensurePendingOrderPromoEditable(order)
+
+  const previous = buildPromoOrderChangePrevious(order)
+  const removedPromoCode = order.promo || ''
+  const totals = recalculatePendingOrderTotals(order, null)
+
+  order.subtotal = totals.subtotal
+  order.discount = 0
+  order.shipping = totals.shipping
+  order.total = totals.total
+  order.promo = ''
+  order.promoApplied = false
+  order.paymentTransactionId = ''
+
+  await order.save()
+
+  return {
+    success: true,
+    order,
+    removedPromoCode,
+    previous
+  }
+}
+
+async function updatePendingOrderDeliveryMethod(userId, orderId, payload = {}) {
+  const order = await orderRepository.findOne({ _id: orderId, userId, isDeleted: false })
+  if (!order) {
+    throw new AppError('Khong tim thay don hang', 404)
+  }
+  if (order.status !== 'pending' || order.paymentStatus !== 'pending') {
+    throw new AppError('Chi co the doi phuong thuc nhan/giao cua don pending chua thanh toan', 400)
+  }
+  if (order.reservationExpiresAt && new Date(order.reservationExpiresAt).getTime() <= Date.now()) {
+    throw new AppError('Don hang da het han thanh toan, vui long tao don moi', 400)
+  }
+
+  const deliveryMethod = normalizeOrderDeliveryMethod(payload.deliveryMethod)
+  if (!deliveryMethod) {
+    throw new AppError('Phuong thuc nhan/giao khong hop le', 400)
+  }
+
+  const previousSnapshot = buildOrderSnapshot(order)
+  const subtotal = calculateItemsSubtotal(order.orderItems)
+  const shipping = calculatePendingOrderDeliveryShipping(deliveryMethod, subtotal, payload.shipping)
+  const totals = calculateOrderTotals(order.orderItems, order.discount, shipping)
+
+  order.deliveryMethod = deliveryMethod
+  order.subtotal = totals.subtotal
+  order.shipping = totals.shipping
+  order.total = totals.total
+
+  await order.save()
+
+  return {
+    success: true,
+    order,
+    previous: {
+      deliveryMethod: previousSnapshot.deliveryMethod,
+      shipping: previousSnapshot.shipping,
+      total: previousSnapshot.total
+    }
+  }
+}
+
+async function updatePendingOrderPaymentMethod(userId, orderId, paymentMethod) {
+  const normalizedPaymentMethod = String(paymentMethod || '').trim().toLowerCase()
+  if (!ONLINE_PAYMENT_METHODS.includes(normalizedPaymentMethod)) {
+    throw new AppError('Phuong thuc thanh toan khong hop le cho don pending', 400)
+  }
+
+  const order = await orderRepository.findOne({ _id: orderId, userId, isDeleted: false })
+  if (!order) {
+    throw new AppError('Khong tim thay don hang', 404)
+  }
+  if (order.status !== 'pending' || order.paymentStatus !== 'pending') {
+    throw new AppError('Chi co the doi cong thanh toan cua don pending chua thanh toan', 400)
+  }
+  if (order.reservationExpiresAt && new Date(order.reservationExpiresAt).getTime() <= Date.now()) {
+    throw new AppError('Don hang da het han thanh toan, vui long tao don moi', 400)
+  }
+
+  const previousPaymentMethod = order.paymentMethod
+  order.paymentMethod = normalizedPaymentMethod
+  order.paymentTransactionId = ''
+  await order.save()
+
+  return {
+    success: true,
+    order,
+    previousPaymentMethod,
+    paymentMethodChanged: previousPaymentMethod !== normalizedPaymentMethod
+  }
+}
+
 async function trackOrder({ orderCode, phone }) {
   if (!orderCode || !phone) {
     throw new AppError('Vui lòng nhập mã đơn hàng và số điện thoại.', 400)
@@ -883,6 +1072,7 @@ async function expirePendingOnlineOrders({ now = new Date(), batchSize = 100 } =
     order.paymentExpiredAt = now
     order.cancelledAt = now
     await order.save()
+    notificationsService.createOrderStatusNotification(order)
     expiredCount += 1
   }
 
@@ -898,6 +1088,10 @@ module.exports = {
   updateOrderAddress,
   updateOrderContact,
   updatePendingOrderItems,
+  applyPromoCodeToPendingOrder,
+  removePromoCodeFromPendingOrder,
+  updatePendingOrderDeliveryMethod,
+  updatePendingOrderPaymentMethod,
   trackOrder,
   restoreOrderStock,
   markOrderPromoUsed,

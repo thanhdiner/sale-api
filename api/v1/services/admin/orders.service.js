@@ -4,6 +4,7 @@ const AppError = require('../../utils/AppError')
 const orderRepository = require('../../repositories/order.repository')
 const userRepository = require('../../repositories/user.repository')
 const clientOrdersService = require('../client/orders.service')
+const notificationsService = require('../client/notifications.service')
 const digitalDeliveryService = require('../digitalDelivery.service')
 const logger = require('../../../../config/logger')
 const { getIO } = require('../../helpers/socket')
@@ -330,6 +331,7 @@ function emitOrderStatusUpdate(order) {
   try {
     if (order.userId) {
       logger.info(`[Socket] Emitting order_status_updated to user_${order.userId}, status: ${order.status}`)
+      notificationsService.createOrderStatusNotification(order)
       getIO().to(`user_${order.userId}`).emit('order_status_updated', {
         _id: order._id,
         status: order.status,

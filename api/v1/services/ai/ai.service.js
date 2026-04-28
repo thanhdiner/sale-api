@@ -21,7 +21,7 @@ async function processMessage(sessionId, userMessage, customerInfo = {}, overrid
   let fallbackMessage = PROCESS_FALLBACK_MESSAGE
 
   try {
-    const { promptInput, promptText, memoryInput } = normalizeUserMessage(userMessage)
+    const { promptInput, promptText, memoryInput, imageUrls } = normalizeUserMessage(userMessage)
     const runtimeConfig = await getRuntimeConfig(overrides)
     const {
       provider,
@@ -104,6 +104,7 @@ async function processMessage(sessionId, userMessage, customerInfo = {}, overrid
       sessionId,
       customerInfo,
       promptText,
+      imageUrls,
       onActivity
     })
     const elapsed = Date.now() - startTime

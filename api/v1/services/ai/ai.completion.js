@@ -83,6 +83,7 @@ async function generateReplyWithTools({
   sessionId,
   customerInfo,
   promptText,
+  imageUrls = [],
   onActivity
 }) {
   let totalTokens = 0
@@ -94,6 +95,7 @@ async function generateReplyWithTools({
     sessionId,
     customerInfo,
     promptText,
+    currentMessageImageUrls: Array.isArray(imageUrls) ? imageUrls : [],
     userId: customerInfo.userId || null
   }
 

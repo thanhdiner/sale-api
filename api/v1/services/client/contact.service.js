@@ -151,6 +151,124 @@ function buildContactRequestEmail(request) {
   }
 }
 
+function normalizeUrlList(value, maxItems = 10) {
+  const items = Array.isArray(value)
+    ? value
+    : (cleanString(value, 1000) ? [value] : [])
+
+  return [...new Set(
+    items
+      .map(item => cleanString(item, 1000))
+      .filter(Boolean)
+  )].slice(0, maxItems)
+}
+
+function normalizeSupportTicketMessage(payload = {}, context = {}) {
+  const ticketId = cleanString(payload.ticketId || payload.ticketCode || payload.id, 120).toUpperCase()
+  const message = cleanMultiline(
+    payload.message || payload.update || payload.details || payload.note || payload.description || context.promptText,
+    3000
+  )
+  const imageUrls = normalizeUrlList(payload.imageUrls || payload.screenshotUrls || payload.mediaUrls)
+  const attachmentUrls = normalizeUrlList(payload.attachmentUrls || payload.fileUrls || payload.files)
+  const allAttachmentUrls = [...new Set([...imageUrls, ...attachmentUrls])]
+  const subject = cleanString(payload.subject || `Bo sung thong tin ticket ${ticketId}`, 200)
+
+  if (!ticketId) {
+    throw createValidationError('Can co ma ticket de bo sung thong tin.')
+  }
+
+  if (!message && allAttachmentUrls.length === 0) {
+    throw createValidationError('Can co noi dung hoac anh/tep dinh kem de bo sung vao ticket.')
+  }
+
+  return {
+    ticketId,
+    subject,
+    message,
+    imageUrls,
+    attachmentUrls: allAttachmentUrls,
+    sessionId: cleanString(payload.sessionId || context.sessionId, 120),
+    userId: cleanString(payload.userId || context.userId || context.customerInfo?.userId, 120),
+    name: cleanString(payload.name || context.customerInfo?.name, 100),
+    email: cleanString(payload.email || context.customerInfo?.email, 160).toLowerCase(),
+    phone: cleanString(payload.phone || context.customerInfo?.phone, 40),
+    source: cleanString(payload.source || context.source || 'chatbot_ticket_update', 80),
+    currentPage: cleanString(payload.currentPage || context.customerInfo?.currentPage, 500),
+    createdAt: new Date().toISOString()
+  }
+}
+
+function buildSupportTicketMessageEmail(update) {
+  const subject = `[Ticket Update ${update.ticketId}] ${update.subject}`
+  const attachmentLines = update.attachmentUrls.length > 0
+    ? update.attachmentUrls.map((url, index) => `${index + 1}. ${url}`)
+    : ['(khong co)']
+  const text = [
+    `Ticket: ${update.ticketId}`,
+    `Nguon: ${update.source}`,
+    `Session: ${update.sessionId || '(khong co)'}`,
+    `User: ${update.userId || '(khong co)'}`,
+    `Ten: ${update.name || '(khong ghi)'}`,
+    `Email: ${update.email || '(khong ghi)'}`,
+    `So dien thoai: ${update.phone || '(khong ghi)'}`,
+    `Trang hien tai: ${update.currentPage || '(khong co)'}`,
+    '',
+    'Noi dung bo sung:',
+    update.message || '(khong co noi dung text)',
+    '',
+    'Anh/tep dinh kem:',
+    ...attachmentLines
+  ].join('\n')
+  const htmlRows = [
+    ['Ticket', update.ticketId],
+    ['Nguon', update.source],
+    ['Session', update.sessionId || '(khong co)'],
+    ['User', update.userId || '(khong co)'],
+    ['Ten', update.name || '(khong ghi)'],
+    ['Email', update.email || '(khong ghi)'],
+    ['So dien thoai', update.phone || '(khong ghi)'],
+    ['Trang hien tai', update.currentPage || '(khong co)']
+  ]
+    .map(([label, value]) => `<p><b>${escapeHtml(label)}:</b> ${escapeHtml(value)}</p>`)
+    .join('')
+  const attachmentHtml = update.attachmentUrls.length > 0
+    ? `<ol>${update.attachmentUrls.map(url => `<li><a href="${escapeHtml(url)}">${escapeHtml(url)}</a></li>`).join('')}</ol>`
+    : '<p>(khong co)</p>'
+
+  return {
+    subject,
+    text,
+    html: `${htmlRows}<p><b>Noi dung bo sung:</b></p><p>${escapeHtml(update.message || '(khong co noi dung text)').replace(/\n/g, '<br/>')}</p><p><b>Anh/tep dinh kem:</b></p>${attachmentHtml}`
+  }
+}
+
+async function addSupportTicketMessage(payload = {}, context = {}) {
+  const update = normalizeSupportTicketMessage(payload, context)
+  const email = buildSupportTicketMessageEmail(update)
+
+  await sendMail(process.env.MAIL_USER, email.subject, email.text, email.html)
+
+  return {
+    success: true,
+    ticketId: update.ticketId,
+    message: 'Thong tin bo sung da duoc ghi nhan.',
+    update: {
+      ticketId: update.ticketId,
+      subject: update.subject,
+      message: update.message,
+      imageUrls: update.imageUrls,
+      attachmentUrls: update.attachmentUrls,
+      attachmentCount: update.attachmentUrls.length,
+      sessionId: update.sessionId,
+      userId: update.userId,
+      source: update.source,
+      currentPage: update.currentPage,
+      createdAt: update.createdAt
+    }
+  }
+}
+
 async function submitContactRequest(payload = {}, context = {}) {
   const request = normalizeContactRequest(payload, context)
   const email = buildContactRequestEmail(request)
@@ -193,5 +311,7 @@ async function sendContactEmail(req, res) {
 
 module.exports = {
   submitContactRequest,
+  addSupportTicketMessage,
+  updateSupportTicket: addSupportTicketMessage,
   sendContactEmail
 }

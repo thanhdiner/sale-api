@@ -130,6 +130,76 @@ const orderSummaryBlock = order => `
   </tfoot>
 </table>`
 
+const escapeHtml = value =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+
+const DIGITAL_DELIVERY_FIELDS = [
+  { key: 'username', label: 'Tai khoan' },
+  { key: 'password', label: 'Mat khau' },
+  { key: 'email', label: 'Email dang nhap' },
+  { key: 'licenseKey', label: 'License key' },
+  { key: 'loginUrl', label: 'Link dang nhap', link: true },
+  { key: 'instructions', label: 'Huong dan' },
+  { key: 'notes', label: 'Ghi chu' }
+]
+
+const hasDeliveryFieldValue = delivery =>
+  DIGITAL_DELIVERY_FIELDS.some(field => String(delivery?.[field.key] || '').trim())
+
+const getDigitalDeliveryEntries = order =>
+  (order.orderItems || [])
+    .flatMap(item => (item.digitalDeliveries || []).map((delivery, index) => ({
+      item,
+      delivery,
+      index
+    })))
+    .filter(entry => hasDeliveryFieldValue(entry.delivery))
+
+const renderDigitalDeliveryField = (label, value, options = {}) => {
+  const text = String(value || '').trim()
+  if (!text) return ''
+
+  const escapedText = escapeHtml(text).replace(/\n/g, '<br/>')
+  const isSafeLink = options.link && /^https?:\/\//i.test(text)
+  const valueHtml = isSafeLink
+    ? `<a href="${escapeHtml(text)}" style="color:#2563eb;text-decoration:none;">${escapedText}</a>`
+    : `<span style="${options.monospace ? 'font-family:Consolas,Monaco,monospace;' : ''}">${escapedText}</span>`
+
+  return `
+    <tr>
+      <td style="padding:8px 10px;color:#6b7280;font-size:13px;border-bottom:1px solid #eef2f7;width:34%;">${escapeHtml(label)}</td>
+      <td style="padding:8px 10px;color:#111827;font-size:13px;border-bottom:1px solid #eef2f7;word-break:break-word;">${valueHtml}</td>
+    </tr>`
+}
+
+const renderDigitalDeliveryEntry = ({ item, delivery, index }) => {
+  const rows = DIGITAL_DELIVERY_FIELDS
+    .map(field => renderDigitalDeliveryField(field.label, delivery[field.key], {
+      link: field.link,
+      monospace: ['username', 'password', 'email', 'licenseKey'].includes(field.key)
+    }))
+    .join('')
+
+  if (!rows) return ''
+
+  return `
+    <div style="border:1px solid #dbeafe;border-radius:12px;margin:16px 0;overflow:hidden;">
+      <div style="background:#eff6ff;padding:12px 14px;">
+        <p style="margin:0;color:#1e3a8a;font-weight:700;font-size:14px;">${escapeHtml(item.name || 'San pham so')} #${index + 1}</p>
+        ${delivery.deliveredAt ? `<p style="margin:4px 0 0;color:#64748b;font-size:12px;">Ban giao luc: ${new Date(delivery.deliveredAt).toLocaleString('vi-VN')}</p>` : ''}
+      </div>
+      <table width="100%" cellpadding="0" cellspacing="0">${rows}</table>
+    </div>`
+}
+
+const renderDigitalDeliveryEntries = order =>
+  getDigitalDeliveryEntries(order).map(renderDigitalDeliveryEntry).join('')
+
 // ─── T1: Đặt hàng thành công (COD / Transfer) ────────────────────────────────
 
 exports.orderConfirmedTemplate = order => {
@@ -221,7 +291,45 @@ exports.paymentSuccessTemplate = order => {
   }
 }
 
-// ─── T3: Admin cập nhật trạng thái đơn ───────────────────────────────────────
+// T2b: Gui lai thong tin ban giao so
+
+exports.digitalDeliveryTemplate = order => {
+  const fullName = [order.contact?.firstName, order.contact?.lastName].filter(Boolean).join(' ') || 'ban'
+  const orderId = order._id.toString()
+  const entriesHtml = renderDigitalDeliveryEntries(order)
+
+  const content = `
+    <h2 style="margin:0 0 8px;color:#1f2937;font-size:22px;font-weight:800;">Thong tin ban giao so</h2>
+    <p style="margin:0 0 24px;color:#6b7280;">Xin chao <strong>${escapeHtml(fullName)}</strong>, duoi day la thong tin ban giao cho don hang #${orderId.slice(-8).toUpperCase()}.</p>
+    <div style="background:#f8fafc;border-radius:10px;padding:16px;margin-bottom:20px;">
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="color:#6b7280;font-size:13px;padding:4px 0;">Ma don hang:</td>
+          <td style="text-align:right;font-weight:700;color:#6366f1;font-size:13px;">#${orderId.slice(-8).toUpperCase()}</td>
+        </tr>
+        <tr>
+          <td style="color:#6b7280;font-size:13px;padding:4px 0;">Ngay dat:</td>
+          <td style="text-align:right;color:#1f2937;font-size:13px;">${new Date(order.createdAt).toLocaleString('vi-VN')}</td>
+        </tr>
+        <tr>
+          <td style="color:#6b7280;font-size:13px;padding:4px 0;">Trang thai thanh toan:</td>
+          <td style="text-align:right;color:#1f2937;font-size:13px;">${order.paymentStatus || ''}</td>
+        </tr>
+      </table>
+    </div>
+    ${entriesHtml}
+    <div style="background:#fffbeb;border-left:4px solid #f59e0b;border-radius:0 8px 8px 0;padding:14px 16px;margin:20px 0;">
+      <p style="margin:0;color:#92400e;font-size:13px;">Vui long bao mat thong tin nay va khong chia se mat khau/license cho nguoi khac. Neu thong tin khong hoat dong, hay lien he ho tro kem ma don hang.</p>
+    </div>
+    <p style="margin:0;color:#6b7280;font-size:13px;text-align:center;">Cam on ban da mua hang tai SmartMall.</p>`
+
+  return {
+    subject: `SmartMall - Thong tin ban giao so #${orderId.slice(-8).toUpperCase()}`,
+    html: baseLayout(content)
+  }
+}
+
+// T3: Admin cap nhat trang thai don
 
 exports.orderStatusUpdatedTemplate = order => {
   const fullName = `${order.contact.firstName} ${order.contact.lastName}`

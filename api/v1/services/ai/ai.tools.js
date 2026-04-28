@@ -21,6 +21,8 @@ const { findAllDescendantIds } = require('../../helpers/product-categoryHelper')
 const ordersService = require('../client/orders.service')
 const paymentService = require('../client/payment.service')
 const bankInfoService = require('../client/bankInfo.service')
+const notificationsService = require('../client/notifications.service')
+const backInStockService = require('../backInStock.service')
 const clientUserService = require('../client/user.service')
 const clientProductService = require('../client/products.service')
 const clientReviewsService = require('../client/reviews.service')
@@ -30,6 +32,8 @@ const privacyPolicyPageService = require('../privacyPolicyPage.service')
 const termsContentService = require('../client/termsContent.service')
 const vipContentService = require('../client/vipContent.service')
 const { normalizeStructuredAddress } = require('../../utils/structuredAddress')
+const { sendMail } = require('../../../../config/mailer')
+const { orderConfirmedTemplate, digitalDeliveryTemplate } = require('../../utils/emailTemplates')
 const applyTranslation = require('../../utils/applyTranslation')
 const logger = require('../../../../config/logger')
 const removeAccents = require('remove-accents')
@@ -266,6 +270,121 @@ const TOOL_REGISTRY = [
     }
   },
   {
+    name: 'getProductAlternatives',
+    label: 'Goi y san pham thay the',
+    description: 'Goi y san pham thay the dang con hang khi san pham goc het hang, khong du so luong hoac vuot ngan sach cua khach. Uu tien san pham cung danh muc, trong ngan sach va con du ton kho.',
+    group: 'catalog',
+    riskLevel: 'safe',
+    requiresConfirmation: false,
+    defaultEnabled: true,
+    endpoint: 'productService.getProductAlternatives',
+    parameters: {
+      type: 'object',
+      properties: {
+        productId: {
+          type: 'string',
+          description: 'MongoDB ObjectId cua san pham goc can tim thay the, neu co.'
+        },
+        productQuery: {
+          type: 'string',
+          description: 'Ten hoac slug san pham goc can tim thay the neu chua co productId.'
+        },
+        budget: {
+          type: 'number',
+          description: 'Ngan sach toi da cua khach cho moi san pham, tinh theo VND.'
+        },
+        maxPrice: {
+          type: 'number',
+          description: 'Alias cua budget: gia toi da sau giam.'
+        },
+        quantity: {
+          type: 'number',
+          description: 'So luong khach muon mua de loc san pham co du ton kho, mac dinh 1.'
+        },
+        category: {
+          type: 'string',
+          description: 'Danh muc muon uu tien neu khach noi ro. Neu bo trong se uu tien danh muc cua san pham goc.'
+        },
+        reason: {
+          type: 'string',
+          enum: ['out_of_stock', 'over_budget', 'insufficient_stock', 'general'],
+          description: 'Ly do can goi y thay the neu biet ro.'
+        },
+        limit: {
+          type: 'number',
+          description: 'So san pham thay the toi da, mac dinh 5 va toi da 10.'
+        }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'subscribeBackInStock',
+    label: 'Dang ky bao co hang',
+    description: 'Dang ky nhan email khi san pham dang het hang co hang tro lai. Dung khi khach muon bao khi co hang, nhac toi khi hang ve, dang ky back-in-stock cho san pham. Co the dung productId/productQuery hoac san pham khach dang xem; neu khach chua dang nhap thi can email.',
+    group: 'catalog',
+    riskLevel: 'write',
+    requiresConfirmation: false,
+    defaultEnabled: true,
+    endpoint: 'backInStockService.registerBackInStockNotification',
+    parameters: {
+      type: 'object',
+      properties: {
+        productId: {
+          type: 'string',
+          description: 'MongoDB ObjectId cua san pham can dang ky bao co hang.'
+        },
+        productQuery: {
+          type: 'string',
+          description: 'Ten hoac slug san pham neu chua co productId.'
+        },
+        email: {
+          type: 'string',
+          description: 'Email nhan thong bao. Co the bo trong neu khach da dang nhap va tai khoan co email.'
+        },
+        language: {
+          type: 'string',
+          enum: ['vi', 'en'],
+          description: 'Ngon ngu thong bao, mac dinh theo phien chat.'
+        }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'unsubscribeBackInStock',
+    label: 'Huy bao co hang',
+    description: 'Huy dang ky nhan email khi san pham co hang tro lai. Dung khi khach muon huy bao hang ve/huy back-in-stock cho san pham. Co the dung productId/productQuery hoac san pham khach dang xem; neu khach chua dang nhap thi can email da dang ky.',
+    group: 'catalog',
+    riskLevel: 'write',
+    requiresConfirmation: false,
+    defaultEnabled: true,
+    endpoint: 'backInStockService.unregisterBackInStockNotification',
+    parameters: {
+      type: 'object',
+      properties: {
+        productId: {
+          type: 'string',
+          description: 'MongoDB ObjectId cua san pham can huy dang ky bao co hang.'
+        },
+        productQuery: {
+          type: 'string',
+          description: 'Ten hoac slug san pham neu chua co productId.'
+        },
+        email: {
+          type: 'string',
+          description: 'Email da dang ky. Co the bo trong neu khach da dang nhap va tai khoan co email.'
+        },
+        language: {
+          type: 'string',
+          enum: ['vi', 'en'],
+          description: 'Ngon ngu thong bao, mac dinh theo phien chat.'
+        }
+      },
+      required: []
+    }
+  },
+  {
     name: 'compareProducts',
     label: 'So sánh sản phẩm',
     description: 'So sánh 2-4 sản phẩm khi khách hỏi nên mua A hay B. Dùng productIds nếu đã có ID, hoặc productQueries là tên/slug sản phẩm. Trả về giá, tồn kho, rating, sold, discount, features và gợi ý lựa chọn theo từng tiêu chí.',
@@ -399,6 +518,64 @@ const TOOL_REGISTRY = [
         }
       },
       required: []
+    }
+  },
+  {
+    name: 'resendOrderConfirmation',
+    label: 'Gui lai email xac nhan don',
+    description: 'Gui lai email xac nhan don hang cho khach dang dang nhap va so huu don. Chi gui ve email lien he cua don hoac email tai khoan; khong cho phep nhap email tuy y.',
+    group: 'orders',
+    riskLevel: 'write',
+    requiresConfirmation: true,
+    confirmationMessage: 'Hanh dong nay se gui lai email xac nhan don hang den email lien he cua don hoac email tai khoan. Ban co chac muon gui lai khong?',
+    defaultEnabled: true,
+    endpoint: 'orderService.resendOrderConfirmation',
+    parameters: {
+      type: 'object',
+      properties: {
+        orderId: {
+          type: 'string',
+          description: 'MongoDB ObjectId cua don hang, neu co.'
+        },
+        orderCode: {
+          type: 'string',
+          description: 'Ma don hang/orderCode hoac ma hien thi khach cung cap.'
+        },
+        confirmed: {
+          type: 'boolean',
+          description: 'Phai la true sau khi khach da xac nhan ro rang muon gui lai email xac nhan don.'
+        }
+      },
+      required: ['confirmed']
+    }
+  },
+  {
+    name: 'resendDigitalDelivery',
+    label: 'Gui lai thong tin ban giao so',
+    description: 'Gui lai email thong tin ban giao so/tai khoan/license cua don da thanh toan cho khach dang dang nhap va so huu don. Khong hien thi username, mat khau, license hay link dang nhap trong chat.',
+    group: 'orders',
+    riskLevel: 'write',
+    requiresConfirmation: true,
+    confirmationMessage: 'Hanh dong nay se gui lai thong tin ban giao so cua don hang qua email. Vi bao mat, chatbot se khong hien thi tai khoan, mat khau hay license trong chat. Ban co chac muon gui lai khong?',
+    defaultEnabled: true,
+    endpoint: 'orderService.resendDigitalDelivery',
+    parameters: {
+      type: 'object',
+      properties: {
+        orderId: {
+          type: 'string',
+          description: 'MongoDB ObjectId cua don hang, neu co.'
+        },
+        orderCode: {
+          type: 'string',
+          description: 'Ma don hang/orderCode hoac ma hien thi khach cung cap.'
+        },
+        confirmed: {
+          type: 'boolean',
+          description: 'Phai la true sau khi khach da xac nhan ro rang muon gui lai thong tin ban giao so qua email.'
+        }
+      },
+      required: ['confirmed']
     }
   },
   {
@@ -709,6 +886,118 @@ const TOOL_REGISTRY = [
     }
   },
   {
+    name: 'applyPromoCodeToPendingOrder',
+    label: 'Ap ma giam gia don pending',
+    description: 'Ap hoac thay ma giam gia cho don pending chua thanh toan cua khach dang dang nhap. Tool nay cap nhat tong tien va tra ve link/thong tin thanh toan moi, can khach xac nhan ro rang truoc khi thuc thi.',
+    group: 'orders',
+    riskLevel: 'write',
+    requiresConfirmation: true,
+    confirmationMessage: 'Hanh dong nay se ap ma giam gia va cap nhat tong tien cua don pending. Ban co chac muon ap ma nay khong?',
+    defaultEnabled: true,
+    endpoint: 'orderService.applyPromoCodeToPendingOrder',
+    parameters: {
+      type: 'object',
+      properties: {
+        orderId: {
+          type: 'string',
+          description: 'MongoDB ObjectId cua don pending can ap ma, neu co.'
+        },
+        orderCode: {
+          type: 'string',
+          description: 'Ma don hang/orderCode hoac ma hien thi khach cung cap.'
+        },
+        code: {
+          type: 'string',
+          description: 'Ma giam gia can ap vao don pending.'
+        },
+        promoCode: {
+          type: 'string',
+          description: 'Alias cua code, ma giam gia can ap vao don pending.'
+        },
+        confirmed: {
+          type: 'boolean',
+          description: 'Phai la true sau khi khach da xac nhan ro rang muon ap ma giam gia vao don pending.'
+        }
+      },
+      required: ['confirmed']
+    }
+  },
+  {
+    name: 'removePromoCodeFromPendingOrder',
+    label: 'Go ma giam gia don pending',
+    description: 'Go ma giam gia khoi don pending chua thanh toan cua khach dang dang nhap. Tool nay cap nhat tong tien va tra ve link/thong tin thanh toan moi, can khach xac nhan ro rang truoc khi thuc thi.',
+    group: 'orders',
+    riskLevel: 'write',
+    requiresConfirmation: true,
+    confirmationMessage: 'Hanh dong nay se go ma giam gia va cap nhat tong tien cua don pending. Ban co chac muon go ma khong?',
+    defaultEnabled: true,
+    endpoint: 'orderService.removePromoCodeFromPendingOrder',
+    parameters: {
+      type: 'object',
+      properties: {
+        orderId: {
+          type: 'string',
+          description: 'MongoDB ObjectId cua don pending can go ma, neu co.'
+        },
+        orderCode: {
+          type: 'string',
+          description: 'Ma don hang/orderCode hoac ma hien thi khach cung cap.'
+        },
+        code: {
+          type: 'string',
+          description: 'Ma giam gia khach nhac den, neu co. Neu bo trong se go ma dang ap tren don.'
+        },
+        promoCode: {
+          type: 'string',
+          description: 'Alias cua code.'
+        },
+        confirmed: {
+          type: 'boolean',
+          description: 'Phai la true sau khi khach da xac nhan ro rang muon go ma giam gia khoi don pending.'
+        }
+      },
+      required: ['confirmed']
+    }
+  },
+  {
+    name: 'updatePendingOrderDeliveryMethod',
+    label: 'Doi phuong thuc nhan/giao don pending',
+    description: 'Doi phuong thuc nhan/giao cho don pending chua thanh toan cua khach dang dang nhap va tinh lai phi giao/ban giao, tong tien, thong tin thanh toan moi. Chi goi sau khi khach xac nhan ro rang.',
+    group: 'orders',
+    riskLevel: 'write',
+    requiresConfirmation: true,
+    confirmationMessage: 'Hanh dong nay se doi phuong thuc nhan/giao va cap nhat phi cung tong tien cua don pending. Ban co chac muon luu thay doi nay khong?',
+    defaultEnabled: true,
+    endpoint: 'orderService.updatePendingOrderDeliveryMethod',
+    parameters: {
+      type: 'object',
+      properties: {
+        orderId: {
+          type: 'string',
+          description: 'MongoDB ObjectId cua don pending can doi phuong thuc nhan/giao, neu co.'
+        },
+        orderCode: {
+          type: 'string',
+          description: 'Ma don hang/orderCode hoac ma hien thi khach cung cap.'
+        },
+        deliveryMethod: {
+          type: 'string',
+          enum: ['pickup', 'contact'],
+          description: 'Phuong thuc moi: pickup=nhan/ban giao truc tiep, contact=lien he de thoa thuan giao/ban giao.'
+        },
+        shipping: {
+          type: 'number',
+          description: 'Phi giao/ban giao da chot neu co. Bo trong de he thong tinh lai: pickup=0, contact theo nguong mien phi/mac dinh.'
+        },
+        confirmed: {
+          type: 'boolean',
+          description: 'Phai la true sau khi khach da xac nhan ro rang muon doi phuong thuc nhan/giao.'
+        }
+      },
+      required: ['deliveryMethod', 'confirmed']
+    }
+  },
+  {
     name: 'checkPaymentStatus',
     label: 'Kiem tra trang thai thanh toan',
     description: 'Kiem tra trang thai thanh toan cua don hang theo orderId/orderCode. Ho tro pending/paid/failed/expired cho VNPay, MoMo, ZaloPay va Sepay. Khach chua dang nhap can cung cap them so dien thoai dat hang.',
@@ -766,6 +1055,40 @@ const TOOL_REGISTRY = [
     }
   },
   {
+    name: 'updatePendingOrderPaymentMethod',
+    label: 'Doi cong thanh toan don pending',
+    description: 'Doi cong thanh toan cho don pending chua thanh toan cua khach dang dang nhap. Dung khi khach muon doi tu VNPay sang MoMo/ZaloPay/Sepay hoac nguoc lai. Can khach xac nhan ro rang truoc khi thuc thi va tra ve link/thong tin thanh toan moi.',
+    group: 'payments',
+    riskLevel: 'write',
+    requiresConfirmation: true,
+    confirmationMessage: 'Hanh dong nay se doi cong thanh toan cua don pending va tao thong tin thanh toan moi. Ban co chac muon doi cong thanh toan khong?',
+    defaultEnabled: true,
+    endpoint: 'orderService.updatePendingOrderPaymentMethod',
+    parameters: {
+      type: 'object',
+      properties: {
+        orderId: {
+          type: 'string',
+          description: 'MongoDB ObjectId cua don pending, neu khach cung cap.'
+        },
+        orderCode: {
+          type: 'string',
+          description: 'Ma don hang/orderCode hoac ma hien thi khach cung cap.'
+        },
+        paymentMethod: {
+          type: 'string',
+          enum: ['vnpay', 'momo', 'zalopay', 'sepay', 'card'],
+          description: 'Cong thanh toan moi khach muon dung. card se duoc hieu la vnpay.'
+        },
+        confirmed: {
+          type: 'boolean',
+          description: 'Phai la true sau khi khach da xac nhan ro rang muon doi cong thanh toan cua don pending.'
+        }
+      },
+      required: ['paymentMethod', 'confirmed']
+    }
+  },
+  {
     name: 'getBankInfo',
     label: 'Thong tin chuyen khoan',
     description: 'Lay thong tin tai khoan ngan hang active va QR chuyen khoan. Neu co don pending/Sepay, tra them so tien va noi dung chuyen khoan can dung.',
@@ -816,6 +1139,76 @@ const TOOL_REGISTRY = [
         paymentReference: {
           type: 'string',
           description: 'Noi dung chuyen khoan/paymentReference khach da nhap khi chuyen tien.'
+        }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'submitPaymentProof',
+    label: 'Gui chung tu thanh toan',
+    description: 'Tao ticket gui bien lai/chung tu chuyen khoan de nhan vien doi soat thu cong khi auto verify/Sepay chua khop. Dung khi khach da chuyen khoan va gui anh bien lai, ma giao dich, so tien, thoi gian chuyen khoan hoac thong tin ngan hang. Tool nay khong tu xac nhan thanh toan va khong doi paymentStatus.',
+    group: 'payments',
+    riskLevel: 'write',
+    requiresConfirmation: false,
+    defaultEnabled: true,
+    endpoint: 'paymentService.submitPaymentProof',
+    parameters: {
+      type: 'object',
+      properties: {
+        orderId: {
+          type: 'string',
+          description: 'MongoDB ObjectId cua don hang neu co.'
+        },
+        orderCode: {
+          type: 'string',
+          description: 'Ma don hang/orderCode khach cung cap.'
+        },
+        paymentReference: {
+          type: 'string',
+          description: 'Noi dung chuyen khoan/paymentReference khach da nhap khi chuyen tien.'
+        },
+        phone: {
+          type: 'string',
+          description: 'So dien thoai dat hang, can cho khach chua dang nhap de xac minh don.'
+        },
+        email: {
+          type: 'string',
+          description: 'Email lien he/dat hang neu khach chua dang nhap hoac muon nhan phan hoi qua email.'
+        },
+        proofImageUrls: {
+          type: 'array',
+          description: 'Danh sach URL anh bien lai/chung tu khach da upload/gui trong chat.',
+          items: { type: 'string' },
+          maxItems: 10
+        },
+        proofUrl: {
+          type: 'string',
+          description: 'URL chung tu neu chi co mot link.'
+        },
+        transactionId: {
+          type: 'string',
+          description: 'Ma giao dich/reference tren bien lai neu khach cung cap.'
+        },
+        paidAmount: {
+          type: 'number',
+          description: 'So tien khach da chuyen theo bien lai.'
+        },
+        transferTime: {
+          type: 'string',
+          description: 'Thoi gian chuyen khoan theo bien lai neu co.'
+        },
+        senderBank: {
+          type: 'string',
+          description: 'Ngan hang nguoi chuyen neu co.'
+        },
+        senderAccount: {
+          type: 'string',
+          description: 'So tai khoan hoac ten tai khoan nguoi chuyen neu co.'
+        },
+        note: {
+          type: 'string',
+          description: 'Ghi chu bo sung cua khach ve giao dich/chung tu.'
         }
       },
       required: []
@@ -1184,6 +1577,69 @@ const TOOL_REGISTRY = [
     parameters: {
       type: 'object',
       properties: {},
+      required: []
+    }
+  },
+  {
+    name: 'listNotifications',
+    label: 'Danh sach thong bao',
+    description: 'Xem danh sach thong bao cua khach dang dang nhap, gom thong bao don hang, thanh toan, he thong va ho tro. Co the loc thong bao chua doc/da doc va danh muc.',
+    group: 'account',
+    riskLevel: 'safe',
+    requiresConfirmation: false,
+    defaultEnabled: true,
+    endpoint: 'notificationService.listNotifications',
+    parameters: {
+      type: 'object',
+      properties: {
+        status: {
+          type: 'string',
+          enum: ['all', 'read', 'unread'],
+          description: 'Loc trang thai doc thong bao, mac dinh all.'
+        },
+        category: {
+          type: 'string',
+          enum: ['orders', 'payments', 'promotions', 'system', 'support', 'account', 'wishlist', 'reviews', 'chat'],
+          description: 'Loc theo nhom thong bao neu khach yeu cau.'
+        },
+        limit: {
+          type: 'number',
+          description: 'So thong bao toi da can lay, mac dinh 10 va toi da 50.'
+        },
+        unreadOnly: {
+          type: 'boolean',
+          description: 'true neu chi muon xem thong bao chua doc.'
+        }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'markNotificationRead',
+    label: 'Danh dau da doc thong bao',
+    description: 'Danh dau mot, nhieu hoac tat ca thong bao cua khach dang dang nhap la da doc. Dung khi khach yeu cau danh dau thong bao da doc.',
+    group: 'account',
+    riskLevel: 'write',
+    requiresConfirmation: false,
+    defaultEnabled: true,
+    endpoint: 'notificationService.markNotificationRead',
+    parameters: {
+      type: 'object',
+      properties: {
+        notificationId: {
+          type: 'string',
+          description: 'ID thong bao can danh dau da doc.'
+        },
+        notificationIds: {
+          type: 'array',
+          description: 'Danh sach ID thong bao can danh dau da doc.',
+          items: { type: 'string' }
+        },
+        all: {
+          type: 'boolean',
+          description: 'true de danh dau tat ca thong bao chua doc la da doc.'
+        }
+      },
       required: []
     }
   },
@@ -2483,6 +2939,61 @@ const TOOL_REGISTRY = [
     }
   },
   {
+    name: 'updateSupportTicket',
+    label: 'Cap nhat support ticket',
+    description: 'Bo sung thong tin, ghi chu, file dinh kem hoac noi dung moi vao ticket ho tro da tao qua chatbot. Tool nay tao mot follow-up request gan voi ticket goc va can xac minh bang tai khoan/phien chat/email/so dien thoai cua ticket.',
+    group: 'support',
+    riskLevel: 'write',
+    requiresConfirmation: true,
+    confirmationMessage: 'Hanh dong nay se bo sung thong tin/anh vao ticket ho tro da tao va gui cho nhan vien support. Ban co chac muon gui bo sung nay khong?',
+    defaultEnabled: true,
+    endpoint: 'contactService.addSupportTicketMessage',
+    parameters: {
+      type: 'object',
+      properties: {
+        ticketId: {
+          type: 'string',
+          description: 'Ma ticket goc can cap nhat, vi du CR-20260428-101530-ABCD.'
+        },
+        message: {
+          type: 'string',
+          description: 'Noi dung khach muon bo sung vao ticket.'
+        },
+        update: {
+          type: 'string',
+          description: 'Alias cua message, noi dung cap nhat ticket.'
+        },
+        attachmentUrls: {
+          type: 'array',
+          description: 'Danh sach URL anh/file/chung tu bo sung neu khach cung cap.',
+          items: { type: 'string' }
+        },
+        email: {
+          type: 'string',
+          description: 'Email lien he cua ticket neu can xac minh hoac ticket goc khong co thong tin lien he.'
+        },
+        phone: {
+          type: 'string',
+          description: 'So dien thoai/Zalo lien he cua ticket neu can xac minh hoac ticket goc khong co thong tin lien he.'
+        },
+        name: {
+          type: 'string',
+          description: 'Ten khach hang neu khach cung cap.'
+        },
+        confirmed: {
+          type: 'boolean',
+          description: 'Phai la true sau khi khach da xac nhan ro rang muon bo sung thong tin/anh vao ticket.'
+        },
+        imageUrls: {
+          type: 'array',
+          description: 'Danh sach URL anh chup man hinh/anh minh chung khach gui kem.',
+          items: { type: 'string' }
+        }
+      },
+      required: ['confirmed', 'ticketId']
+    }
+  },
+  {
     name: 'requestPersonalDataExport',
     label: 'Yeu cau xuat du lieu ca nhan',
     description: 'Tao ticket yeu cau xuat/tai ve du lieu ca nhan cua khach dang dang nhap. Dung khi khach muon download/export du lieu tai khoan, du lieu ca nhan, lich su don hang, dia chi, wishlist, review hoac chat. Khong tra du lieu ca nhan truc tiep trong chat; chi ghi nhan ticket va gui qua email tai khoan sau khi nhan vien xac minh.',
@@ -2534,7 +3045,7 @@ const TOOL_REGISTRY = [
       properties: {
         type: {
           type: 'string',
-          enum: ['all', 'contact_request', 'support_ticket', 'callback', 'bug_report', 'return_refund', 'warranty', 'personal_data_export', 'account_deletion'],
+          enum: ['all', 'contact_request', 'support_ticket', 'ticket_update', 'callback', 'bug_report', 'return_refund', 'warranty', 'personal_data_export', 'account_deletion', 'payment_proof'],
           description: 'Loai yeu cau ho tro muon loc. Mac dinh all.'
         },
         limit: {
@@ -2543,6 +3054,43 @@ const TOOL_REGISTRY = [
         }
       },
       required: []
+    }
+  },
+  {
+    name: 'cancelSupportTicket',
+    label: 'Huy yeu cau ho tro',
+    description: 'Huy/danh dau da huy mot yeu cau ho tro hoac ticket da tao qua chatbot khi khach doi y. Can ma ticket va chi thuc hien khi ticket thuoc tai khoan/phien chat hien tai hoac khach xac minh bang email/so dien thoai.',
+    group: 'support',
+    riskLevel: 'write',
+    requiresConfirmation: true,
+    confirmationMessage: 'Hanh dong nay se ghi nhan huy yeu cau ho tro/ticket da tao qua chatbot. Ban co chac muon huy ticket nay khong?',
+    defaultEnabled: true,
+    endpoint: 'supportService.cancelSupportTicket',
+    parameters: {
+      type: 'object',
+      properties: {
+        confirmed: {
+          type: 'boolean',
+          description: 'Phai la true sau khi khach da xac nhan ro rang muon huy yeu cau ho tro/ticket.'
+        },
+        ticketId: {
+          type: 'string',
+          description: 'Ma ticket can huy, vi du CR-20260428-101530-ABCD.'
+        },
+        reason: {
+          type: 'string',
+          description: 'Ly do huy neu khach cung cap.'
+        },
+        email: {
+          type: 'string',
+          description: 'Email lien he cua ticket neu can xac minh.'
+        },
+        phone: {
+          type: 'string',
+          description: 'So dien thoai/Zalo lien he cua ticket neu can xac minh.'
+        }
+      },
+      required: ['confirmed', 'ticketId']
     }
   },
   {
@@ -2885,7 +3433,7 @@ const TOOL_REGISTRY = [
   {
     name: 'getSupportTicketStatus',
     label: 'Tra trang thai support ticket',
-    description: 'Tra trang thai ticket ho tro da tao tu createSupportTicket, reportBugOrIssue, requestReturnOrRefund, requestPersonalDataExport hoac requestAccountDeletion theo ma ticket. Dung khi khach hoi ticket ho tro, bao loi, su co, doi tra, hoan tien, yeu cau xuat du lieu ca nhan hoac yeu cau xoa tai khoan dang o trang thai nao.',
+    description: 'Tra trang thai ticket ho tro da tao/cap nhat tu createSupportTicket, addSupportTicketMessage, updateSupportTicket, reportBugOrIssue, requestWarrantySupport, requestReturnOrRefund, requestPersonalDataExport, requestAccountDeletion hoac submitPaymentProof theo ma ticket. Dung khi khach hoi ticket ho tro, bao loi, su co, bao hanh, doi tra, hoan tien, chung tu thanh toan, yeu cau xuat du lieu ca nhan hoac yeu cau xoa tai khoan dang o trang thai nao.',
     group: 'support',
     riskLevel: 'safe',
     requiresConfirmation: false,
@@ -2908,6 +3456,66 @@ const TOOL_REGISTRY = [
         }
       },
       required: ['ticketId']
+    }
+  },
+  {
+    name: 'addSupportTicketMessage',
+    label: 'Bo sung thong tin ticket',
+    description: 'Bo sung noi dung, ghi chu, anh chup man hinh hoac tep/link dinh kem vao ticket ho tro da tao qua chatbot. Dung khi khach co ma ticket va muon gui them thong tin/anh cho nhan vien theo doi. Tool nay ghi them cap nhat vao ticket va gui cho support, nen can khach xac nhan ro rang.',
+    group: 'support',
+    riskLevel: 'write',
+    requiresConfirmation: true,
+    confirmationMessage: 'Hanh dong nay se bo sung thong tin/anh vao ticket ho tro da tao va gui cho nhan vien support. Ban co chac muon gui bo sung nay khong?',
+    defaultEnabled: true,
+    endpoint: 'contactService.addSupportTicketMessage',
+    parameters: {
+      type: 'object',
+      properties: {
+        confirmed: {
+          type: 'boolean',
+          description: 'Phai la true sau khi khach da xac nhan ro rang muon bo sung thong tin/anh vao ticket.'
+        },
+        ticketId: {
+          type: 'string',
+          description: 'Ma ticket da tao, vi du CR-20260428-101530-ABCD.'
+        },
+        message: {
+          type: 'string',
+          description: 'Noi dung/ghi chu bo sung khach muon gui cho support.'
+        },
+        details: {
+          type: 'string',
+          description: 'Alias cua message: chi tiet bo sung khach cung cap.'
+        },
+        note: {
+          type: 'string',
+          description: 'Ghi chu ngan bo sung vao ticket.'
+        },
+        imageUrls: {
+          type: 'array',
+          description: 'Danh sach URL anh chup man hinh/anh minh chung khach gui kem.',
+          items: { type: 'string' }
+        },
+        screenshotUrls: {
+          type: 'array',
+          description: 'Alias cua imageUrls cho anh chup man hinh.',
+          items: { type: 'string' }
+        },
+        attachmentUrls: {
+          type: 'array',
+          description: 'Danh sach URL tep/link dinh kem khac neu co.',
+          items: { type: 'string' }
+        },
+        email: {
+          type: 'string',
+          description: 'Email lien he cua ticket neu can xac minh quyen bo sung.'
+        },
+        phone: {
+          type: 'string',
+          description: 'So dien thoai/Zalo lien he cua ticket neu can xac minh quyen bo sung.'
+        }
+      },
+      required: ['confirmed', 'ticketId']
     }
   },
   {
@@ -3717,6 +4325,492 @@ function buildProductAvailabilityMessage(products = [], unresolved = []) {
   }
 
   return 'Co san pham het hang hoac khong du so luong yeu cau.'
+}
+
+function getBackInStockEmail(args = {}, context = {}) {
+  const contact = args.contact && typeof args.contact === 'object' ? args.contact : {}
+  return pickString(args.email, contact.email, context.customerInfo?.email)
+}
+
+function buildBackInStockProductPayload(product = {}) {
+  const stockQty = Math.max(0, Number(product.stock || 0))
+
+  return {
+    productId: product._id?.toString?.() || product.id || product.productId || null,
+    name: product.title || product.name || null,
+    slug: product.slug || null,
+    stockQty,
+    inStock: stockQty > 0,
+    url: product.slug ? `${CLIENT_URL}/products/${product.slug}` : null
+  }
+}
+
+function isUsableBackInStockProduct(product) {
+  return !!product
+    && product.deleted !== true
+    && (product.status === 'active' || product.status == null)
+    && (product._id || product.id || product.productId)
+}
+
+async function resolveBackInStockProduct(args = {}, context = {}) {
+  const productId = cleanString(args.productId || args.id)
+  const productQuery = cleanString(
+    args.productQuery
+    || args.productName
+    || args.query
+    || args.slug
+    || args.name
+  )
+
+  if (productId || productQuery) {
+    const product = await resolveProductForAvailabilityInput({ productId, productQuery })
+    return isUsableBackInStockProduct(product) ? product : null
+  }
+
+  const currentPageProduct = await resolveCurrentPageProduct(context)
+  return isUsableBackInStockProduct(currentPageProduct) ? currentPageProduct : null
+}
+
+function buildBackInStockToolError(error, fallbackMessage) {
+  return {
+    success: false,
+    message: error?.message || fallbackMessage,
+    requiresEmail: /email/i.test(error?.message || ''),
+    error: 'BACK_IN_STOCK_REQUEST_FAILED'
+  }
+}
+
+async function subscribeBackInStock(args = {}, context = {}) {
+  try {
+    const product = await resolveBackInStockProduct(args, context)
+    if (!product) {
+      return JSON.stringify({
+        success: false,
+        found: false,
+        requiresProduct: true,
+        message: 'Vui long cho minh biet san pham can dang ky bao khi co hang.'
+      })
+    }
+
+    const userId = normalizeUserId(context)
+    const result = await backInStockService.registerBackInStockNotification({
+      productId: product._id?.toString?.() || product.id || product.productId,
+      email: getBackInStockEmail(args, context),
+      user: isMongoObjectId(userId) ? { userId } : null,
+      lang: normalizePolicyLanguage(args.language, context)
+    })
+
+    return JSON.stringify({
+      ...result,
+      product: buildBackInStockProductPayload(product)
+    })
+  } catch (err) {
+    logger.error('[AI Tool] subscribeBackInStock error:', err.message)
+    return JSON.stringify(buildBackInStockToolError(err, 'Khong the dang ky bao khi co hang luc nay.'))
+  }
+}
+
+async function unsubscribeBackInStock(args = {}, context = {}) {
+  try {
+    const product = await resolveBackInStockProduct(args, context)
+    if (!product) {
+      return JSON.stringify({
+        success: false,
+        found: false,
+        requiresProduct: true,
+        message: 'Vui long cho minh biet san pham can huy dang ky bao khi co hang.'
+      })
+    }
+
+    const userId = normalizeUserId(context)
+    const result = await backInStockService.unregisterBackInStockNotification({
+      productId: product._id?.toString?.() || product.id || product.productId,
+      email: getBackInStockEmail(args, context),
+      user: isMongoObjectId(userId) ? { userId } : null,
+      lang: normalizePolicyLanguage(args.language, context)
+    })
+
+    return JSON.stringify({
+      ...result,
+      product: buildBackInStockProductPayload(product)
+    })
+  } catch (err) {
+    logger.error('[AI Tool] unsubscribeBackInStock error:', err.message)
+    return JSON.stringify(buildBackInStockToolError(err, 'Khong the huy dang ky bao khi co hang luc nay.'))
+  }
+}
+
+function normalizeProductAlternativesReason(reason) {
+  const normalized = cleanString(reason).toLowerCase().replace(/[-\s]+/g, '_')
+  const allowed = new Set(['out_of_stock', 'over_budget', 'insufficient_stock', 'general'])
+  return allowed.has(normalized) ? normalized : 'general'
+}
+
+function normalizeProductAlternativeBudget(args = {}) {
+  return normalizeSearchProductsNumber(
+    args.budget
+    ?? args.maxBudget
+    ?? args.maxPrice
+    ?? args.priceLimit
+  )
+}
+
+function normalizeProductAlternativesArgs(args = {}) {
+  return {
+    productId: cleanString(args.productId || args.id),
+    productQuery: cleanString(args.productQuery || args.query || args.slug || args.name || args.title),
+    category: cleanString(args.category || args.categorySlug || args.categoryId),
+    budget: normalizeProductAlternativeBudget(args),
+    quantity: normalizeQuantity(args.quantity, 1) || 1,
+    reason: normalizeProductAlternativesReason(args.reason),
+    limit: normalizeToolLimit(args.limit, 5, 10)
+  }
+}
+
+function getProductCategoryId(product = {}) {
+  const category = product?.productCategory
+  if (!category) return null
+  if (typeof category === 'object') return category._id || null
+  return category
+}
+
+function getProductCategoryTitle(product = {}) {
+  const category = product?.productCategory
+  return category && typeof category === 'object' ? category.title || null : null
+}
+
+function getProductAlternativeSourceStatus(product, { budget, quantity, reason } = {}) {
+  if (!product) {
+    return {
+      found: false,
+      requestedReason: reason,
+      inStock: null,
+      canFulfillRequestedQuantity: null,
+      overBudget: budget != null ? null : false
+    }
+  }
+
+  const stockQty = Math.max(0, Number(product.stock || 0))
+  const finalPrice = getProductFinalPrice(product)
+  const overBudget = budget != null && finalPrice > budget
+
+  return {
+    found: true,
+    requestedReason: reason,
+    stockQty,
+    requestedQuantity: quantity,
+    inStock: stockQty > 0,
+    canFulfillRequestedQuantity: stockQty >= quantity,
+    overBudget,
+    finalPriceValue: finalPrice,
+    finalPrice: formatPrice(finalPrice),
+    budget,
+    budgetFormatted: budget != null ? formatPrice(budget) : null
+  }
+}
+
+function buildProductAlternativeQuery({
+  categoryIds = [],
+  excludeIds = [],
+  keyword = '',
+  quantity = 1
+} = {}) {
+  const query = {
+    deleted: false,
+    status: 'active',
+    stock: { $gte: quantity }
+  }
+
+  const normalizedExcludeIds = excludeIds.filter(Boolean)
+  if (normalizedExcludeIds.length > 0) {
+    query._id = { $nin: normalizedExcludeIds }
+  }
+
+  if (categoryIds.length > 0) {
+    query.productCategory = { $in: categoryIds }
+  }
+
+  applySearchProductsKeywordFilter(query, keyword)
+  return query
+}
+
+async function fetchProductAlternativeCandidates({
+  categoryIds = [],
+  excludeIds = [],
+  keyword = '',
+  budget = null,
+  quantity = 1,
+  limit = 5,
+  strategy = 'popular'
+} = {}) {
+  const query = buildProductAlternativeQuery({
+    categoryIds,
+    excludeIds,
+    keyword,
+    quantity
+  })
+  const pipeline = [
+    { $match: query },
+    { $addFields: { finalPriceValue: buildSearchProductsFinalPriceExpression() } },
+    ...(budget != null ? [{ $match: { finalPriceValue: { $lte: budget } } }] : []),
+    {
+      $sort: {
+        recommendScore: -1,
+        soldQuantity: -1,
+        rate: -1,
+        finalPriceValue: 1,
+        _id: 1
+      }
+    },
+    { $limit: limit },
+    {
+      $lookup: {
+        from: 'product_categories',
+        localField: 'productCategory',
+        foreignField: '_id',
+        as: 'productCategory'
+      }
+    },
+    {
+      $unwind: {
+        path: '$productCategory',
+        preserveNullAndEmptyArrays: true
+      }
+    },
+    {
+      $project: {
+        title: 1,
+        price: 1,
+        discountPercentage: 1,
+        stock: 1,
+        thumbnail: 1,
+        slug: 1,
+        rate: 1,
+        soldQuantity: 1,
+        recommendScore: 1,
+        productCategory: {
+          _id: '$productCategory._id',
+          title: '$productCategory.title',
+          slug: '$productCategory.slug'
+        },
+        finalPriceValue: 1
+      }
+    }
+  ]
+
+  const products = await productRepository.aggregate(pipeline)
+  return products.map(product => ({ ...product, alternativeStrategy: strategy }))
+}
+
+function buildProductAlternativeStrategies({
+  sourceProduct,
+  explicitCategoryIds = [],
+  budget,
+  productQuery
+} = {}) {
+  const sourceCategoryId = getProductCategoryId(sourceProduct)
+  const sourceCategoryIds = sourceCategoryId ? [sourceCategoryId] : []
+  const preferredCategoryIds = explicitCategoryIds.length > 0 ? explicitCategoryIds : sourceCategoryIds
+  const sourceKeyword = sourceProduct?.title || productQuery
+  const strategies = []
+
+  if (preferredCategoryIds.length > 0) {
+    strategies.push({
+      strategy: budget != null ? 'same_category_within_budget' : 'same_category',
+      categoryIds: preferredCategoryIds,
+      budget
+    })
+  }
+
+  if (sourceKeyword) {
+    strategies.push({
+      strategy: budget != null ? 'similar_keyword_within_budget' : 'similar_keyword',
+      keyword: sourceKeyword,
+      budget
+    })
+  }
+
+  if (budget != null) {
+    strategies.push({
+      strategy: 'within_budget',
+      budget
+    })
+  }
+
+  if (preferredCategoryIds.length > 0 && budget != null) {
+    strategies.push({
+      strategy: 'same_category_any_price',
+      categoryIds: preferredCategoryIds,
+      budget: null
+    })
+  }
+
+  strategies.push({
+    strategy: 'popular_in_stock',
+    budget: null
+  })
+
+  return strategies
+}
+
+async function collectProductAlternatives({
+  sourceProduct,
+  explicitCategoryIds = [],
+  productQuery,
+  budget,
+  quantity,
+  limit
+} = {}) {
+  const alternatives = []
+  const seenIds = new Set()
+  const sourceId = sourceProduct?._id || null
+  const excludeIds = sourceId ? [sourceId] : []
+  const strategies = buildProductAlternativeStrategies({
+    sourceProduct,
+    explicitCategoryIds,
+    budget,
+    productQuery
+  })
+
+  for (const strategy of strategies) {
+    if (alternatives.length >= limit) break
+
+    const products = await fetchProductAlternativeCandidates({
+      ...strategy,
+      excludeIds: [...excludeIds, ...alternatives.map(product => product._id)],
+      quantity,
+      limit: limit - alternatives.length
+    })
+
+    for (const product of products) {
+      const productId = product._id?.toString()
+      if (!productId || seenIds.has(productId)) continue
+      seenIds.add(productId)
+      alternatives.push(product)
+      if (alternatives.length >= limit) break
+    }
+  }
+
+  return alternatives
+}
+
+function getProductAlternativeMatchReasons(product = {}, {
+  sourceProduct,
+  budget,
+  quantity
+} = {}) {
+  const reasons = []
+  const finalPrice = getProductFinalPrice(product)
+  const sourceFinalPrice = sourceProduct ? getProductFinalPrice(sourceProduct) : null
+  const productCategoryId = getProductCategoryId(product)?.toString?.()
+  const sourceCategoryId = getProductCategoryId(sourceProduct)?.toString?.()
+
+  if (Number(product.stock || 0) >= quantity) reasons.push('enough_stock')
+  if (budget != null && finalPrice <= budget) reasons.push('within_budget')
+  if (sourceFinalPrice != null && finalPrice < sourceFinalPrice) reasons.push('cheaper_than_source')
+  if (productCategoryId && sourceCategoryId && productCategoryId === sourceCategoryId) {
+    reasons.push('same_category')
+  }
+  if (product.alternativeStrategy) reasons.push(product.alternativeStrategy)
+
+  return [...new Set(reasons)]
+}
+
+function buildProductAlternativePayload(product = {}, context = {}) {
+  const finalPrice = getProductFinalPrice(product)
+  const sourceFinalPrice = context.sourceProduct ? getProductFinalPrice(context.sourceProduct) : null
+  const priceDeltaFromSource = sourceFinalPrice != null ? finalPrice - sourceFinalPrice : null
+
+  return {
+    ...buildCatalogProductPayload(product),
+    category: getProductCategoryTitle(product),
+    originalPriceValue: Number(product.price || 0),
+    finalPriceValue: finalPrice,
+    stockSufficient: Number(product.stock || 0) >= context.quantity,
+    priceDeltaFromSource,
+    priceDeltaFromSourceFormatted: priceDeltaFromSource != null ? formatPrice(priceDeltaFromSource) : null,
+    matchReasons: getProductAlternativeMatchReasons(product, context)
+  }
+}
+
+function buildProductAlternativesMessage({ sourceProduct, alternatives, budget, quantity } = {}) {
+  if (alternatives.length === 0) {
+    return sourceProduct
+      ? 'Chua tim thay san pham thay the con du hang phu hop. Co the noi ngan sach hoac mo rong danh muc de minh tim tiep.'
+      : 'Chua tim thay san pham thay the phu hop. Hay cho minh biet san pham, danh muc hoac ngan sach cu the hon.'
+  }
+
+  const status = getProductAlternativeSourceStatus(sourceProduct, { budget, quantity })
+  if (!sourceProduct) return 'Da tim thay mot so san pham thay the phu hop voi dieu kien hien tai.'
+  if (status.overBudget && !status.canFulfillRequestedQuantity) {
+    return 'San pham goc vuot ngan sach hoac khong du hang; day la cac lua chon thay the phu hop hon.'
+  }
+  if (status.overBudget) return 'San pham goc vuot ngan sach; day la cac lua chon thay the uu tien trong ngan sach.'
+  if (!status.canFulfillRequestedQuantity) return 'San pham goc het hang hoac khong du so luong; day la cac lua chon thay the con hang.'
+  return 'Da tim thay mot so san pham thay the de khach so sanh them.'
+}
+
+async function getProductAlternatives(args = {}) {
+  try {
+    const params = normalizeProductAlternativesArgs(args)
+    let sourceProduct = null
+
+    if (params.productId || params.productQuery) {
+      sourceProduct = await resolveProductForAvailabilityInput({
+        productId: params.productId,
+        productQuery: params.productQuery
+      })
+    }
+
+    const explicitCategoryFilter = await resolveSearchProductCategoryFilter(params.category)
+    const alternatives = await collectProductAlternatives({
+      sourceProduct,
+      explicitCategoryIds: explicitCategoryFilter.categoryIds,
+      productQuery: params.productQuery,
+      budget: params.budget,
+      quantity: params.quantity,
+      limit: params.limit
+    })
+    const sourceStatus = getProductAlternativeSourceStatus(sourceProduct, params)
+    const products = alternatives.map(product => buildProductAlternativePayload(product, {
+      sourceProduct,
+      budget: params.budget,
+      quantity: params.quantity
+    }))
+
+    return JSON.stringify({
+      found: products.length > 0,
+      count: products.length,
+      reason: params.reason,
+      budget: params.budget,
+      budgetFormatted: params.budget != null ? formatPrice(params.budget) : null,
+      requestedQuantity: params.quantity,
+      sourceProduct: sourceProduct
+        ? {
+            ...buildCatalogProductPayload(sourceProduct),
+            category: getProductCategoryTitle(sourceProduct),
+            finalPriceValue: getProductFinalPrice(sourceProduct),
+            status: sourceStatus
+          }
+        : null,
+      sourceFound: Boolean(sourceProduct),
+      matchedCategories: explicitCategoryFilter.matchedCategories,
+      products,
+      message: buildProductAlternativesMessage({
+        sourceProduct,
+        alternatives: products,
+        budget: params.budget,
+        quantity: params.quantity
+      })
+    })
+  } catch (err) {
+    logger.error('[AI Tool] getProductAlternatives error:', err.message)
+    return JSON.stringify({
+      found: false,
+      message: 'Khong the lay san pham thay the luc nay.',
+      error: 'Loi khi goi y san pham thay the.'
+    })
+  }
 }
 
 async function compareProducts(args = {}) {
@@ -5154,6 +6248,78 @@ async function getNotificationPreferences(args = {}, context = {}) {
   } catch (err) {
     logger.error('[AI Tool] getNotificationPreferences error:', err.message)
     return JSON.stringify({ found: false, error: 'Loi khi lay tuy chon thong bao.' })
+  }
+}
+
+async function listNotifications(args = {}, context = {}) {
+  try {
+    const userId = normalizeUserId(context)
+    if (!isMongoObjectId(userId)) {
+      return JSON.stringify({
+        found: false,
+        requiresLogin: true,
+        message: 'Khach can dang nhap de xem thong bao.'
+      })
+    }
+
+    const result = await notificationsService.listNotifications(userId, {
+      status: args.status,
+      category: args.category,
+      limit: args.limit,
+      unreadOnly: args.unreadOnly
+    })
+
+    return JSON.stringify({
+      ...result,
+      message: result.found
+        ? `Da lay ${result.count} thong bao.`
+        : 'Chua co thong bao phu hop.'
+    })
+  } catch (err) {
+    logger.error('[AI Tool] listNotifications error:', err.message)
+    return JSON.stringify({
+      found: false,
+      message: err.message || 'Khong the lay danh sach thong bao.',
+      error: 'Loi khi lay thong bao.'
+    })
+  }
+}
+
+async function markNotificationRead(args = {}, context = {}) {
+  try {
+    const userId = normalizeUserId(context)
+    if (!isMongoObjectId(userId)) {
+      return JSON.stringify({
+        success: false,
+        requiresLogin: true,
+        message: 'Khach can dang nhap de danh dau thong bao da doc.'
+      })
+    }
+
+    const result = await notificationsService.markNotificationRead(userId, {
+      notificationId: args.notificationId || args.id,
+      notificationIds: args.notificationIds || args.ids,
+      all: args.all === true || args.markAll === true
+    })
+    const unreadResult = await notificationsService.listNotifications(userId, {
+      status: 'unread',
+      limit: 1
+    })
+
+    return JSON.stringify({
+      ...result,
+      unreadCount: unreadResult.unreadCount,
+      message: result.all
+        ? `Da danh dau ${result.modifiedCount} thong bao la da doc.`
+        : 'Da danh dau thong bao la da doc.'
+    })
+  } catch (err) {
+    logger.error('[AI Tool] markNotificationRead error:', err.message)
+    return JSON.stringify({
+      success: false,
+      message: err.message || 'Khong the danh dau thong bao da doc.',
+      error: 'Loi khi danh dau thong bao da doc.'
+    })
   }
 }
 
@@ -10079,6 +11245,273 @@ async function getOrderInvoice({ orderId, orderCode } = {}, context = {}) {
   }
 }
 
+async function resolveOwnedOrderForEmailResend({ userId, orderId, orderCode } = {}) {
+  const hasLookup = !!cleanString(orderId || orderCode)
+
+  if (hasLookup) {
+    const resolved = await resolveOwnOrderId(userId, { orderId, orderCode })
+    if (resolved.error) return { error: { success: false, ...resolved.error } }
+
+    const order = await orderRepository.findOne({
+      _id: resolved.orderId,
+      userId,
+      isDeleted: false
+    })
+
+    if (!order) {
+      return {
+        error: {
+          success: false,
+          found: false,
+          message: 'Khong tim thay don hang trong tai khoan dang chat.'
+        }
+      }
+    }
+
+    return { order }
+  }
+
+  const result = await ordersService.getMyOrders(userId)
+  const orders = Array.isArray(result?.orders) ? result.orders : []
+
+  if (orders.length === 0) {
+    return {
+      error: {
+        success: false,
+        found: false,
+        message: 'Khong tim thay don hang nao trong tai khoan dang chat.'
+      }
+    }
+  }
+
+  if (orders.length > 1) {
+    return {
+      error: {
+        success: false,
+        requiresOrderSelection: true,
+        message: 'Tim thay nhieu don hang. Vui long chon ma don can gui lai email.',
+        orders: orders.slice(0, 5).map(order => buildOrderSummaryPayload(order))
+      }
+    }
+  }
+
+  const onlyOrderId = serializeId(orders[0]?._id || orders[0]?.id)
+  const order = onlyOrderId
+    ? await orderRepository.findOne({ _id: onlyOrderId, userId, isDeleted: false })
+    : null
+
+  if (!order) {
+    return {
+      error: {
+        success: false,
+        found: false,
+        message: 'Khong tim thay don hang trong tai khoan dang chat.'
+      }
+    }
+  }
+
+  return { order }
+}
+
+async function resolveOrderResendRecipient(order = {}, userId) {
+  const source = getOrderObject(order)
+  const orderEmail = normalizePasswordResetEmail(source.contact?.email)
+  if (orderEmail) {
+    return {
+      email: orderEmail,
+      maskedEmail: maskEmail(orderEmail),
+      source: 'order_contact'
+    }
+  }
+
+  const user = isMongoObjectId(userId)
+    ? await userRepository.findEmailById(userId)
+    : null
+  const accountEmail = normalizePasswordResetEmail(user?.email)
+
+  if (accountEmail) {
+    return {
+      email: accountEmail,
+      maskedEmail: maskEmail(accountEmail),
+      source: 'account'
+    }
+  }
+
+  return null
+}
+
+function getDigitalDeliverySummary(order = {}) {
+  const source = getOrderObject(order)
+  const items = Array.isArray(source.orderItems) ? source.orderItems : []
+  const deliveredItems = []
+  let deliveryCount = 0
+
+  for (const item of items) {
+    const deliveries = Array.isArray(item.digitalDeliveries)
+      ? item.digitalDeliveries.filter(delivery => {
+          const data = getOrderObject(delivery)
+          return ['username', 'password', 'email', 'licenseKey', 'loginUrl', 'notes', 'instructions']
+            .some(field => cleanString(data[field]))
+        })
+      : []
+
+    if (!deliveries.length) continue
+
+    deliveryCount += deliveries.length
+    deliveredItems.push({
+      productId: serializeId(item.productId),
+      name: item.name || 'San pham',
+      deliveryCount: deliveries.length
+    })
+  }
+
+  return {
+    hasDigitalDelivery: deliveryCount > 0,
+    deliveryCount,
+    deliveredItems
+  }
+}
+
+function buildEmailResendOrderPayload(order = {}) {
+  const source = getOrderObject(order)
+  const payload = buildOrderPayload(source)
+  return {
+    ...payload,
+    statusLabel: ORDER_STATUS_LABELS[source.status] || source.status,
+    paymentStatusLabel: PAYMENT_STATUS_LABELS[source.paymentStatus] || source.paymentStatus,
+    hasDigitalDelivery: !!source.hasDigitalDelivery || getDigitalDeliverySummary(source).hasDigitalDelivery
+  }
+}
+
+async function resendOrderConfirmation({ orderId, orderCode } = {}, context = {}) {
+  try {
+    const userId = normalizeUserId(context)
+    if (!isMongoObjectId(userId)) {
+      return JSON.stringify({
+        success: false,
+        requiresLogin: true,
+        message: 'Khach can dang nhap de gui lai email xac nhan don hang.'
+      })
+    }
+
+    const { order, error } = await resolveOwnedOrderForEmailResend({ userId, orderId, orderCode })
+    if (error) return JSON.stringify(error)
+
+    const recipient = await resolveOrderResendRecipient(order, userId)
+    if (!recipient?.email) {
+      return JSON.stringify({
+        success: false,
+        emailSent: false,
+        order: buildEmailResendOrderPayload(order),
+        message: 'Don hang nay chua co email lien he hop le de gui lai xac nhan. Vui long cap nhat email hoac lien he nhan vien ho tro.'
+      })
+    }
+
+    const { subject, html } = orderConfirmedTemplate(order)
+    const emailSent = await sendMail({ to: recipient.email, subject, html })
+
+    return JSON.stringify({
+      success: emailSent,
+      emailSent,
+      emailType: 'order_confirmation',
+      recipient: {
+        maskedEmail: recipient.maskedEmail,
+        source: recipient.source
+      },
+      order: buildEmailResendOrderPayload(order),
+      message: emailSent
+        ? `Minh da gui lai email xac nhan don hang ${formatOrderCode(order)} den ${recipient.maskedEmail}.`
+        : 'Minh chua gui duoc email xac nhan luc nay. Ban vui long thu lai sau hoac yeu cau gap nhan vien ho tro.'
+    })
+  } catch (err) {
+    logger.error('[AI Tool] resendOrderConfirmation error:', err.message)
+    return JSON.stringify({
+      success: false,
+      emailSent: false,
+      message: 'Minh chua gui duoc email xac nhan luc nay. Ban vui long thu lai sau hoac yeu cau gap nhan vien ho tro.',
+      error: 'ORDER_CONFIRMATION_RESEND_FAILED'
+    })
+  }
+}
+
+async function resendDigitalDelivery({ orderId, orderCode } = {}, context = {}) {
+  try {
+    const userId = normalizeUserId(context)
+    if (!isMongoObjectId(userId)) {
+      return JSON.stringify({
+        success: false,
+        requiresLogin: true,
+        message: 'Khach can dang nhap de gui lai thong tin ban giao so.'
+      })
+    }
+
+    const { order, error } = await resolveOwnedOrderForEmailResend({ userId, orderId, orderCode })
+    if (error) return JSON.stringify(error)
+
+    const deliverySummary = getDigitalDeliverySummary(order)
+    if (order.paymentStatus !== 'paid') {
+      return JSON.stringify({
+        success: false,
+        emailSent: false,
+        requiresPaidOrder: true,
+        order: buildEmailResendOrderPayload(order),
+        digitalDelivery: deliverySummary,
+        message: `Don ${formatOrderCode(order)} chua duoc ghi nhan thanh toan nen khong the gui thong tin ban giao so.`
+      })
+    }
+
+    if (!deliverySummary.hasDigitalDelivery) {
+      return JSON.stringify({
+        success: false,
+        emailSent: false,
+        noDigitalDelivery: true,
+        order: buildEmailResendOrderPayload(order),
+        digitalDelivery: deliverySummary,
+        message: `Don ${formatOrderCode(order)} chua co thong tin ban giao so san sang de gui lai.`
+      })
+    }
+
+    const recipient = await resolveOrderResendRecipient(order, userId)
+    if (!recipient?.email) {
+      return JSON.stringify({
+        success: false,
+        emailSent: false,
+        order: buildEmailResendOrderPayload(order),
+        digitalDelivery: deliverySummary,
+        message: 'Don hang nay chua co email lien he hop le de gui thong tin ban giao so. Vui long cap nhat email hoac lien he nhan vien ho tro.'
+      })
+    }
+
+    const { subject, html } = digitalDeliveryTemplate(order)
+    const emailSent = await sendMail({ to: recipient.email, subject, html })
+
+    return JSON.stringify({
+      success: emailSent,
+      emailSent,
+      emailType: 'digital_delivery',
+      recipient: {
+        maskedEmail: recipient.maskedEmail,
+        source: recipient.source
+      },
+      order: buildEmailResendOrderPayload(order),
+      digitalDelivery: deliverySummary,
+      credentialsReturnedInChat: false,
+      message: emailSent
+        ? `Minh da gui lai thong tin ban giao so cua don ${formatOrderCode(order)} den ${recipient.maskedEmail}. Vi bao mat, minh khong hien thi tai khoan, mat khau hay license trong chat.`
+        : 'Minh chua gui duoc thong tin ban giao so luc nay. Ban vui long thu lai sau hoac yeu cau gap nhan vien ho tro.'
+    })
+  } catch (err) {
+    logger.error('[AI Tool] resendDigitalDelivery error:', err.message)
+    return JSON.stringify({
+      success: false,
+      emailSent: false,
+      credentialsReturnedInChat: false,
+      message: 'Minh chua gui duoc thong tin ban giao so luc nay. Ban vui long thu lai sau hoac yeu cau gap nhan vien ho tro.',
+      error: 'DIGITAL_DELIVERY_RESEND_FAILED'
+    })
+  }
+}
+
 function buildReorderItemsFromOrder(order = {}) {
   const source = getOrderObject(order)
   const items = Array.isArray(source.orderItems) ? source.orderItems : []
@@ -10725,6 +12158,315 @@ async function updatePendingOrderItems(args = {}, context = {}) {
       success: false,
       message: err.message || 'Khong the cap nhat san pham/so luong trong don pending.',
       error: 'Loi khi cap nhat san pham don pending.'
+    })
+  }
+}
+
+async function updatePendingOrderPaymentMethod(args = {}, context = {}) {
+  try {
+    const userId = normalizeUserId(context)
+    if (!isMongoObjectId(userId)) {
+      return JSON.stringify({
+        success: false,
+        requiresLogin: true,
+        message: 'Khach can dang nhap de doi cong thanh toan cua don pending.'
+      })
+    }
+
+    const selectedPaymentMethod = normalizePaymentToolMethod(args.paymentMethod)
+    if (!selectedPaymentMethod) {
+      return JSON.stringify({
+        success: false,
+        message: 'Phuong thuc thanh toan moi khong hop le. Chi ho tro VNPay, MoMo, ZaloPay hoac Sepay.'
+      })
+    }
+
+    const { order, error } = await resolveOwnedOrderForPayment({
+      userId,
+      orderId: args.orderId,
+      orderCode: args.orderCode
+    })
+    if (error) return JSON.stringify(error)
+
+    const paymentCheckError = await ensureOrderCanResumePayment(order)
+    if (paymentCheckError) return JSON.stringify(paymentCheckError)
+
+    const result = await ordersService.updatePendingOrderPaymentMethod(
+      userId,
+      order._id.toString(),
+      selectedPaymentMethod
+    )
+    const updatedOrder = result.order
+    const paymentReference = getOrderPaymentReference(updatedOrder)
+    const payment = await createOnlinePaymentRequest(
+      selectedPaymentMethod,
+      updatedOrder._id.toString(),
+      userId,
+      paymentReference
+    )
+
+    if (selectedPaymentMethod === 'sepay') {
+      payment.bankInfo = await getActiveBankInfoPayload({ order: updatedOrder, paymentReference })
+    }
+
+    return JSON.stringify({
+      success: true,
+      requiresPayment: true,
+      paymentMethodChanged: result.paymentMethodChanged,
+      previousPaymentMethod: result.previousPaymentMethod,
+      paymentMethod: selectedPaymentMethod,
+      message: selectedPaymentMethod === 'sepay'
+        ? 'Da doi cong thanh toan sang Sepay. Vui long chuyen khoan dung so tien va noi dung thanh toan moi.'
+        : 'Da doi cong thanh toan va tao link thanh toan moi. Vui long dung link moi de hoan tat don.',
+      order: buildPendingPaymentOrderPreview(updatedOrder),
+      payment
+    })
+  } catch (err) {
+    logger.error('[AI Tool] updatePendingOrderPaymentMethod error:', err.message)
+    return JSON.stringify({
+      success: false,
+      message: err.message || 'Khong the doi cong thanh toan cua don pending.',
+      error: 'Loi khi doi cong thanh toan don pending.'
+    })
+  }
+}
+
+function formatPendingOrderChangePrevious(previous = {}) {
+  return {
+    ...previous,
+    subtotalFormatted: formatPrice(previous?.subtotal),
+    discountFormatted: formatPrice(previous?.discount),
+    shippingFormatted: formatPrice(previous?.shipping),
+    totalFormatted: formatPrice(previous?.total)
+  }
+}
+
+async function buildPendingOrderPaymentRefresh(order, userId) {
+  const paymentReference = getOrderPaymentReference(order)
+  const payment = await createOnlinePaymentRequest(
+    order.paymentMethod,
+    order._id.toString(),
+    userId,
+    paymentReference
+  )
+
+  if (order.paymentMethod === 'sepay') {
+    payment.bankInfo = await getActiveBankInfoPayload({ order, paymentReference })
+  }
+
+  return payment
+}
+
+function normalizePendingOrderDeliveryMethod(value) {
+  const normalized = normalizeIntentText(value)
+  if (!normalized) return null
+  if (['pickup', 'nhan', 'nhan hang', 'tu nhan', 'truc tiep', 'ban giao truc tiep'].includes(normalized)) return 'pickup'
+  if (['contact', 'giao', 'giao hang', 'delivery', 'ship', 'shipping', 'lien he', 'thoa thuan'].includes(normalized)) return 'contact'
+  return PLACE_ORDER_DELIVERY_METHODS.includes(normalized) ? normalized : null
+}
+
+function getDeliveryMethodLabel(deliveryMethod) {
+  if (deliveryMethod === 'pickup') return 'Nhan hang/ban giao truc tiep'
+  if (deliveryMethod === 'contact') return 'Lien he de thoa thuan giao/ban giao'
+  return deliveryMethod || null
+}
+
+function formatPendingOrderDeliveryPrevious(previous = {}) {
+  return {
+    deliveryMethod: previous.deliveryMethod || null,
+    deliveryMethodLabel: getDeliveryMethodLabel(previous.deliveryMethod),
+    shipping: previous.shipping,
+    shippingFormatted: formatPrice(previous.shipping),
+    total: previous.total,
+    totalFormatted: formatPrice(previous.total)
+  }
+}
+
+async function updatePendingOrderDeliveryMethod(args = {}, context = {}) {
+  try {
+    const userId = normalizeUserId(context)
+    if (!isMongoObjectId(userId)) {
+      return JSON.stringify({
+        success: false,
+        requiresLogin: true,
+        message: 'Khach can dang nhap de doi phuong thuc nhan/giao cua don pending.'
+      })
+    }
+
+    const deliveryMethod = normalizePendingOrderDeliveryMethod(args.deliveryMethod || args.method)
+    if (!deliveryMethod) {
+      return JSON.stringify({
+        success: false,
+        message: 'Phuong thuc nhan/giao khong hop le. Chi ho tro pickup hoac contact.'
+      })
+    }
+
+    const { order, error } = await resolveOwnedOrderForPayment({
+      userId,
+      orderId: args.orderId,
+      orderCode: args.orderCode
+    })
+    if (error) return JSON.stringify(error)
+
+    const paymentCheckError = await ensureOrderCanResumePayment(order)
+    if (paymentCheckError) return JSON.stringify(paymentCheckError)
+
+    const result = await ordersService.updatePendingOrderDeliveryMethod(userId, order._id.toString(), {
+      deliveryMethod,
+      shipping: args.shipping
+    })
+    const updatedOrder = result.order
+    const payment = await buildPendingOrderPaymentRefresh(updatedOrder, userId)
+
+    return JSON.stringify({
+      success: true,
+      deliveryMethodChanged: result.previous?.deliveryMethod !== updatedOrder.deliveryMethod,
+      requiresPayment: true,
+      paymentRefreshed: true,
+      deliveryMethod: updatedOrder.deliveryMethod,
+      deliveryMethodLabel: getDeliveryMethodLabel(updatedOrder.deliveryMethod),
+      shippingRecalculated: true,
+      shipping: updatedOrder.shipping,
+      shippingFormatted: formatPrice(updatedOrder.shipping),
+      message: payment.paymentUrl
+        ? 'Da doi phuong thuc nhan/giao va tinh lai phi cho don pending. Vui long dung link thanh toan moi de hoan tat don.'
+        : 'Da doi phuong thuc nhan/giao va tinh lai phi cho don pending. Vui long chuyen khoan dung so tien va noi dung thanh toan moi.',
+      order: buildOrderDetailPayload(updatedOrder),
+      previous: formatPendingOrderDeliveryPrevious(result.previous),
+      payment
+    })
+  } catch (err) {
+    logger.error('[AI Tool] updatePendingOrderDeliveryMethod error:', err.message)
+    return JSON.stringify({
+      success: false,
+      message: err.message || 'Khong the doi phuong thuc nhan/giao cua don pending.',
+      error: 'Loi khi doi phuong thuc nhan/giao don pending.'
+    })
+  }
+}
+
+async function applyPromoCodeToPendingOrder(args = {}, context = {}) {
+  try {
+    const userId = normalizeUserId(context)
+    if (!isMongoObjectId(userId)) {
+      return JSON.stringify({
+        success: false,
+        requiresLogin: true,
+        message: 'Khach can dang nhap de ap ma giam gia vao don pending.'
+      })
+    }
+
+    const code = cleanString(args.code || args.promoCode).toUpperCase()
+    if (!code) {
+      return JSON.stringify({
+        success: false,
+        message: 'Vui long cung cap ma giam gia can ap vao don pending.'
+      })
+    }
+
+    const { order, error } = await resolveOwnedOrderForPayment({
+      userId,
+      orderId: args.orderId,
+      orderCode: args.orderCode
+    })
+    if (error) return JSON.stringify(error)
+
+    const paymentCheckError = await ensureOrderCanResumePayment(order)
+    if (paymentCheckError) return JSON.stringify(paymentCheckError)
+
+    const result = await ordersService.applyPromoCodeToPendingOrder(userId, order._id.toString(), code)
+    const updatedOrder = result.order
+    const payment = await buildPendingOrderPaymentRefresh(updatedOrder, userId)
+
+    return JSON.stringify({
+      success: true,
+      promoApplied: true,
+      requiresPayment: true,
+      paymentRefreshed: true,
+      message: payment.paymentUrl
+        ? `Da ap ma giam gia ${updatedOrder.promo}. Vui long dung link thanh toan moi de hoan tat don.`
+        : `Da ap ma giam gia ${updatedOrder.promo}. Vui long chuyen khoan dung so tien va noi dung thanh toan moi.`,
+      promo: result.promo ? buildPromoPayload(toPlainObject(result.promo), { subtotal: updatedOrder.subtotal }) : null,
+      order: buildOrderDetailPayload(updatedOrder),
+      previous: formatPendingOrderChangePrevious(result.previous),
+      payment
+    })
+  } catch (err) {
+    logger.error('[AI Tool] applyPromoCodeToPendingOrder error:', err.message)
+    return JSON.stringify({
+      success: false,
+      message: err.message || 'Khong the ap ma giam gia vao don pending.',
+      error: 'Loi khi ap ma giam gia don pending.'
+    })
+  }
+}
+
+async function removePromoCodeFromPendingOrder(args = {}, context = {}) {
+  try {
+    const userId = normalizeUserId(context)
+    if (!isMongoObjectId(userId)) {
+      return JSON.stringify({
+        success: false,
+        requiresLogin: true,
+        message: 'Khach can dang nhap de go ma giam gia khoi don pending.'
+      })
+    }
+
+    const { order, error } = await resolveOwnedOrderForPayment({
+      userId,
+      orderId: args.orderId,
+      orderCode: args.orderCode
+    })
+    if (error) return JSON.stringify(error)
+
+    const paymentCheckError = await ensureOrderCanResumePayment(order)
+    if (paymentCheckError) return JSON.stringify(paymentCheckError)
+
+    const requestedCode = cleanString(args.code || args.promoCode).toUpperCase()
+    const currentCode = cleanString(order.promo).toUpperCase()
+
+    if (!currentCode) {
+      return JSON.stringify({
+        success: true,
+        promoRemoved: false,
+        paymentRefreshed: false,
+        message: 'Don pending nay chua ap ma giam gia nao.',
+        order: buildOrderDetailPayload(order)
+      })
+    }
+
+    if (requestedCode && requestedCode !== currentCode) {
+      return JSON.stringify({
+        success: false,
+        promoRemoved: false,
+        message: `Don pending dang ap ma ${currentCode}, khong phai ${requestedCode}. Vui long xac nhan lai ma can go.`,
+        order: buildOrderDetailPayload(order)
+      })
+    }
+
+    const result = await ordersService.removePromoCodeFromPendingOrder(userId, order._id.toString())
+    const updatedOrder = result.order
+    const payment = await buildPendingOrderPaymentRefresh(updatedOrder, userId)
+
+    return JSON.stringify({
+      success: true,
+      promoRemoved: true,
+      removedPromoCode: result.removedPromoCode || currentCode,
+      requiresPayment: true,
+      paymentRefreshed: true,
+      message: payment.paymentUrl
+        ? `Da go ma giam gia ${result.removedPromoCode || currentCode}. Vui long dung link thanh toan moi de hoan tat don.`
+        : `Da go ma giam gia ${result.removedPromoCode || currentCode}. Vui long chuyen khoan dung so tien va noi dung thanh toan moi.`,
+      order: buildOrderDetailPayload(updatedOrder),
+      previous: formatPendingOrderChangePrevious(result.previous),
+      payment
+    })
+  } catch (err) {
+    logger.error('[AI Tool] removePromoCodeFromPendingOrder error:', err.message)
+    return JSON.stringify({
+      success: false,
+      message: err.message || 'Khong the go ma giam gia khoi don pending.',
+      error: 'Loi khi go ma giam gia don pending.'
     })
   }
 }
@@ -11898,11 +13640,20 @@ async function createSupportTicket(args = {}, context = {}) {
   }
 }
 
-const SUPPORT_TICKET_SOURCE_TOOLS = ['createSupportTicket', 'reportBugOrIssue', 'requestWarrantySupport', 'requestReturnOrRefund', 'requestPersonalDataExport', 'requestAccountDeletion']
+const SUPPORT_TICKET_SOURCE_TOOLS = ['createSupportTicket', 'reportBugOrIssue', 'requestWarrantySupport', 'requestReturnOrRefund', 'requestPersonalDataExport', 'requestAccountDeletion', 'submitPaymentProof']
+const SUPPORT_TICKET_UPDATE_TOOLS = ['addSupportTicketMessage', 'updateSupportTicket']
 const SUPPORT_TICKET_SOURCE_META = {
   createSupportTicket: {
     type: 'support_ticket',
     label: 'Ticket ho tro'
+  },
+  addSupportTicketMessage: {
+    type: 'ticket_update',
+    label: 'Cap nhat ticket'
+  },
+  updateSupportTicket: {
+    type: 'ticket_update',
+    label: 'Cap nhat ticket'
   },
   reportBugOrIssue: {
     type: 'bug_report',
@@ -11923,23 +13674,34 @@ const SUPPORT_TICKET_SOURCE_META = {
   requestAccountDeletion: {
     type: 'account_deletion_request',
     label: 'Yeu cau xoa tai khoan'
+  },
+  submitPaymentProof: {
+    type: 'payment_proof',
+    label: 'Chung tu thanh toan'
   }
 }
 const SUPPORT_TICKET_STATUS_LABELS = {
   submitted: 'Da tiep nhan',
   pending_support_review: 'Dang cho nhan vien ho tro kiem tra',
+  cancelled: 'Da huy theo yeu cau khach',
+  canceled: 'Da huy theo yeu cau khach',
   error: 'Khong tao thanh cong'
 }
 const SUPPORT_REQUEST_SOURCE_TOOLS = [
   'submitContactRequest',
   'createSupportTicket',
+  'addSupportTicketMessage',
+  'updateSupportTicket',
   'scheduleCallback',
   'reportBugOrIssue',
   'requestWarrantySupport',
   'requestReturnOrRefund',
   'requestPersonalDataExport',
-  'requestAccountDeletion'
+  'requestAccountDeletion',
+  'submitPaymentProof'
 ]
+const SUPPORT_TICKET_LOOKUP_SOURCE_TOOLS = SUPPORT_REQUEST_SOURCE_TOOLS
+  .filter(toolName => !SUPPORT_TICKET_UPDATE_TOOLS.includes(toolName))
 const SUPPORT_REQUEST_SOURCE_META = {
   submitContactRequest: {
     type: 'contact_request',
@@ -11952,6 +13714,14 @@ const SUPPORT_REQUEST_SOURCE_META = {
   scheduleCallback: {
     type: 'callback',
     label: 'Lich goi lai'
+  },
+  addSupportTicketMessage: {
+    type: 'ticket_update',
+    label: 'Cap nhat ticket'
+  },
+  updateSupportTicket: {
+    type: 'ticket_update',
+    label: 'Cap nhat ticket'
   },
   reportBugOrIssue: {
     type: 'bug_report',
@@ -11972,19 +13742,27 @@ const SUPPORT_REQUEST_SOURCE_META = {
   requestAccountDeletion: {
     type: 'account_deletion',
     label: 'Yeu cau xoa tai khoan'
+  },
+  submitPaymentProof: {
+    type: 'payment_proof',
+    label: 'Chung tu thanh toan'
   }
 }
 const SUPPORT_REQUEST_TYPE_TOOLS = {
   all: SUPPORT_REQUEST_SOURCE_TOOLS,
   contact_request: ['submitContactRequest'],
   support_ticket: ['createSupportTicket'],
+  ticket_update: SUPPORT_TICKET_UPDATE_TOOLS,
   callback: ['scheduleCallback'],
   bug_report: ['reportBugOrIssue'],
   warranty: ['requestWarrantySupport'],
   return_refund: ['requestReturnOrRefund'],
   personal_data_export: ['requestPersonalDataExport'],
-  account_deletion: ['requestAccountDeletion']
+  account_deletion: ['requestAccountDeletion'],
+  payment_proof: ['submitPaymentProof']
 }
+const SUPPORT_TICKET_ALREADY_CANCELLED_STATUSES = ['cancelled', 'canceled']
+const SUPPORT_TICKET_NON_CANCELLABLE_STATUSES = ['error', 'completed', 'closed', 'resolved', 'rejected']
 
 function normalizeSupportRequestType(value) {
   const normalized = cleanString(value).toLowerCase()
@@ -12015,11 +13793,39 @@ function extractSupportTicketPayload(payload = {}, fallbackTicketId = '') {
   }
 }
 
+function normalizeSupportTicketUrlValue(value) {
+  if (!value) return ''
+  if (typeof value === 'object') {
+    return cleanString(value.url || value.imageUrl || value.fileUrl || value.href)
+  }
+  return cleanString(value)
+}
+
+function normalizeSupportTicketUrlList(...sources) {
+  const urls = []
+
+  for (const source of sources) {
+    if (Array.isArray(source)) {
+      source.forEach(item => {
+        const url = normalizeSupportTicketUrlValue(item)
+        if (url) urls.push(url)
+      })
+      continue
+    }
+
+    const url = normalizeSupportTicketUrlValue(source)
+    if (url) urls.push(url)
+  }
+
+  return [...new Set(urls)].slice(0, 10)
+}
+
 function normalizeSupportTicketStatus(payload = {}) {
   const ticket = getSupportTicketObject(payload.ticket)
   const request = getSupportTicketObject(payload.request)
   const explicitStatus = cleanString(payload.status || ticket.status || request.status).toLowerCase()
 
+  if (explicitStatus === 'canceled') return 'cancelled'
   if (explicitStatus) return explicitStatus
   if (payload.success === false || payload.error) return 'error'
 
@@ -12064,10 +13870,10 @@ function isSupportTicketLookupVerified(log = {}, args = {}, context = {}, payloa
   )
 }
 
-async function findSupportTicketLog(ticketId) {
+async function findSupportTicketLog(ticketId, sourceTools = SUPPORT_TICKET_SOURCE_TOOLS) {
   const ticketRegex = new RegExp(escapeRegExp(ticketId), 'i')
   const logs = await agentToolCallRepository.findByQuery({
-    toolName: { $in: SUPPORT_TICKET_SOURCE_TOOLS },
+    toolName: { $in: sourceTools },
     outcome: 'success',
     $or: [
       { resultPayload: ticketRegex },
@@ -12089,6 +13895,46 @@ async function findSupportTicketLog(ticketId) {
   }) || null
 }
 
+async function findSupportTicketUpdateLogs(ticketId) {
+  const ticketRegex = new RegExp(escapeRegExp(ticketId), 'i')
+  return agentToolCallRepository.findByQuery({
+    toolName: { $in: SUPPORT_TICKET_UPDATE_TOOLS },
+    outcome: 'success',
+    $or: [
+      { resultPayload: ticketRegex },
+      { resultPreview: ticketRegex }
+    ]
+  }, {
+    sort: { createdAt: -1, _id: -1 },
+    limit: 10,
+    lean: true
+  })
+}
+
+function buildSupportTicketUpdatePayload(log = {}) {
+  const payload = parseToolPayload(log.resultPayload) || {}
+  const update = getSupportTicketObject(payload.update)
+  const ticketId = normalizeSupportTicketId(payload.ticketId || update.ticketId)
+  const message = truncateHandoffText(update.message || payload.updateMessage || '', 500)
+  const imageUrls = normalizeSupportTicketUrlList(update.imageUrls)
+  const attachmentUrls = normalizeSupportTicketUrlList(update.attachmentUrls)
+  const createdAt = update.createdAt || serializeDate(log.createdAt)
+
+  if (!ticketId) return null
+
+  return {
+    id: serializeId(log._id),
+    ticketId,
+    message: message || null,
+    imageUrls,
+    attachmentUrls,
+    attachmentCount: Number(update.attachmentCount || attachmentUrls.length || imageUrls.length || 0),
+    createdAt,
+    createdAtFormatted: createdAt ? formatDate(createdAt) : null,
+    sourceTool: log.toolName
+  }
+}
+
 function buildSupportTicketStatusResponse(log = {}, payload = {}, args = {}, context = {}, fallbackTicketId = '') {
   const ticket = extractSupportTicketPayload(payload, fallbackTicketId)
   const status = normalizeSupportTicketStatus(payload)
@@ -12099,6 +13945,7 @@ function buildSupportTicketStatusResponse(log = {}, payload = {}, args = {}, con
   }
   const verified = isSupportTicketLookupVerified(log, args, context, payload)
   const createdAt = ticket.createdAt || serializeDate(log.createdAt)
+  const isCancelled = status === 'cancelled'
   const response = {
     success: true,
     found: true,
@@ -12116,8 +13963,10 @@ function buildSupportTicketStatusResponse(log = {}, payload = {}, args = {}, con
     statusNote: 'Trang thai duoc lay tu ticket da ghi nhan qua chatbot; khong tu suy doan da xu ly xong neu chua co cap nhat.',
     message: status === 'error'
       ? `Ticket ${ticket.ticketId} chua duoc tao thanh cong.`
-      : `Ticket ${ticket.ticketId} da duoc ghi nhan va dang cho nhan vien ho tro kiem tra.`,
-    nextAction: 'wait_for_support_response'
+      : (isCancelled
+          ? `Ticket ${ticket.ticketId} da duoc ghi nhan huy theo yeu cau cua khach.`
+          : `Ticket ${ticket.ticketId} da duoc ghi nhan va dang cho nhan vien ho tro kiem tra.`),
+    nextAction: isCancelled ? 'support_ticket_cancelled' : 'wait_for_support_response'
   }
 
   if (verified) {
@@ -12138,6 +13987,29 @@ function buildSupportTicketStatusResponse(log = {}, payload = {}, args = {}, con
     response.warranty = payload.warranty || null
     response.item = payload.item || null
     response.accountDeletionRequested = payload.accountDeletionRequested === true
+    response.paymentProofSubmitted = payload.paymentProofSubmitted === true
+    response.paymentVerified = payload.paymentVerified === true
+    response.proof = payload.proof || null
+    response.cancelledByCustomer = payload.cancelledByCustomer === true || isCancelled
+    response.cancellation = payload.cancellation || null
+  }
+
+  return response
+}
+
+function addSupportTicketUpdatesToStatusResponse(response = {}, updateLogs = []) {
+  if (!response.verified) return response
+
+  const updates = updateLogs
+    .map(buildSupportTicketUpdatePayload)
+    .filter(Boolean)
+
+  response.updateCount = updates.length
+  response.updates = updates
+
+  if (updates.length > 0) {
+    response.lastUpdatedAt = updates[0].createdAt || response.lastUpdatedAt
+    response.statusNote = 'Trang thai duoc lay tu ticket chatbot; cac thong tin bo sung gan day duoc liet ke trong updates neu da xac minh duoc quyen xem.'
   }
 
   return response
@@ -12178,6 +14050,8 @@ function buildSupportRequestOrderReference(order = null) {
     code: cleanString(order.code) || null,
     status: cleanString(order.status) || null,
     paymentStatus: cleanString(order.paymentStatus) || null,
+    paymentMethod: cleanString(order.paymentMethod) || null,
+    paymentReference: cleanString(order.paymentReference) || null,
     totalFormatted: cleanString(order.totalFormatted) || null,
     orderUrl: cleanString(order.orderUrl) || null
   }
@@ -12194,8 +14068,9 @@ function buildSupportRequestListItem(log = {}) {
     label: 'Ticket ho tro'
   }
   const createdAt = ticket.createdAt || serializeDate(log.createdAt)
+  const update = getSupportTicketObject(payload.update)
   const summary = truncateHandoffText(
-    pickString(payload.summary, ticket.subject, payload.message, log.resultPreview),
+    pickString(payload.summary, update.message, ticket.subject, payload.message, log.resultPreview),
     240
   )
 
@@ -12226,6 +14101,9 @@ function buildSupportRequestListItem(log = {}) {
     warranty: payload.warranty || null,
     item: payload.item || null,
     accountDeletionRequested: payload.accountDeletionRequested === true,
+    paymentProofSubmitted: payload.paymentProofSubmitted === true,
+    paymentVerified: payload.paymentVerified === true,
+    proof: payload.proof || null,
     order: buildSupportRequestOrderReference(payload.order),
     nextAction: payload.nextAction || null
   }
@@ -12295,6 +14173,352 @@ async function listMySupportTickets({ type = 'all', limit = 5 } = {}, context = 
   }
 }
 
+function isSupportTicketAlreadyCancelled(status) {
+  return SUPPORT_TICKET_ALREADY_CANCELLED_STATUSES.includes(cleanString(status).toLowerCase())
+}
+
+function canCancelSupportTicketStatus(status) {
+  const normalized = cleanString(status).toLowerCase()
+  return !SUPPORT_TICKET_NON_CANCELLABLE_STATUSES.includes(normalized)
+}
+
+function buildCancelledSupportTicketPayload(payload = {}, {
+  ticketId,
+  previousStatus = 'submitted',
+  reason = '',
+  cancelledAt,
+  context = {}
+} = {}) {
+  const sourceTicket = getSupportTicketObject(payload.ticket)
+  const sourceRequest = getSupportTicketObject(payload.request)
+  const cancellation = {
+    cancelledAt,
+    reason: reason || null,
+    requestedBy: 'customer',
+    sessionId: cleanString(context.sessionId) || null,
+    userId: cleanString(normalizeUserId(context)) || null
+  }
+
+  return {
+    ...payload,
+    success: payload.success !== false,
+    status: 'cancelled',
+    previousStatus,
+    cancelledByCustomer: true,
+    cancelledAt,
+    cancellation,
+    ticket: {
+      ...sourceTicket,
+      ticketId: sourceTicket.ticketId || ticketId,
+      status: 'cancelled',
+      cancelledAt,
+      cancellationReason: reason || undefined
+    },
+    request: Object.keys(sourceRequest).length > 0
+      ? {
+          ...sourceRequest,
+          ticketId: sourceRequest.ticketId || ticketId,
+          status: 'cancelled',
+          cancelledAt,
+          cancellationReason: reason || undefined
+        }
+      : sourceRequest,
+    message: `Da ghi nhan huy ticket ${ticketId} theo yeu cau cua khach.`,
+    nextAction: 'support_ticket_cancelled'
+  }
+}
+
+async function cancelSupportTicket(args = {}, context = {}) {
+  try {
+    const ticketId = normalizeSupportTicketId(args.ticketId || args.ticketCode || args.id)
+
+    if (!ticketId) {
+      return JSON.stringify({
+        success: false,
+        found: false,
+        requiresTicketId: true,
+        message: 'Vui long cung cap ma ticket ho tro can huy.',
+        nextAction: 'ask_for_ticket_id'
+      })
+    }
+
+    const log = await findSupportTicketLog(ticketId, SUPPORT_TICKET_LOOKUP_SOURCE_TOOLS)
+
+    if (!log) {
+      return JSON.stringify({
+        success: false,
+        found: false,
+        ticketId,
+        message: 'Khong tim thay ticket nay trong cac yeu cau ho tro chatbot da ghi nhan. Vui long kiem tra lai ma ticket hoac lien he nhan vien ho tro.',
+        nextAction: 'ask_ticket_id_or_contact_support'
+      })
+    }
+
+    const payload = parseToolPayload(log.resultPayload) || {}
+    const ticket = extractSupportTicketPayload(payload, ticketId)
+    const status = normalizeSupportTicketStatus(payload)
+    const statusLabel = getSupportTicketStatusLabel(status)
+    const sourceMeta = SUPPORT_REQUEST_SOURCE_META[log.toolName] || SUPPORT_TICKET_SOURCE_META[log.toolName] || {
+      type: 'support_ticket',
+      label: 'Ticket ho tro'
+    }
+    const verified = isSupportTicketLookupVerified(log, args, context, payload)
+
+    if (!verified) {
+      return JSON.stringify({
+        success: false,
+        found: true,
+        ticketId: ticket.ticketId || ticketId,
+        requiresVerification: true,
+        detailsRestricted: true,
+        message: 'Can dang nhap dung tai khoan/phien chat da tao ticket hoac cung cap email/so dien thoai cua ticket de xac minh truoc khi huy.',
+        nextAction: 'ask_for_ticket_contact_verification'
+      })
+    }
+
+    if (isSupportTicketAlreadyCancelled(status)) {
+      return JSON.stringify({
+        success: true,
+        found: true,
+        cancelled: true,
+        alreadyCancelled: true,
+        ticketId: ticket.ticketId || ticketId,
+        status: 'cancelled',
+        statusLabel: getSupportTicketStatusLabel('cancelled'),
+        ticketType: sourceMeta.type,
+        ticketTypeLabel: sourceMeta.label,
+        cancellation: payload.cancellation || null,
+        message: `Ticket ${ticket.ticketId || ticketId} da duoc ghi nhan huy truoc do.`,
+        nextAction: 'support_ticket_cancelled'
+      })
+    }
+
+    if (!canCancelSupportTicketStatus(status)) {
+      return JSON.stringify({
+        success: false,
+        found: true,
+        canCancel: false,
+        ticketId: ticket.ticketId || ticketId,
+        status,
+        statusLabel,
+        ticketType: sourceMeta.type,
+        ticketTypeLabel: sourceMeta.label,
+        message: `Ticket ${ticket.ticketId || ticketId} dang o trang thai ${statusLabel}, chatbot khong the huy truc tiep.`,
+        nextAction: 'contact_support_if_needed'
+      })
+    }
+
+    const reason = truncateHandoffText(args.reason || args.cancelReason || args.details || context.promptText, 240)
+    const cancelledAt = new Date().toISOString()
+    const updatedPayload = buildCancelledSupportTicketPayload(payload, {
+      ticketId: ticket.ticketId || ticketId,
+      previousStatus: status,
+      reason,
+      cancelledAt,
+      context
+    })
+    const updatedLog = await agentToolCallRepository.updateById(log._id, {
+      resultPayload: JSON.stringify(updatedPayload),
+      resultPreview: `Da huy ticket ${ticket.ticketId || ticketId} theo yeu cau cua khach.`,
+      outcome: 'success'
+    }, { lean: true })
+
+    if (!updatedLog) {
+      return JSON.stringify({
+        success: false,
+        found: true,
+        ticketId: ticket.ticketId || ticketId,
+        message: 'Khong the cap nhat trang thai huy ticket luc nay. Ban vui long thu lai hoac yeu cau gap nhan vien ho tro.',
+        error: 'SUPPORT_TICKET_CANCEL_UPDATE_FAILED'
+      })
+    }
+
+    return JSON.stringify({
+      success: true,
+      found: true,
+      cancelled: true,
+      ticketId: ticket.ticketId || ticketId,
+      status: 'cancelled',
+      statusLabel: getSupportTicketStatusLabel('cancelled'),
+      previousStatus: status,
+      previousStatusLabel: statusLabel,
+      ticketType: sourceMeta.type,
+      ticketTypeLabel: sourceMeta.label,
+      ticket: {
+        ticketId: ticket.ticketId || ticketId,
+        category: ticket.category || null,
+        priority: ticket.priority || null,
+        subject: ticket.subject || null,
+        createdAt: ticket.createdAt || serializeDate(log.createdAt)
+      },
+      cancellation: updatedPayload.cancellation,
+      message: `Da ghi nhan huy ticket ${ticket.ticketId || ticketId}. Neu nhan vien da bat dau xu ly, ho co the lien he de xac nhan them.`,
+      nextAction: 'support_ticket_cancelled'
+    })
+  } catch (err) {
+    logger.error('[AI Tool] cancelSupportTicket error:', err.message)
+
+    return JSON.stringify({
+      success: false,
+      cancelled: false,
+      message: 'Minh chua huy duoc ticket luc nay. Ban vui long thu lai hoac yeu cau gap nhan vien ho tro.',
+      error: 'SUPPORT_TICKET_CANCEL_FAILED'
+    })
+  }
+}
+
+function getSupportTicketContactValue(log = {}, payload = {}, args = {}, context = {}, field) {
+  const sources = getSupportTicketContactSources(log, payload)
+  return pickString(
+    args[field],
+    context.customerInfo?.[field],
+    ...sources.map(source => source[field])
+  )
+}
+
+async function addSupportTicketMessage(args = {}, context = {}) {
+  try {
+    const ticketId = normalizeSupportTicketId(args.ticketId || args.ticketCode || args.id)
+
+    if (!ticketId) {
+      return JSON.stringify({
+        success: false,
+        found: false,
+        requiresTicketId: true,
+        message: 'Vui long cung cap ma ticket ho tro can bo sung thong tin.',
+        nextAction: 'ask_for_ticket_id'
+      })
+    }
+
+    const updateMessage = truncateHandoffText(
+      args.message || args.update || args.details || args.note || args.description || '',
+      3000
+    )
+    const imageUrls = normalizeSupportTicketUrlList(
+      args.imageUrls,
+      args.screenshotUrls,
+      args.mediaUrls,
+      context.currentMessageImageUrls
+    )
+    const attachmentUrls = normalizeSupportTicketUrlList(
+      args.attachmentUrls,
+      args.fileUrls,
+      args.files
+    )
+    const allAttachmentUrls = [...new Set([...imageUrls, ...attachmentUrls])]
+
+    if (!updateMessage && allAttachmentUrls.length === 0) {
+      return JSON.stringify({
+        success: false,
+        found: false,
+        ticketId,
+        requiresContent: true,
+        message: 'Can co noi dung bo sung hoac anh/tep dinh kem de gui vao ticket.',
+        nextAction: 'ask_for_ticket_update_content'
+      })
+    }
+
+    const log = await findSupportTicketLog(ticketId, SUPPORT_TICKET_LOOKUP_SOURCE_TOOLS)
+
+    if (!log) {
+      return JSON.stringify({
+        success: false,
+        found: false,
+        ticketId,
+        message: 'Khong tim thay ticket nay trong cac yeu cau ho tro chatbot da ghi nhan. Vui long kiem tra lai ma ticket hoac lien he nhan vien ho tro.',
+        nextAction: 'ask_ticket_id_or_contact_support'
+      })
+    }
+
+    const payload = parseToolPayload(log.resultPayload) || {}
+    const ticket = extractSupportTicketPayload(payload, ticketId)
+    const verified = isSupportTicketLookupVerified(log, args, context, payload)
+
+    if (!verified) {
+      return JSON.stringify({
+        success: false,
+        found: true,
+        ticketId: ticket.ticketId || ticketId,
+        requiresVerification: true,
+        detailsRestricted: true,
+        message: 'Can dang nhap dung tai khoan/phien chat da tao ticket hoac cung cap email/so dien thoai cua ticket de xac minh truoc khi bo sung thong tin.',
+        nextAction: 'ask_for_ticket_contact_verification'
+      })
+    }
+
+    const sourceMeta = SUPPORT_REQUEST_SOURCE_META[log.toolName] || SUPPORT_TICKET_SOURCE_META[log.toolName] || {
+      type: 'support_ticket',
+      label: 'Ticket ho tro'
+    }
+    const contactService = require('../client/contact.service')
+    const result = await contactService.addSupportTicketMessage({
+      ticketId: ticket.ticketId || ticketId,
+      subject: `Bo sung thong tin ticket ${ticket.ticketId || ticketId}`,
+      message: updateMessage,
+      imageUrls,
+      attachmentUrls: allAttachmentUrls,
+      name: getSupportTicketContactValue(log, payload, args, context, 'name'),
+      email: getSupportTicketContactValue(log, payload, args, context, 'email'),
+      phone: getSupportTicketContactValue(log, payload, args, context, 'phone'),
+      currentPage: args.currentPage || context.customerInfo?.currentPage,
+      source: 'chatbot_ticket_update'
+    }, {
+      ...context,
+      source: 'chatbot_ticket_update'
+    })
+
+    return JSON.stringify({
+      ...result,
+      success: true,
+      found: true,
+      ticketUpdated: true,
+      ticketId: ticket.ticketId || ticketId,
+      ticketType: sourceMeta.type,
+      ticketTypeLabel: sourceMeta.label,
+      ticket: {
+        ticketId: ticket.ticketId || ticketId,
+        category: ticket.category || null,
+        priority: ticket.priority || null,
+        subject: ticket.subject || null,
+        createdAt: ticket.createdAt || serializeDate(log.createdAt)
+      },
+      update: {
+        ...(result.update || {}),
+        ticketId: ticket.ticketId || ticketId,
+        message: updateMessage || null,
+        imageUrls,
+        attachmentUrls: allAttachmentUrls,
+        attachmentCount: allAttachmentUrls.length
+      },
+      message: `Minh da bo sung thong tin vao ticket ${ticket.ticketId || ticketId}. Nhan vien ho tro se xem phan cap nhat nay khi theo doi ticket.`,
+      nextAction: 'support_ticket_updated'
+    })
+  } catch (err) {
+    if (err.statusCode === 400) {
+      logger.warn(`[AI Tool] addSupportTicketMessage validation: ${err.message}`)
+      return JSON.stringify({
+        success: false,
+        ticketUpdated: false,
+        message: err.message,
+        error: 'SUPPORT_TICKET_UPDATE_VALIDATION_FAILED'
+      })
+    }
+
+    logger.error('[AI Tool] addSupportTicketMessage error:', err.message)
+
+    return JSON.stringify({
+      success: false,
+      ticketUpdated: false,
+      message: 'Minh chua bo sung duoc thong tin vao ticket luc nay. Ban vui long thu lai hoac yeu cau gap nhan vien ho tro.',
+      error: 'SUPPORT_TICKET_UPDATE_FAILED'
+    })
+  }
+}
+
+async function updateSupportTicket(args = {}, context = {}) {
+  return addSupportTicketMessage(args, context)
+}
+
 async function getSupportTicketStatus(args = {}, context = {}) {
   try {
     const ticketId = normalizeSupportTicketId(args.ticketId || args.ticketCode || args.id)
@@ -12322,8 +14546,10 @@ async function getSupportTicketStatus(args = {}, context = {}) {
     }
 
     const payload = parseToolPayload(log.resultPayload) || {}
+    const response = buildSupportTicketStatusResponse(log, payload, args, context, ticketId)
+    const updateLogs = response.verified ? await findSupportTicketUpdateLogs(response.ticketId || ticketId) : []
 
-    return JSON.stringify(buildSupportTicketStatusResponse(log, payload, args, context, ticketId))
+    return JSON.stringify(addSupportTicketUpdatesToStatusResponse(response, updateLogs))
   } catch (err) {
     logger.error('[AI Tool] getSupportTicketStatus error:', err.message)
 
@@ -13372,6 +15598,333 @@ async function verifyBankTransfer({ orderCode, paymentReference } = {}, context 
   }
 }
 
+function normalizePaymentProofAttachmentUrls(args = {}) {
+  const rawValues = []
+  const append = value => {
+    if (Array.isArray(value)) {
+      value.forEach(append)
+      return
+    }
+
+    if (typeof value === 'string' && /[\n,]/.test(value)) {
+      value.split(/[\n,]+/).forEach(append)
+      return
+    }
+
+    const url = cleanString(value)
+    if (url) rawValues.push(url)
+  }
+
+  append(args.proofImageUrls)
+  append(args.proofImageUrl)
+  append(args.proofUrls)
+  append(args.proofUrl)
+  append(args.receiptUrls)
+  append(args.receiptUrl)
+  append(args.attachmentUrls)
+  append(args.attachmentUrl)
+  append(args.imageUrls)
+  append(args.imageUrl)
+
+  return [...new Set(rawValues)].slice(0, 10)
+}
+
+function normalizePaymentProofAmount(value) {
+  const amount = Number(value)
+  return Number.isFinite(amount) && amount > 0 ? Math.round(amount) : null
+}
+
+function hasPaymentProofEvidence(args = {}, attachmentUrls = []) {
+  return attachmentUrls.length > 0
+    || !!cleanString(args.transactionId || args.referenceCode || args.bankTransactionId)
+    || !!cleanString(args.transferTime || args.paidAt)
+    || normalizePaymentProofAmount(args.paidAmount || args.amount) !== null
+    || cleanString(args.note || args.details || args.message).length >= 10
+}
+
+function buildPaymentProofOrderLookup(args = {}) {
+  const paymentReference = cleanString(args.paymentReference || args.transferContent)
+  return {
+    orderId: cleanString(args.orderId) || (isMongoObjectId(paymentReference) ? paymentReference : ''),
+    orderCode: cleanString(args.orderCode || args.code) || (!isMongoObjectId(paymentReference) ? paymentReference : ''),
+    paymentReference
+  }
+}
+
+async function findOrderByPaymentProofLookup(args = {}) {
+  const { orderId, orderCode, paymentReference } = buildPaymentProofOrderLookup(args)
+  const lookup = normalizeOrderLookupValue({ orderId, orderCode: orderCode || paymentReference })
+  if (!lookup) return null
+
+  if (isMongoObjectId(lookup)) {
+    const order = await orderRepository.findByIdNotDeleted(lookup)
+    if (order) return order
+  }
+
+  return orderRepository.findOne({
+    orderCode: { $regex: `^${escapeRegExp(lookup)}$`, $options: 'i' },
+    isDeleted: false
+  })
+}
+
+function paymentProofContactMatchesOrder(order = {}, { phone = '', email = '' } = {}) {
+  const source = getOrderObject(order)
+  const orderPhone = normalizePhone(source.contact?.phone)
+  const orderEmail = cleanString(source.contact?.email).toLowerCase()
+
+  return !!(
+    (phone && orderPhone && phone === orderPhone)
+    || (email && orderEmail && email === orderEmail)
+  )
+}
+
+async function resolveOrderForPaymentProof(args = {}, context = {}) {
+  const userId = normalizeUserId(context)
+  const { orderId, orderCode, paymentReference } = buildPaymentProofOrderLookup(args)
+
+  if (isMongoObjectId(userId)) {
+    const resolved = await resolveOwnedOrderForPayment({
+      userId,
+      orderId,
+      orderCode: orderCode || paymentReference
+    })
+
+    if (resolved.error) return { error: { success: false, ...resolved.error } }
+    return { order: resolved.order }
+  }
+
+  if (!cleanString(orderId || orderCode || paymentReference)) {
+    return {
+      error: {
+        success: false,
+        requiresOrderCode: true,
+        message: 'Vui long cung cap ma don hang hoac paymentReference tren noi dung chuyen khoan.'
+      }
+    }
+  }
+
+  const phone = normalizePhone(args.phone || context.customerInfo?.phone)
+  const email = cleanString(args.email || context.customerInfo?.email).toLowerCase()
+  if (!phone && !email) {
+    return {
+      error: {
+        success: false,
+        requiresContactInfo: true,
+        message: 'Khach chua dang nhap can cung cap so dien thoai hoac email dat hang de gui chung tu thanh toan.'
+      }
+    }
+  }
+
+  const order = await findOrderByPaymentProofLookup({ orderId, orderCode, paymentReference })
+  if (!order) {
+    return {
+      error: {
+        success: false,
+        found: false,
+        message: 'Khong tim thay don hang khop voi ma don/paymentReference.'
+      }
+    }
+  }
+
+  if (!paymentProofContactMatchesOrder(order, { phone, email })) {
+    return {
+      error: {
+        success: false,
+        found: false,
+        message: 'Thong tin lien he khong khop voi don hang can gui chung tu.'
+      }
+    }
+  }
+
+  return { order }
+}
+
+async function getPaymentProofContact(args = {}, order = {}, context = {}) {
+  const source = getOrderObject(order)
+  const customerInfo = context.customerInfo || {}
+  const userId = normalizeUserId(context)
+  const user = isMongoObjectId(userId)
+    ? await userRepository.findById(userId, {
+        select: 'username fullName email phone',
+        lean: true
+      })
+    : null
+
+  return {
+    name: pickString(
+      args.name,
+      args.fullName,
+      customerInfo.name,
+      source.contact?.firstName && source.contact?.lastName
+        ? `${source.contact.firstName} ${source.contact.lastName}`
+        : '',
+      user?.fullName,
+      user?.username
+    ),
+    email: pickString(args.email, customerInfo.email, source.contact?.email, user?.email).toLowerCase(),
+    phone: normalizePhone(pickString(args.phone, customerInfo.phone, source.contact?.phone, user?.phone)),
+    preferredContactMethod: cleanString(args.preferredContactMethod || args.contactMethod)
+      || (pickString(args.email, customerInfo.email, source.contact?.email, user?.email) ? 'email' : 'phone')
+  }
+}
+
+function buildPaymentProofMessage({ args = {}, order = {}, attachmentUrls = [], context = {} } = {}) {
+  const source = getOrderObject(order)
+  const paidAmount = normalizePaymentProofAmount(args.paidAmount || args.amount)
+  const transactionId = cleanString(args.transactionId || args.referenceCode || args.bankTransactionId)
+  const transferTime = cleanString(args.transferTime || args.paidAt)
+  const note = cleanString(args.note || args.details || args.message)
+  const paymentReference = cleanString(args.paymentReference || args.transferContent) || getOrderPaymentReference(source)
+
+  return [
+    'Loai yeu cau: Doi soat chung tu thanh toan/chuyen khoan',
+    `Don hang: ${formatOrderCode(source)}`,
+    `OrderId: ${serializeId(source._id || source.id)}`,
+    `OrderCode: ${cleanString(source.orderCode) || '(khong co)'}`,
+    `Phuong thuc thanh toan: ${source.paymentMethod || '(khong ro)'}`,
+    `Trang thai don: ${source.status || '(khong ro)'} / thanh toan: ${source.paymentStatus || '(khong ro)'}`,
+    `So tien don hang: ${formatPrice(source.total || 0)}`,
+    `PaymentReference/noi dung chuyen khoan mong doi: ${paymentReference || '(khong co)'}`,
+    paidAmount !== null ? `So tien khach bao da chuyen: ${formatPrice(paidAmount)}` : null,
+    transactionId ? `Ma giao dich tren bien lai: ${transactionId}` : null,
+    transferTime ? `Thoi gian chuyen khoan: ${transferTime}` : null,
+    cleanString(args.senderBank) ? `Ngan hang nguoi chuyen: ${cleanString(args.senderBank)}` : null,
+    cleanString(args.senderAccount) ? `Tai khoan nguoi chuyen: ${cleanString(args.senderAccount)}` : null,
+    attachmentUrls.length > 0 ? `Chung tu/anh bien lai: ${attachmentUrls.join(' | ')}` : null,
+    note ? `Ghi chu cua khach: ${note}` : null,
+    cleanString(context.promptText) ? `Noi dung chat gan nhat: ${cleanString(context.promptText)}` : null,
+    '',
+    'Luu y: Ticket nay chi de nhan vien doi soat thu cong. Chatbot khong tu dong cap nhat paymentStatus.'
+  ].filter(line => line !== null).join('\n')
+}
+
+function buildPaymentProofResponse(result = {}, args = {}, meta = {}) {
+  const request = result.request || {}
+  const ticketId = result.ticketId || request.ticketId || null
+  const order = getOrderObject(meta.order)
+  const paidAmount = normalizePaymentProofAmount(args.paidAmount || args.amount)
+
+  return {
+    ...result,
+    success: true,
+    ticketCreated: true,
+    paymentProofSubmitted: true,
+    paymentVerified: false,
+    paymentStatusChanged: false,
+    handoffRequested: false,
+    escalate: false,
+    ticketId,
+    ticket: {
+      ticketId,
+      category: request.category || 'payment',
+      priority: request.priority || 'high',
+      subject: request.subject || meta.subject || null,
+      preferredContactMethod: request.preferredContactMethod || meta.contact?.preferredContactMethod || null,
+      createdAt: request.createdAt || null
+    },
+    proof: {
+      attachmentUrls: meta.attachmentUrls || [],
+      transactionId: cleanString(args.transactionId || args.referenceCode || args.bankTransactionId) || null,
+      paidAmount,
+      paidAmountFormatted: paidAmount !== null ? formatPrice(paidAmount) : null,
+      transferTime: cleanString(args.transferTime || args.paidAt) || null,
+      senderBank: cleanString(args.senderBank) || null,
+      senderAccount: cleanString(args.senderAccount) || null
+    },
+    order: {
+      id: serializeId(order._id || order.id),
+      orderCode: cleanString(order.orderCode) || null,
+      code: formatOrderCode(order),
+      paymentMethod: order.paymentMethod,
+      paymentStatus: order.paymentStatus,
+      paymentStatusLabel: PAYMENT_STATUS_LABELS[order.paymentStatus] || order.paymentStatus,
+      status: order.status,
+      total: Number(order.total || 0),
+      totalFormatted: formatPrice(order.total || 0),
+      paymentReference: getOrderPaymentReference(order),
+      orderUrl: order._id ? `${CLIENT_URL}/orders/${order._id.toString()}` : null
+    },
+    message: `Minh da gui chung tu thanh toan${ticketId ? ` ${ticketId}` : ''} cho nhan vien doi soat. Trang thai thanh toan chua duoc xac nhan tu dong; nhan vien se kiem tra va phan hoi.`,
+    nextAction: 'manual_payment_review'
+  }
+}
+
+async function submitPaymentProof(args = {}, context = {}) {
+  try {
+    const attachmentUrls = normalizePaymentProofAttachmentUrls(args)
+    if (!hasPaymentProofEvidence(args, attachmentUrls)) {
+      return JSON.stringify({
+        success: false,
+        requiresProof: true,
+        message: 'Vui long gui anh/link bien lai hoac thong tin giao dich nhu ma giao dich, so tien, thoi gian chuyen khoan.'
+      })
+    }
+
+    const { order, error } = await resolveOrderForPaymentProof(args, context)
+    if (error) return JSON.stringify(error)
+
+    if (order.paymentStatus === 'paid') {
+      return JSON.stringify({
+        success: true,
+        paymentProofSubmitted: false,
+        alreadyPaid: true,
+        paymentVerified: true,
+        order: buildPaymentStatusSelectionPayload(order),
+        message: `Don ${formatOrderCode(order)} da duoc he thong ghi nhan thanh toan, khong can gui them chung tu.`
+      })
+    }
+
+    const contactService = require('../client/contact.service')
+    const contact = await getPaymentProofContact(args, order, context)
+    const subject = truncateHandoffText(
+      `[Chung tu thanh toan] ${formatOrderCode(order)} - ${getOrderPaymentReference(order)}`,
+      180
+    )
+    const result = await contactService.submitContactRequest({
+      ...contact,
+      category: 'payment',
+      priority: 'high',
+      subject,
+      message: buildPaymentProofMessage({ args, order, attachmentUrls, context }),
+      currentPage: cleanString(args.currentPage || context.customerInfo?.currentPage),
+      source: 'chatbot_payment_proof'
+    }, {
+      ...context,
+      source: 'chatbot_payment_proof'
+    })
+
+    return JSON.stringify(buildPaymentProofResponse(result, args, {
+      order,
+      contact,
+      subject,
+      attachmentUrls
+    }))
+  } catch (err) {
+    if (err.statusCode === 400) {
+      logger.warn(`[AI Tool] submitPaymentProof validation: ${err.message}`)
+      return JSON.stringify({
+        success: false,
+        ticketCreated: false,
+        paymentProofSubmitted: false,
+        paymentVerified: false,
+        requiresContactInfo: /email|so dien thoai|phone/i.test(err.message),
+        message: err.message,
+        error: 'PAYMENT_PROOF_VALIDATION_FAILED'
+      })
+    }
+
+    logger.error('[AI Tool] submitPaymentProof error:', err.message)
+    return JSON.stringify({
+      success: false,
+      ticketCreated: false,
+      paymentProofSubmitted: false,
+      paymentVerified: false,
+      message: 'Minh chua gui duoc chung tu thanh toan luc nay. Ban vui long thu lai hoac yeu cau gap nhan vien ho tro.',
+      error: 'PAYMENT_PROOF_SUBMIT_FAILED'
+    })
+  }
+}
+
 const RETURN_REQUEST_TYPES = ['return', 'refund', 'exchange', 'return_refund']
 const RETURN_RESOLUTIONS = ['refund', 'exchange', 'store_credit', 'repair', 'support']
 const RETURN_REQUEST_TYPE_LABELS = {
@@ -14091,21 +16644,31 @@ const toolExecutors = {
   searchProducts,
   getProductDetail,
   checkProductAvailability,
+  subscribeBackInStock,
+  unsubscribeBackInStock,
+  getProductAlternatives,
   compareProducts,
   checkOrderStatus,
   listMyOrders,
   getOrderDetail,
   getOrderInvoice,
+  resendOrderConfirmation,
+  resendDigitalDelivery,
   reorderPreviousOrder,
   trackOrderByCode,
   cancelOrder,
   updateOrderAddress,
   updateOrderContact,
   updatePendingOrderItems,
+  applyPromoCodeToPendingOrder,
+  removePromoCodeFromPendingOrder,
+  updatePendingOrderDeliveryMethod,
   checkPaymentStatus,
   resumePayment,
+  updatePendingOrderPaymentMethod,
   getBankInfo,
   verifyBankTransfer,
+  submitPaymentProof,
   getFlashSales,
   getAvailablePromoCodes,
   getCouponWallet,
@@ -14122,6 +16685,8 @@ const toolExecutors = {
   verifyEmailChange,
   requestAccountDeletion,
   getNotificationPreferences,
+  listNotifications,
+  markNotificationRead,
   addToCart,
   updateCartQuantity,
   removeFromCart,
@@ -14168,6 +16733,9 @@ const toolExecutors = {
   createSupportTicket,
   requestPersonalDataExport,
   listMySupportTickets,
+  cancelSupportTicket,
+  addSupportTicketMessage,
+  updateSupportTicket,
   getSupportTicketStatus,
   handoffToHuman,
   requestHumanAgent
