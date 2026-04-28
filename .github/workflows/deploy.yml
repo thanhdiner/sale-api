@@ -20,7 +20,7 @@ jobs:
           script: |
             set -e
 
-            cd /var/www/sales-api
+            cd /var/www/sale-api
 
             echo "Pull latest code..."
             git pull origin main
