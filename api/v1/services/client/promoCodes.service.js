@@ -1,9 +1,25 @@
 const promoCodeRepository = require('../../repositories/promoCode.repository')
 
 async function getPromoCodes() {
+  const now = new Date()
   const promoCodes = await promoCodeRepository.findAll({
-    isActive: true,
-    expiresAt: { $gte: new Date() }
+    $and: [
+      { isActive: true },
+      {
+        $or: [
+          { startsAt: { $exists: false } },
+          { startsAt: null },
+          { startsAt: { $lte: now } }
+        ]
+      },
+      {
+        $or: [
+          { expiresAt: { $exists: false } },
+          { expiresAt: null },
+          { expiresAt: { $gte: now } }
+        ]
+      }
+    ]
   }, {
     sort: { createdAt: -1 }
   })
@@ -21,6 +37,7 @@ async function validatePromoCode({ code, subtotal, userId }) {
     isActive: true
   })
 
+  if (promo?.startsAt && promo.startsAt > new Date()) return { valid: false, message: 'Ma chua den thoi gian su dung' }
   if (!promo) return { valid: false, message: 'Mã không tồn tại hoặc đã hết hạn' }
   if (promo.expiresAt && promo.expiresAt < new Date()) return { valid: false, message: 'Mã đã hết hạn' }
   if (promo.usageLimit && promo.usedCount >= promo.usageLimit) return { valid: false, message: 'Mã đã hết lượt dùng' }

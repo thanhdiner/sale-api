@@ -5,6 +5,12 @@ const BannerSchema = new mongoose.Schema(
     img: { type: String, required: true },
     title: { type: String, required: true },
     link: { type: String, default: '#' },
+    translations: {
+      en: {
+        title: { type: String, trim: true, default: '' },
+        link: { type: String, trim: true, default: '' }
+      }
+    },
     order: { type: Number, default: 0 },
     isActive: { type: Boolean, default: true }
   },

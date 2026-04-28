@@ -14,9 +14,11 @@ const handleKnownControllerError = (res, error) => {
 }
 
 //# GET /api/v1/admin/roles
-module.exports.index = async (_req, res) => {
+module.exports.index = async (req, res) => {
   try {
-    const result = await rolesService.listRoles()
+    const result = await rolesService.listRoles({
+      language: req.get('accept-language')
+    })
     res.json(result)
   } catch (err) {
     logger.error('[Admin] Error getting roles:', err)

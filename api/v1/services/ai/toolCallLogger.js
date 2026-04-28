@@ -29,7 +29,9 @@ function getResultPreview(result) {
   try {
     const parsed = JSON.parse(result)
     const previewSource =
-      parsed?.message
+      parsed?.escalationReason
+      || parsed?.reason
+      || parsed?.message
       || parsed?.error
       || parsed?.suggestion
       || parsed?.product?.name

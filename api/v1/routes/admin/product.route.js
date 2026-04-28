@@ -11,11 +11,17 @@ const checkPermission = require('../../middlewares/admin/checkPermission.middlew
 const validate = require('../../middlewares/validate.middleware')
 const productSchemas = require('../../validations/adminProduct.validation')
 const { invalidateProducts } = require('../../middlewares/cacheInvalidation.middleware')
+const parseJsonBodyField = require('../../utils/parseJsonBodyField')
 
 const productImageUpload = fileUpload.fields([
   { name: 'thumbnail', maxCount: 1 },
   { name: 'images', maxCount: 12 }
 ])
+
+const parseProductJsonBodyFields = (req, res, next) => {
+  parseJsonBodyField(req.body, 'translations')
+  next()
+}
 
 router.get('/', checkPermission.checkPermission('view_products'), controller.index)
 
@@ -26,6 +32,7 @@ router.post(
   checkPermission.checkPermission('create_product'),
   productImageUpload,
   uploadCloud.uploadMany,
+  parseProductJsonBodyFields,
   validate(productSchemas.createProduct),
   invalidateProducts,
   controller.create
@@ -66,6 +73,7 @@ router.patch(
   uploadCloud.deleteImage,
   uploadCloud.deleteImageMany,
   uploadCloud.uploadMany,
+  parseProductJsonBodyFields,
   validate(productSchemas.editProduct),
   invalidateProducts,
   controller.edit

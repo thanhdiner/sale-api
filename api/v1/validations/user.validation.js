@@ -111,7 +111,7 @@ const checkoutProfile = Joi.object({
   address: Joi.string().max(255).allow('', null).optional(),
   notes: Joi.string().max(500).allow('', null).optional(),
   deliveryMethod: Joi.string().valid('pickup', 'contact').optional(),
-  paymentMethod: Joi.string().valid('transfer', 'contact', 'vnpay', 'momo', 'zalopay').optional()
+  paymentMethod: Joi.string().valid('transfer', 'contact', 'vnpay', 'momo', 'zalopay', 'sepay').optional()
 }).custom((value, helpers) => {
   const hasStructuredAddress = [
     value.addressLine1,

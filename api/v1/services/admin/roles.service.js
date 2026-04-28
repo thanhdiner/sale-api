@@ -20,13 +20,50 @@ function normalizeWriteError(error, fallbackMessage) {
   return error
 }
 
-async function listRoles() {
+const normalizeLanguage = language => (String(language || '').toLowerCase().startsWith('en') ? 'en' : 'vi')
+
+const hasText = value => typeof value === 'string' && value.trim().length > 0
+
+const toPlainObject = item => {
+  if (!item) return item
+  return item.toObject ? item.toObject() : { ...item }
+}
+
+function normalizeRoleTranslations(translations = {}) {
+  const en = translations?.en || {}
+
+  return {
+    en: {
+      label: typeof en.label === 'string' ? en.label.trim() : '',
+      description: typeof en.description === 'string' ? en.description.trim() : ''
+    }
+  }
+}
+
+function localizeRole(role, languageInput) {
+  const language = normalizeLanguage(languageInput)
+  const plainRole = toPlainObject(role)
+
+  if (!plainRole) return plainRole
+
+  const translated = plainRole.translations?.en || {}
+
+  return {
+    ...plainRole,
+    localizedLabel: language === 'en' && hasText(translated.label) ? translated.label : plainRole.label,
+    localizedDescription:
+      language === 'en' && hasText(translated.description) ? translated.description : plainRole.description
+  }
+}
+
+async function listRoles(params = {}) {
+  const { language } = params
   const roles = await roleRepository.findByQuery({ deleted: false })
-  return { data: roles }
+  return { data: roles.map(role => localizeRole(role, language)) }
 }
 
 async function createRole(payload = {}) {
-  const { label, description, permissions = [], isActive } = payload
+  const { label, description, permissions = [], isActive, translations } = payload
 
   if (!label) {
     throw new AppError('Role name (label) is required', 400)
@@ -41,6 +78,7 @@ async function createRole(payload = {}) {
     const role = await roleRepository.create({
       label,
       description,
+      translations: normalizeRoleTranslations(translations),
       permissions,
       isActive
     })
@@ -54,7 +92,7 @@ async function createRole(payload = {}) {
 async function editRole(id, payload = {}) {
   ensureValidObjectId(id)
 
-  const { label, description, permissions, isActive } = payload
+  const { label, description, permissions, isActive, translations } = payload
 
   if (!label) {
     throw new AppError('Role name (label) is required', 400)
@@ -66,7 +104,13 @@ async function editRole(id, payload = {}) {
   }
 
   try {
-    const updated = await roleRepository.updateById(id, { label, description, permissions, isActive })
+    const updated = await roleRepository.updateById(id, {
+      label,
+      description,
+      translations: normalizeRoleTranslations(translations),
+      permissions,
+      isActive
+    })
     if (!updated) {
       throw new AppError('Role group not found', 404)
     }

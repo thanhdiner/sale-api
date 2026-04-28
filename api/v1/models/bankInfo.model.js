@@ -27,6 +27,13 @@ const bankInfoSchema = new mongoose.Schema(
       trim: true,
       maxlength: 255
     },
+    translations: {
+      en: {
+        bankName: { type: String, trim: true, default: '', maxlength: 100 },
+        accountHolder: { type: String, trim: true, default: '', maxlength: 100 },
+        noteTemplate: { type: String, trim: true, default: '', maxlength: 255 }
+      }
+    },
     isActive: {
       type: Boolean,
       default: false

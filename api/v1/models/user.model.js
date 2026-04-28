@@ -23,9 +23,27 @@ const checkoutProfileSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ['transfer', 'contact', 'vnpay', 'momo', 'zalopay'],
+      enum: ['transfer', 'contact', 'vnpay', 'momo', 'zalopay', 'sepay'],
       default: 'transfer'
     }
+  },
+  { _id: false }
+)
+
+const notificationPreferencesSchema = new mongoose.Schema(
+  {
+    channels: {
+      inApp: { type: Boolean, default: true },
+      email: { type: Boolean, default: true },
+      browser: { type: Boolean, default: true },
+      sms: { type: Boolean, default: false }
+    },
+    orderUpdates: { type: Boolean, default: true },
+    paymentUpdates: { type: Boolean, default: true },
+    promotions: { type: Boolean, default: true },
+    backInStock: { type: Boolean, default: true },
+    wishlistUpdates: { type: Boolean, default: true },
+    supportMessages: { type: Boolean, default: true }
   },
   { _id: false }
 )
@@ -59,6 +77,10 @@ const userSchema = new mongoose.Schema(
     avatarUrl: String,
     checkoutProfile: {
       type: checkoutProfileSchema,
+      default: () => ({})
+    },
+    notificationPreferences: {
+      type: notificationPreferencesSchema,
       default: () => ({})
     },
     deleted: {

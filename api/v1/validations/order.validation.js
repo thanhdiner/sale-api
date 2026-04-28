@@ -89,7 +89,7 @@ const createOrder = Joi.object({
     'any.required': 'Danh sach san pham la bat buoc'
   }),
   deliveryMethod: Joi.string().valid('pickup', 'contact').default('pickup'),
-  paymentMethod: Joi.string().valid('transfer', 'contact', 'vnpay', 'momo', 'zalopay').default('transfer'),
+  paymentMethod: Joi.string().valid('transfer', 'contact', 'vnpay', 'momo', 'zalopay', 'sepay').default('transfer'),
   subtotal: Joi.number().min(0).optional(),
   discount: Joi.number().min(0).default(0),
   shipping: Joi.number().min(0).default(0),

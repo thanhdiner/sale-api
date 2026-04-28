@@ -8,10 +8,31 @@ const uploadCloud = require('../../middlewares/admin/uploadCloud.middleware')
 
 const validate = require('../../middlewares/validate.middleware')
 const accountSchemas = require('../../validations/adminAccount.validation')
+const parseJsonBodyField = require('../../utils/parseJsonBodyField')
+
+const parseAdminAccountJsonBodyFields = (req, res, next) => {
+  parseJsonBodyField(req.body, 'translations')
+  next()
+}
 
 router.get('/', controller.index)
-router.post('/create', fileUpload.single('avatarUrl'), uploadCloud.upload, validate(accountSchemas.createAccount), controller.create)
-router.patch('/edit/:id', fileUpload.single('avatarUrl'), uploadCloud.deleteImage, uploadCloud.upload, validate(accountSchemas.editAccount), controller.edit)
+router.post(
+  '/create',
+  fileUpload.single('avatarUrl'),
+  uploadCloud.upload,
+  parseAdminAccountJsonBodyFields,
+  validate(accountSchemas.createAccount),
+  controller.create
+)
+router.patch(
+  '/edit/:id',
+  fileUpload.single('avatarUrl'),
+  uploadCloud.deleteImage,
+  uploadCloud.upload,
+  parseAdminAccountJsonBodyFields,
+  validate(accountSchemas.editAccount),
+  controller.edit
+)
 router.patch('/delete/:id', controller.delete)
 router.patch('/change-status/:id', validate(accountSchemas.changeStatus), controller.changeStatus)
 router.patch('/update-avatar/:id', fileUpload.single('avatarUrl'), uploadCloud.deleteImage, uploadCloud.upload, validate(accountSchemas.updateAvatar), controller.updateAvatar)

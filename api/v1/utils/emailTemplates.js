@@ -19,7 +19,8 @@ const paymentMethodLabel = method => {
     contact: '💵 Thanh toán khi nhận hàng (COD)',
     vnpay: '🏦 VNPay',
     momo: '💜 MoMo',
-    zalopay: '🔵 ZaloPay'
+    zalopay: '🔵 ZaloPay',
+    sepay: 'Sepay'
   }
   return map[method] || method
 }

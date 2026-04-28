@@ -5,6 +5,7 @@ async function findAll(filter = {}, options = {}) {
     sort = { createdAt: -1 },
     skip = 0,
     limit,
+    populate,
     lean = false
   } = options
 
@@ -12,6 +13,12 @@ async function findAll(filter = {}, options = {}) {
 
   if (typeof limit === 'number') {
     cursor = cursor.limit(limit)
+  }
+
+  if (populate) {
+    cursor = Array.isArray(populate)
+      ? populate.reduce((nextCursor, item) => nextCursor.populate(item), cursor)
+      : cursor.populate(populate)
   }
 
   if (lean) {
@@ -25,8 +32,20 @@ async function countByQuery(query = {}) {
   return PromoCode.countDocuments(query)
 }
 
-async function findById(id) {
-  return PromoCode.findById(id)
+async function findById(id, options = {}) {
+  let cursor = PromoCode.findById(id)
+
+  if (options.populate) {
+    cursor = Array.isArray(options.populate)
+      ? options.populate.reduce((nextCursor, item) => nextCursor.populate(item), cursor)
+      : cursor.populate(options.populate)
+  }
+
+  if (options.lean) {
+    cursor = cursor.lean()
+  }
+
+  return cursor
 }
 
 async function findOne(filter = {}, options = {}) {

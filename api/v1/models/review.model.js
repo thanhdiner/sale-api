@@ -14,6 +14,11 @@ const reviewSchema = new mongoose.Schema(
     helpfulCount: { type: Number, default: 0 },
     sellerReply: {
       content: { type: String, default: '' },
+      translations: {
+        en: {
+          content: { type: String, default: '' }
+        }
+      },
       repliedAt: Date
     },
     hidden: { type: Boolean, default: false },

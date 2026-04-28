@@ -2,9 +2,19 @@ const AppError = require('../../utils/AppError')
 const logger = require('../../../../config/logger')
 const cartRepository = require('../../repositories/cart.repository')
 const productRepository = require('../../repositories/product.repository')
+const applyTranslation = require('../../utils/applyTranslation')
 
 const MAX_CART_UNIQUE_ITEMS = 50
 const CART_UNIQUE_LIMIT_MESSAGE = `Gio hang chi chua toi da ${MAX_CART_UNIQUE_ITEMS} san pham khac nhau`
+const PRODUCT_TRANSLATION_FIELDS = ['title']
+
+function normalizeLanguage(lang) {
+  return String(lang || '').toLowerCase().startsWith('en') ? 'en' : 'vi'
+}
+
+function localizeProduct(product, lang) {
+  return applyTranslation(product, normalizeLanguage(lang), PRODUCT_TRANSLATION_FIELDS)
+}
 
 function isSellableProduct(product) {
   return product && product.deleted !== true && product.status === 'active'
@@ -28,7 +38,7 @@ function buildProductMap(products) {
   return Object.fromEntries(products.map(product => [product._id.toString(), product]))
 }
 
-async function getCart(userId) {
+async function getCart(userId, lang = 'vi') {
   requireUserId(userId)
 
   const cart = await getOrCreateCart(userId)
@@ -37,7 +47,7 @@ async function getCart(userId) {
   const productMap = buildProductMap(products)
 
   const items = cart.items.map(item => {
-    const product = productMap[item.productId.toString()]
+    const product = localizeProduct(productMap[item.productId.toString()], lang)
     const currentPrice =
       item.isFlashSale && item.salePrice !== undefined
         ? item.salePrice
@@ -174,6 +184,9 @@ async function removeFromCart(userId, productId) {
   }
 
   cart.items = cart.items.filter(item => !item.productId.equals(productId))
+  if (cart.items.length === 0) {
+    cart.promoCode = ''
+  }
   cart.updatedAt = new Date()
   await cartRepository.save(cart)
   return cart
@@ -188,6 +201,7 @@ async function clearCart(userId) {
   }
 
   cart.items = []
+  cart.promoCode = ''
   cart.updatedAt = new Date()
   await cartRepository.save(cart)
   return cart
@@ -206,6 +220,9 @@ async function removeManyFromCart(userId, productIds) {
   }
 
   cart.items = cart.items.filter(item => !productIds.includes(item.productId.toString()))
+  if (cart.items.length === 0) {
+    cart.promoCode = ''
+  }
   cart.updatedAt = new Date()
   await cartRepository.save(cart)
   return { success: true, cart }

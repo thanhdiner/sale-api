@@ -40,7 +40,9 @@ function serializeWishlistItem(item, product) {
 
   return {
     productId: item.productId,
+    title: product.title,
     name: product.title,
+    translations: product.translations || {},
     price: product.price * (1 - (product.discountPercentage || 0) / 100),
     originalPrice: product.price,
     discountPercentage: product.discountPercentage || 0,

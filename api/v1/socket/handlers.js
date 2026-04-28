@@ -5,9 +5,18 @@
 const logger = require('../../../config/logger')
 const chatService = require('../services/chat.service')
 const { ROOMS, EVENTS } = require('./constants')
-const { validateString, validateSessionId, validateObjectId } = require('./validators')
+const { validateString, validateSessionId, validateObjectId, validateReactionEmoji } = require('./validators')
 
 const MAX_CHAT_IMAGES = 10
+
+function getSocketClientIp(socket) {
+  const forwardedFor = socket.handshake?.headers?.['x-forwarded-for']
+  if (typeof forwardedFor === 'string' && forwardedFor.trim()) {
+    return forwardedFor.split(',')[0].trim()
+  }
+
+  return socket.handshake?.address || socket.conn?.remoteAddress || ''
+}
 
 function parseImageUrls(data) {
   const rawUrls = []
@@ -105,6 +114,14 @@ function notifyResolvedConversation(io, socket, sessionId, conversation, callbac
       conversation: payload
     })
   }
+}
+
+function validateReactionRole(value) {
+  const role = validateString(value, 'reactorType', { maxLength: 20 })
+  if (!['customer', 'agent'].includes(role)) {
+    throw new Error('reactorType khong hop le')
+  }
+  return role
 }
 
 /**
@@ -208,6 +225,7 @@ function registerHandlers(io) {
         await handleBotReply(io, conv, sessionId, buildBotInput({ type, message, imageUrls }), {
           name: senderName,
           currentPage,
+          ip: getSocketClientIp(socket),
           userId: senderId,
           conversationId: conv._id?.toString()
         })
@@ -215,6 +233,58 @@ function registerHandlers(io) {
         logger.error(`[Chat] send error: ${err.message}`)
         if (typeof callback === 'function') {
           callback({ success: false, message: err.message || 'Send failed' })
+        }
+      }
+    })
+
+    // Customer/agent reacts to a message
+    socket.on(EVENTS.CHAT_REACTION, async (data, callback) => {
+      try {
+        const sessionId = validateSessionId(data.sessionId)
+        const messageId = validateObjectId(data.messageId, 'messageId', { required: true })
+        const emoji = validateReactionEmoji(data.emoji)
+        const reactorType = validateReactionRole(data.reactorType)
+        const reactorId = validateString(data.reactorId, 'reactorId', {
+          required: false,
+          maxLength: 200
+        }) || (reactorType === 'customer' ? sessionId : socket.id)
+        const reactorName = validateString(data.reactorName, 'reactorName', {
+          required: false,
+          maxLength: 100
+        })
+
+        const result = await chatService.toggleMessageReaction(messageId, {
+          sessionId,
+          emoji,
+          reactorType,
+          reactorId,
+          reactorName
+        })
+
+        if (!result?.body?.success) {
+          if (typeof callback === 'function') {
+            callback({
+              success: false,
+              message: result?.body?.message || 'Reaction failed'
+            })
+          }
+          return
+        }
+
+        const payload = result.body.data
+        const target = payload.isInternal
+          ? io.to(ROOMS.AGENTS)
+          : io.to(ROOMS.chat(sessionId)).to(ROOMS.AGENTS)
+
+        target.emit(EVENTS.CHAT_REACTION_UPDATED, payload)
+
+        if (typeof callback === 'function') {
+          callback({ success: true, message: payload })
+        }
+      } catch (err) {
+        logger.error(`[Chat] reaction error: ${err.message}`)
+        if (typeof callback === 'function') {
+          callback({ success: false, message: err.message || 'Reaction failed' })
         }
       }
     })
@@ -238,12 +308,13 @@ function registerHandlers(io) {
         const sysMsg = await chatService.saveSystemMessage(
           conv._id,
           sessionId,
-          'Khách hàng yêu cầu nói chuyện với nhân viên hỗ trợ'
+          'Khách hàng yêu cầu nói chuyện với nhân viên hỗ trợ',
+          { i18nKey: 'system.requestedHuman' }
         )
 
         io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_MESSAGE, sysMsg.toObject())
 
-        const updatedConv = await chatService.getConversation(sessionId)
+        const updatedConv = await chatService.getConversation(sessionId) || conv.toObject()
         io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_CONVERSATION_UPDATED, updatedConv)
         io.to(ROOMS.AGENTS).emit(EVENTS.CHAT_ESCALATION, {
           sessionId,
@@ -272,12 +343,13 @@ function registerHandlers(io) {
         const sysMsg = await chatService.saveSystemMessage(
           conv._id,
           sessionId,
-          'Trợ lý AI SmartMall Bot đã quay trở lại. Bạn cần tôi giúp gì?'
+          'Trợ lý AI SmartMall Bot đã quay trở lại. Bạn cần tôi giúp gì?',
+          { i18nKey: 'system.botReturned' }
         )
 
         io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_MESSAGE, sysMsg.toObject())
 
-        const updatedConv = await chatService.getConversation(sessionId)
+        const updatedConv = await chatService.getConversation(sessionId) || conv.toObject()
         io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_CONVERSATION_UPDATED, updatedConv)
         io.to(ROOMS.AGENTS).emit(EVENTS.CHAT_CONVERSATION_UPDATED, updatedConv)
       } catch (err) {
@@ -362,17 +434,23 @@ function registerHandlers(io) {
         })
         if (!conv) return
 
+        const displayAgentName = agentName || 'Agent'
         const sysMsg = await chatService.saveSystemMessage(
           conv._id,
           sessionId,
-          `${agentName || 'Agent'} đã tham gia cuộc trò chuyện`
+          `${displayAgentName} đã tham gia cuộc trò chuyện`,
+          {
+            i18nKey: 'system.agentJoined',
+            i18nValues: { agentName: displayAgentName }
+          }
         )
+        const updatedConv = await chatService.getConversation(sessionId) || conv.toObject()
 
         io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_MESSAGE, sysMsg.toObject())
-        io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_CONVERSATION_UPDATED, conv.toObject())
-        io.to(ROOMS.AGENTS).emit(EVENTS.CHAT_CONVERSATION_UPDATED, conv.toObject())
+        io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_CONVERSATION_UPDATED, updatedConv)
+        io.to(ROOMS.AGENTS).emit(EVENTS.CHAT_CONVERSATION_UPDATED, updatedConv)
         if (typeof callback === 'function') {
-          callback({ success: true, conversation: conv.toObject() })
+          callback({ success: true, conversation: updatedConv })
         }
       } catch (err) {
         logger.error(`[Chat] assign error: ${err.message}`)
@@ -394,18 +472,24 @@ function registerHandlers(io) {
         const conv = await chatService.resolveConversation(sessionId)
         if (!conv) return
 
+        const displayAgentName = agentName || 'Agent'
         const sysMsg = await chatService.saveSystemMessage(
           conv._id,
           sessionId,
-          `${agentName || 'Agent'} đã đánh dấu cuộc trò chuyện là đã giải quyết`
+          `${displayAgentName} đã đánh dấu cuộc trò chuyện là đã giải quyết`,
+          {
+            i18nKey: 'system.agentResolved',
+            i18nValues: { agentName: displayAgentName }
+          }
         )
+        const updatedConv = await chatService.getConversation(sessionId) || conv.toObject()
 
         io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_MESSAGE, sysMsg.toObject())
         io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_RESOLVED)
-        io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_CONVERSATION_UPDATED, conv.toObject())
-        io.to(ROOMS.AGENTS).emit(EVENTS.CHAT_CONVERSATION_UPDATED, conv.toObject())
+        io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_CONVERSATION_UPDATED, updatedConv)
+        io.to(ROOMS.AGENTS).emit(EVENTS.CHAT_CONVERSATION_UPDATED, updatedConv)
         if (typeof callback === 'function') {
-          callback({ success: true, conversation: conv.toObject() })
+          callback({ success: true, conversation: updatedConv })
         }
       } catch (err) {
         logger.error(`[Chat] resolve error: ${err.message}`)
@@ -449,7 +533,15 @@ async function handleBotReply(io, conv, sessionId, message, customer) {
 
     io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_BOT_TYPING, { isTyping: true })
 
-    const botReply = await aiService.processMessage(sessionId, message, customer, runtimeConfig)
+    const botReply = await aiService.processMessage(sessionId, message, customer, {
+      ...runtimeConfig,
+      onActivity: activity => {
+        io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_BOT_ACTIVITY, {
+          sessionId,
+          ...activity
+        })
+      }
+    })
 
     io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_BOT_TYPING, { isTyping: false })
 
@@ -469,6 +561,7 @@ async function handleBotReply(io, conv, sessionId, message, customer) {
         reason: botReply.escalateReason,
         conversation: escalatedConv
       })
+      io.to(ROOMS.AGENTS).emit(EVENTS.CHAT_CONVERSATION_UPDATED, escalatedConv)
     }
   } catch (botErr) {
     logger.error('[Chat] Bot processing error:', botErr.stack || botErr.message || botErr)

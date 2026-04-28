@@ -1,5 +1,6 @@
 const logger = require('../../../../config/logger')
 const productCategoriesService = require('../../services/client/productCategories.service')
+const getRequestLanguage = require('../../utils/getRequestLanguage')
 
 const handleKnownControllerError = (res, error) => {
   if (!error?.statusCode) {
@@ -10,9 +11,9 @@ const handleKnownControllerError = (res, error) => {
   return true
 }
 
-module.exports.index = async (_req, res) => {
+module.exports.index = async (req, res) => {
   try {
-    const result = await productCategoriesService.getCategoryTree()
+    const result = await productCategoriesService.getCategoryTree(getRequestLanguage(req))
     res.json(result)
   } catch (err) {
     logger.error('[Client] Get public categories error:', err)
@@ -22,7 +23,7 @@ module.exports.index = async (_req, res) => {
 
 module.exports.getProductsByCategorySlug = async (req, res) => {
   try {
-    const result = await productCategoriesService.getProductsByCategorySlug(req.params.slug)
+    const result = await productCategoriesService.getProductsByCategorySlug(req.params.slug, getRequestLanguage(req))
     res.json(result)
   } catch (err) {
     if (handleKnownControllerError(res, err)) return

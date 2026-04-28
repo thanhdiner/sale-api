@@ -13,6 +13,21 @@ const roleSchema = new mongoose.Schema(
       maxlength: 300,
       default: ''
     },
+    translations: {
+      en: {
+        label: {
+          type: String,
+          trim: true,
+          maxlength: 100,
+          default: ''
+        },
+        description: {
+          type: String,
+          maxlength: 300,
+          default: ''
+        }
+      }
+    },
     permissions: [{ type: String }],
     isActive: {
       type: Boolean,

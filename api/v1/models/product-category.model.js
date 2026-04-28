@@ -23,6 +23,17 @@ const productCategorySchema = new mongoose.Schema(
       type: String,
       default: ''
     },
+    content: {
+      type: String,
+      default: ''
+    },
+    translations: {
+      en: {
+        title: { type: String, trim: true, default: '' },
+        description: { type: String, default: '' },
+        content: { type: String, default: '' }
+      }
+    },
     thumbnail: {
       type: String,
       default: ''

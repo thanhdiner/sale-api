@@ -1,5 +1,7 @@
 const logger = require('../../../../config/logger')
 const productService = require('../../services/client/products.service')
+const backInStockService = require('../../services/backInStock.service')
+const getRequestLanguage = require('../../utils/getRequestLanguage')
 
 const handleKnownControllerError = (res, error) => {
   if (!error?.statusCode) {
@@ -12,7 +14,7 @@ const handleKnownControllerError = (res, error) => {
 
 module.exports.index = async (req, res) => {
   try {
-    const result = await productService.getProductsList(req.query)
+    const result = await productService.getProductsList(req.query, getRequestLanguage(req))
     res.json(result)
   } catch (error) {
     if (handleKnownControllerError(res, error)) return
@@ -32,9 +34,20 @@ module.exports.suggest = async (req, res) => {
   }
 }
 
+module.exports.searchSuggestions = async (req, res) => {
+  try {
+    const result = await productService.getSearchSuggestions(req.query)
+    res.json(result)
+  } catch (error) {
+    if (handleKnownControllerError(res, error)) return
+    logger.error('[Products] searchSuggestions error:', error)
+    res.status(500).json({ error: 'Internal server error', status: 500 })
+  }
+}
+
 module.exports.detail = async (req, res) => {
   try {
-    const result = await productService.getProductDetail(req.params.slug)
+    const result = await productService.getProductDetail(req.params.slug, getRequestLanguage(req))
     res.json(result)
   } catch (error) {
     if (handleKnownControllerError(res, error)) return
@@ -79,6 +92,23 @@ module.exports.trackView = async (req, res) => {
   } catch (error) {
     if (handleKnownControllerError(res, error)) return
     logger.error('[Products] trackView error:', error)
+    res.status(500).json({ error: 'Internal server error', status: 500 })
+  }
+}
+
+module.exports.notifyWhenBackInStock = async (req, res) => {
+  try {
+    const result = await backInStockService.registerBackInStockNotification({
+      productId: req.params.id,
+      email: req.body?.email,
+      user: req.user,
+      lang: getRequestLanguage(req)
+    })
+
+    res.json(result)
+  } catch (error) {
+    if (handleKnownControllerError(res, error)) return
+    logger.error('[Products] notifyWhenBackInStock error:', error)
     res.status(500).json({ error: 'Internal server error', status: 500 })
   }
 }

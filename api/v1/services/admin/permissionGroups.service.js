@@ -25,14 +25,51 @@ function normalizeWriteError(error, fallbackMessage) {
   return error
 }
 
-async function listPermissionGroups() {
+const normalizeLanguage = language => (String(language || '').toLowerCase().startsWith('en') ? 'en' : 'vi')
+
+const hasText = value => typeof value === 'string' && value.trim().length > 0
+
+const toPlainObject = item => {
+  if (!item) return item
+  return item.toObject ? item.toObject() : { ...item }
+}
+
+function normalizePermissionGroupTranslations(translations = {}) {
+  const en = translations?.en || {}
+
+  return {
+    en: {
+      label: typeof en.label === 'string' ? en.label.trim() : '',
+      description: typeof en.description === 'string' ? en.description.trim() : ''
+    }
+  }
+}
+
+function localizePermissionGroup(group, languageInput) {
+  const language = normalizeLanguage(languageInput)
+  const plainGroup = toPlainObject(group)
+
+  if (!plainGroup) return plainGroup
+
+  const translated = plainGroup.translations?.en || {}
+
+  return {
+    ...plainGroup,
+    localizedLabel: language === 'en' && hasText(translated.label) ? translated.label : plainGroup.label,
+    localizedDescription:
+      language === 'en' && hasText(translated.description) ? translated.description : plainGroup.description
+  }
+}
+
+async function listPermissionGroups(params = {}) {
+  const { language } = params
   const permissionGroups = await permissionGroupRepository.findByQuery({ deleted: false })
 
-  return { data: permissionGroups }
+  return { data: permissionGroups.map(group => localizePermissionGroup(group, language)) }
 }
 
 async function createPermissionGroup(payload = {}) {
-  const { label, value, description, isActive } = payload
+  const { label, value, description, translations, isActive } = payload
 
   if (!label || !value) {
     throw new AppError('Label, value are required', 400)
@@ -52,6 +89,7 @@ async function createPermissionGroup(payload = {}) {
       label,
       value,
       description,
+      translations: normalizePermissionGroupTranslations(translations),
       isActive
     })
 
@@ -67,17 +105,20 @@ async function createPermissionGroup(payload = {}) {
 async function editPermissionGroup(id, payload = {}) {
   ensureValidObjectId(id)
 
-  const { label, description, isActive } = payload
+  const { label, description, translations, isActive } = payload
 
   if (!label) {
     throw new AppError('Label is required', 400)
   }
 
+  const updateData = { label, description, isActive }
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'translations')) {
+    updateData.translations = normalizePermissionGroupTranslations(translations)
+  }
+
   try {
-    const updated = await permissionGroupRepository.updateById(
-      id,
-      { label, description, isActive }
-    )
+    const updated = await permissionGroupRepository.updateById(id, updateData)
 
     if (!updated) {
       throw new AppError('Permission group not found', 404)

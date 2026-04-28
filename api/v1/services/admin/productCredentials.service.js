@@ -43,7 +43,7 @@ async function listByProduct(productId) {
     .sort({ status: 1, createdAt: -1 })
     .select('_id productId status summary reservedByOrderId soldToOrderId reservedAt soldAt disabledAt createdAt updatedAt')
     .lean()
-  const availableCount = await syncProductStock(productId, { invalidateCache: false })
+  const availableCount = await syncProductStock(productId, { invalidateCache: false, notifyRestock: false })
 
   return { success: true, credentials, availableCount }
 }

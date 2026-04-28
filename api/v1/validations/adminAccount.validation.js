@@ -1,5 +1,11 @@
 const Joi = require('joi')
 
+const accountTranslationSchema = Joi.object({
+  en: Joi.object({
+    fullName: Joi.string().max(100).allow('', null).optional()
+  }).optional()
+}).optional()
+
 const mongoId = Joi.string()
   .pattern(/^[a-f\d]{24}$/i)
   .messages({ 'string.pattern.base': 'ID không hợp lệ' })
@@ -32,6 +38,7 @@ const createAccount = Joi.object({
   }),
   role_id: mongoId.optional().allow('', null),
   status: Joi.string().valid('active', 'inactive', 'banned').default('active'),
+  translations: accountTranslationSchema,
   avatarUrl: Joi.string().uri().allow('', null).optional()
 })
 
@@ -43,6 +50,7 @@ const editAccount = Joi.object({
   fullName: Joi.string().min(2).max(100).optional(),
   role_id: mongoId.optional().allow('', null),
   status: Joi.string().valid('active', 'inactive', 'banned').optional(),
+  translations: accountTranslationSchema,
   avatarUrl: Joi.string().uri().allow('', null).optional(),
   newPassword: Joi.string().min(6).max(128).optional().allow('', null)
 })

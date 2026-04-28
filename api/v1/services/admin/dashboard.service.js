@@ -18,6 +18,17 @@ const RANGE_ALIASES = {
 }
 const ALLOWED_RANGES = new Set(['7days', '30days', '90days'])
 
+const normalizeLanguage = language => (String(language || '').toLowerCase().startsWith('en') ? 'en' : 'vi')
+
+const hasText = value => typeof value === 'string' && value.trim().length > 0
+
+function getLocalizedText(language, translatedValue, baseValue, fallback = '') {
+  if (language === 'en' && hasText(translatedValue)) return translatedValue.trim()
+  if (hasText(baseValue)) return baseValue.trim()
+  if (hasText(fallback)) return fallback.trim()
+  return fallback || ''
+}
+
 const calcChange = (current, previous) => {
   if (previous === 0) {
     if (current === 0) return { change: 0, trend: 'up' }
@@ -229,7 +240,8 @@ async function buildDashboardSummary() {
   return statistic
 }
 
-async function buildDashboardCharts(range) {
+async function buildDashboardCharts(range, languageInput = 'vi') {
+  const language = normalizeLanguage(languageInput)
   const lastNDays = getLastNDays(getRangeDayCount(range))
 
   const [salesAgg, categoryStats] = await Promise.all([
@@ -243,7 +255,13 @@ async function buildDashboardCharts(range) {
       { $group: { _id: '$productCategory', total: { $sum: 1 } } },
       { $lookup: { from: 'product_categories', localField: '_id', foreignField: '_id', as: 'categoryInfo' } },
       { $unwind: '$categoryInfo' },
-      { $project: { name: '$categoryInfo.title', total: 1 } },
+      {
+        $project: {
+          title: '$categoryInfo.title',
+          translations: '$categoryInfo.translations',
+          total: 1
+        }
+      },
       { $sort: { total: -1 } }
     ])
   ])
@@ -254,7 +272,16 @@ async function buildDashboardCharts(range) {
     return { date: key, value: salesMap.get(key) || 0 }
   })
 
-  return { salesNDays, categoryStats }
+  return {
+    salesNDays,
+    categoryStats: categoryStats.map(category => ({
+      _id: category._id,
+      title: category.title,
+      translations: category.translations,
+      name: getLocalizedText(language, category.translations?.en?.title, category.title),
+      total: category.total
+    }))
+  }
 }
 
 async function buildDashboardTopCustomers(limit) {
@@ -303,7 +330,8 @@ async function buildDashboardRecentOrders(limit) {
   return { recentOrders }
 }
 
-async function buildDashboardBestSellingProducts(limit) {
+async function buildDashboardBestSellingProducts(limit, languageInput = 'vi') {
+  const language = normalizeLanguage(languageInput)
   const now = new Date()
   const weekStart = new Date(now)
   weekStart.setDate(now.getDate() - 7)
@@ -318,14 +346,28 @@ async function buildDashboardBestSellingProducts(limit) {
       {
         $group: {
           _id: '$orderItems.productId',
-          name: { $first: '$orderItems.name' },
+          fallbackName: { $first: '$orderItems.name' },
           image: { $first: '$orderItems.image' },
           sales: { $sum: '$orderItems.quantity' },
           revenue: { $sum: { $multiply: ['$orderItems.price', '$orderItems.quantity'] } }
         }
       },
       { $sort: { sales: -1 } },
-      { $limit: limit }
+      { $limit: limit },
+      { $lookup: { from: 'products', localField: '_id', foreignField: '_id', as: 'productInfo' } },
+      { $unwind: { path: '$productInfo', preserveNullAndEmptyArrays: true } },
+      {
+        $project: {
+          _id: 1,
+          fallbackName: 1,
+          image: 1,
+          productImage: '$productInfo.thumbnail',
+          title: '$productInfo.title',
+          translations: '$productInfo.translations',
+          sales: 1,
+          revenue: 1
+        }
+      }
     ]),
     orderRepository.aggregate([
       { $match: { isDeleted: false, status: 'completed', createdAt: { $gte: prevWeekStart, $lt: weekStart } } },
@@ -342,6 +384,8 @@ async function buildDashboardBestSellingProducts(limit) {
       const prevSales = prevWeekMap.get(String(product._id)) || 0
       return {
         ...product,
+        image: product.image || product.productImage || '',
+        name: getLocalizedText(language, product.translations?.en?.title, product.title, product.fallbackName),
         trend: prevSales > product.sales ? 'down' : prevSales === product.sales ? 'equal' : 'up'
       }
     })
@@ -352,9 +396,14 @@ async function getCachedSummaryData() {
   return cache.getOrSet('dashboard:summary', buildDashboardSummary, SUMMARY_TTL)
 }
 
-async function getCachedChartsData(range = '7days') {
+async function getCachedChartsData(range = '7days', language = 'vi') {
   const normalizedRange = normalizeRange(range)
-  return cache.getOrSet(`dashboard:charts:${normalizedRange}`, () => buildDashboardCharts(normalizedRange), CHARTS_TTL)
+  const normalizedLanguage = normalizeLanguage(language)
+  return cache.getOrSet(
+    `dashboard:charts:${normalizedRange}:${normalizedLanguage}`,
+    () => buildDashboardCharts(normalizedRange, normalizedLanguage),
+    CHARTS_TTL
+  )
 }
 
 async function getCachedTopCustomersData(limit = 5) {
@@ -377,12 +426,13 @@ async function getCachedRecentOrdersData(limit = 10) {
   )
 }
 
-async function getCachedBestSellingProductsData(limit = 5) {
+async function getCachedBestSellingProductsData(limit = 5, language = 'vi') {
   const normalizedLimit = normalizeLimit(limit, 5, 20)
+  const normalizedLanguage = normalizeLanguage(language)
 
   return cache.getOrSet(
-    `dashboard:best-selling-products:${normalizedLimit}`,
-    () => buildDashboardBestSellingProducts(normalizedLimit),
+    `dashboard:best-selling-products:${normalizedLimit}:${normalizedLanguage}`,
+    () => buildDashboardBestSellingProducts(normalizedLimit, normalizedLanguage),
     BEST_SELLING_PRODUCTS_TTL
   )
 }
@@ -392,8 +442,8 @@ async function getDashboardSummary() {
   return wrapDashboardResponse(data, 'Dashboard summary retrieved successfully')
 }
 
-async function getDashboardCharts(range = '7days') {
-  const data = await getCachedChartsData(range)
+async function getDashboardCharts(range = '7days', language = 'vi') {
+  const data = await getCachedChartsData(range, language)
   return wrapDashboardResponse(data, 'Dashboard charts retrieved successfully')
 }
 
@@ -407,19 +457,19 @@ async function getDashboardRecentOrders(limit) {
   return wrapDashboardResponse(data, 'Dashboard recent orders retrieved successfully')
 }
 
-async function getDashboardBestSellingProducts(limit) {
-  const data = await getCachedBestSellingProductsData(limit)
+async function getDashboardBestSellingProducts(limit, language = 'vi') {
+  const data = await getCachedBestSellingProductsData(limit, language)
   return wrapDashboardResponse(data, 'Dashboard best selling products retrieved successfully')
 }
 
-async function getDashboard(range = '7days') {
+async function getDashboard(range = '7days', language = 'vi') {
   const normalizedRange = normalizeRange(range)
   const [summary, charts, topCustomers, recentOrders, bestSellingProducts] = await Promise.all([
     getCachedSummaryData(),
-    getCachedChartsData(normalizedRange),
+    getCachedChartsData(normalizedRange, language),
     getCachedTopCustomersData(),
     getCachedRecentOrdersData(),
-    getCachedBestSellingProductsData()
+    getCachedBestSellingProductsData(5, language)
   ])
 
   return wrapDashboardResponse(

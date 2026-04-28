@@ -18,7 +18,10 @@ const handleKnownControllerError = (res, error) => {
 //# GET /api/v1/admin/widgets
 module.exports.index = async (req, res) => {
   try {
-    const result = await widgetsService.listWidgets(req.query)
+    const result = await widgetsService.listWidgets({
+      ...req.query,
+      language: req.get('accept-language')
+    })
     res.status(200).json(result)
   } catch (err) {
     logger.error('[Admin] Error fetching widgets:', err)

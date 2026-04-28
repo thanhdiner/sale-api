@@ -92,23 +92,23 @@ async function listFlashSales(query = {}) {
       }
     }
 
-    const total = await flashSaleRepository.countByQuery({})
     const flashSalesRaw = await flashSaleRepository.findAll({}, {
       populate,
-      sort: { startAt: -1 },
-      skip,
-      limit: pageLimit
+      sort: { startAt: -1 }
     })
 
-    const flashSales = flashSalesRaw
+    const filteredFlashSales = flashSalesRaw
       .map(flashSale => ({ ...flashSale.toObject(), status: getRealStatus(flashSale) }))
       .filter(flashSale => (status === 'all' ? true : flashSale.status === status))
+    const total = filteredFlashSales.length
+    const flashSales = filteredFlashSales.slice(skip, skip + pageLimit)
 
     return {
       flashSales,
       total,
       currentPage,
-      limit: pageLimit
+      limit: pageLimit,
+      hasMore: skip + pageLimit < total
     }
   }, 120)
 }

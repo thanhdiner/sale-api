@@ -1,6 +1,9 @@
 const mongoose = require('mongoose')
 const AppError = require('../../utils/AppError')
 const bankInfoRepository = require('../../repositories/bankInfo.repository')
+const applyTranslation = require('../../utils/applyTranslation')
+
+const BANK_INFO_TRANSLATION_FIELDS = ['bankName', 'accountHolder', 'noteTemplate']
 
 const isTruthy = value => value === true || value === 'true' || value === 1 || value === '1'
 const isFalsy = value => value === false || value === 'false' || value === 0 || value === '0'
@@ -9,13 +12,47 @@ function parseBoolean(value, fieldName) {
   if (typeof value === 'undefined' || value === '') return undefined
   if (isTruthy(value)) return true
   if (isFalsy(value)) return false
-  throw new AppError(`${fieldName} không hợp lệ`, 400)
+  throw new AppError(`${fieldName} is invalid`, 400)
 }
 
-function ensureValidObjectId(id, message = 'ID bank info không hợp lệ') {
+function ensureValidObjectId(id, message = 'Invalid bank info ID') {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw new AppError(message, 400)
   }
+}
+
+function normalizeLanguage(lang) {
+  return String(lang || '').toLowerCase().startsWith('en') ? 'en' : 'vi'
+}
+
+function normalizeText(value) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function normalizeBankInfoTranslations(translations = {}) {
+  let parsedTranslations = translations
+
+  if (typeof translations === 'string') {
+    try {
+      parsedTranslations = JSON.parse(translations)
+    } catch {
+      parsedTranslations = {}
+    }
+  }
+
+  const en = parsedTranslations?.en || {}
+
+  return {
+    en: {
+      bankName: normalizeText(en.bankName),
+      accountHolder: normalizeText(en.accountHolder),
+      noteTemplate: normalizeText(en.noteTemplate)
+    }
+  }
+}
+
+function localizeBankInfo(bankInfo, lang) {
+  return applyTranslation(bankInfo, normalizeLanguage(lang), BANK_INFO_TRANSLATION_FIELDS)
 }
 
 function normalizeWriteError(message, error) {
@@ -28,6 +65,11 @@ function normalizeWriteError(message, error) {
   }
 
   return error
+}
+
+function buildTextSearch(value) {
+  const escapedValue = String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return { $regex: escapedValue, $options: 'i' }
 }
 
 function buildListQuery({ keyword = '', isActive = '' }) {
@@ -43,11 +85,16 @@ function buildListQuery({ keyword = '', isActive = '' }) {
     return query
   }
 
+  const textSearch = buildTextSearch(trimmedKeyword)
   const isObjectId = trimmedKeyword.length === 24 && /^[a-fA-F0-9]{24}$/.test(trimmedKeyword)
   query.$or = [
-    { bankName: { $regex: trimmedKeyword, $options: 'i' } },
-    { accountNumber: { $regex: trimmedKeyword, $options: 'i' } },
-    { accountHolder: { $regex: trimmedKeyword, $options: 'i' } },
+    { bankName: textSearch },
+    { 'translations.en.bankName': textSearch },
+    { accountNumber: textSearch },
+    { accountHolder: textSearch },
+    { 'translations.en.accountHolder': textSearch },
+    { noteTemplate: textSearch },
+    { 'translations.en.noteTemplate': textSearch },
     ...(isObjectId ? [{ _id: trimmedKeyword }] : [])
   ]
 
@@ -57,7 +104,7 @@ function buildListQuery({ keyword = '', isActive = '' }) {
 async function getBankInfoByIdOrThrow(id, options = {}) {
   const {
     includeDeleted = false,
-    message = 'Không tìm thấy bank info'
+    message = 'Bank info not found'
   } = options
 
   ensureValidObjectId(id)
@@ -88,14 +135,14 @@ async function listBankInfos(params = {}) {
   return { success: true, bankInfos, total }
 }
 
-async function getActiveBankInfo() {
+async function getActiveBankInfo(lang = 'vi') {
   const bankInfo = await bankInfoRepository.findLatestActive()
 
   if (!bankInfo) {
-    throw new AppError('Không có bank info đang dùng', 404)
+    throw new AppError('No active bank info', 404)
   }
 
-  return { success: true, bankInfo }
+  return { success: true, bankInfo: localizeBankInfo(bankInfo, lang) }
 }
 
 async function createBankInfo(payload = {}, user = null) {
@@ -112,6 +159,7 @@ async function createBankInfo(payload = {}, user = null) {
       accountNumber: payload.accountNumber,
       accountHolder: payload.accountHolder,
       noteTemplate: payload.noteTemplate,
+      translations: normalizeBankInfoTranslations(payload.translations),
       qrCode: payload.qrCode,
       isActive: isActive ?? false,
       isDeleted: false,
@@ -122,7 +170,7 @@ async function createBankInfo(payload = {}, user = null) {
 
     return { success: true, bankInfo }
   } catch (error) {
-    throw normalizeWriteError('Lỗi tạo bank info', error)
+    throw normalizeWriteError('Failed to create bank info', error)
   }
 }
 
@@ -144,13 +192,16 @@ async function updateBankInfo(id, payload = {}) {
     if (typeof payload.accountNumber === 'string') bankInfo.accountNumber = payload.accountNumber
     if (typeof payload.accountHolder === 'string') bankInfo.accountHolder = payload.accountHolder
     if (typeof payload.noteTemplate === 'string') bankInfo.noteTemplate = payload.noteTemplate
+    if (Object.prototype.hasOwnProperty.call(payload, 'translations')) {
+      bankInfo.translations = normalizeBankInfoTranslations(payload.translations)
+    }
     if (typeof payload.qrCode === 'string') bankInfo.qrCode = payload.qrCode
 
     await bankInfo.save()
 
     return { success: true, bankInfo }
   } catch (error) {
-    throw normalizeWriteError('Lỗi cập nhật bank info', error)
+    throw normalizeWriteError('Failed to update bank info', error)
   }
 }
 
@@ -173,7 +224,7 @@ async function activateBankInfo(id, activeValue) {
   })
 
   if (otherActive === 0) {
-    throw new AppError('Cần ít nhất 1 bản ghi đang dùng', 400)
+    throw new AppError('At least one bank info must stay active', 400)
   }
 
   bankInfo.isActive = false
@@ -187,14 +238,14 @@ async function deleteBankInfo(id, options = {}) {
   const bankInfo = await getBankInfoByIdOrThrow(id, { includeDeleted: true })
 
   if (bankInfo.isActive) {
-    const otherActive = await BankInfo.countDocuments({
+    const otherActive = await bankInfoRepository.countByQuery({
       _id: { $ne: id },
       isActive: true,
       isDeleted: false
     })
 
     if (otherActive === 0) {
-      throw new AppError('Cần ít nhất 1 bản ghi đang dùng', 400)
+      throw new AppError('At least one bank info must stay active', 400)
     }
   }
 

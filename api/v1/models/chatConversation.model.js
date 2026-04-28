@@ -36,6 +36,12 @@ const chatConversationSchema = new mongoose.Schema(
     lastMessage: { type: String, default: '' },
     lastMessageAt: { type: Date, default: null },
     lastMessageSender: { type: String, default: null },
+    lastMessageMetadata: { type: mongoose.Schema.Types.Mixed, default: null },
+    translations: {
+      en: {
+        lastMessage: { type: String, trim: true, maxlength: 2000, default: '' }
+      }
+    },
     unreadByAgent: { type: Number, default: 0 },
     unreadByCustomer: { type: Number, default: 0 },
     messageCount: { type: Number, default: 0 },

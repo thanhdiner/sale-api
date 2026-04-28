@@ -6,6 +6,17 @@ const { deleteImageFromCloudinary } = require('../../utils/cloudinaryUtils')
 const isTruthy = value => value === true || value === 'true' || value === 1 || value === '1'
 const isFalsy = value => value === false || value === 'false' || value === 0 || value === '0'
 
+function normalizeBannerTranslations(translations = {}) {
+  const en = translations?.en || {}
+
+  return {
+    en: {
+      title: typeof en.title === 'string' ? en.title.trim() : '',
+      link: typeof en.link === 'string' ? en.link.trim() : ''
+    }
+  }
+}
+
 function ensureValidObjectId(id) {
   if (!mongoose.Types.ObjectId.isValid(id)) {
     throw new AppError('Invalid banner ID', 400)
@@ -80,6 +91,7 @@ async function createBanner(payload = {}, user = null) {
       title: payload.title,
       img: payload.img,
       link: payload.link || '',
+      translations: normalizeBannerTranslations(payload.translations),
       order: parseOrder(payload.order, 0),
       isActive: parseBoolean(payload.isActive, 'isActive') ?? true,
       createdBy: user?.userId || null
@@ -105,6 +117,10 @@ async function updateBanner(id, payload = {}, user = null) {
 
   if (Object.prototype.hasOwnProperty.call(payload, 'link')) {
     updateData.link = payload.link
+  }
+
+  if (Object.prototype.hasOwnProperty.call(payload, 'translations')) {
+    updateData.translations = normalizeBannerTranslations(payload.translations)
   }
 
   if (Object.prototype.hasOwnProperty.call(payload, 'order')) {

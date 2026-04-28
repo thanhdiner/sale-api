@@ -47,6 +47,27 @@ const chatMessageSchema = new mongoose.Schema(
     // Chi agent thay (internal note)
     isInternal: { type: Boolean, default: false },
     isRead: { type: Boolean, default: false },
+    translations: {
+      en: {
+        message: { type: String, trim: true, maxlength: 2000, default: '' }
+      }
+    },
+    reactions: {
+      type: [
+        {
+          emoji: { type: String, required: true, trim: true, maxlength: 12 },
+          reactorType: {
+            type: String,
+            enum: ['customer', 'agent'],
+            required: true
+          },
+          reactorId: { type: String, default: null, maxlength: 200 },
+          reactorName: { type: String, default: '', trim: true, maxlength: 100 },
+          createdAt: { type: Date, default: Date.now }
+        }
+      ],
+      default: []
+    },
     // Metadata cho bot messages (suggestions, intent, confidence, pendingAction...)
     metadata: { type: mongoose.Schema.Types.Mixed, default: null }
   },

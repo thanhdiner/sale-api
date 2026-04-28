@@ -1,5 +1,6 @@
 const logger = require('../../../../config/logger')
 const purchaseReceiptsService = require('../../services/admin/purchaseReceipts.service')
+const getRequestLanguage = require('../../utils/getRequestLanguage')
 
 const handleKnownControllerError = (res, error) => {
   if (!error?.statusCode) {
@@ -12,9 +13,10 @@ const handleKnownControllerError = (res, error) => {
 
 module.exports.listPurchaseReceipts = async (req, res) => {
   try {
-    const result = await purchaseReceiptsService.listPurchaseReceipts(req.query)
+    const result = await purchaseReceiptsService.listPurchaseReceipts(req.query, getRequestLanguage(req))
     res.json(result)
   } catch (err) {
+    if (handleKnownControllerError(res, err)) return
     logger.error('[Admin] Error listing purchase receipts:', err)
     res.status(500).json({ error: 'Lỗi lấy danh sách phiếu nhập' })
   }
@@ -22,7 +24,7 @@ module.exports.listPurchaseReceipts = async (req, res) => {
 
 module.exports.createPurchaseReceipt = async (req, res) => {
   try {
-    const result = await purchaseReceiptsService.createPurchaseReceipt(req.body, req.user?.userId)
+    const result = await purchaseReceiptsService.createPurchaseReceipt(req.body, req.user?.userId, getRequestLanguage(req))
     res.json(result)
   } catch (err) {
     if (handleKnownControllerError(res, err)) return

@@ -3,6 +3,7 @@ const Product = require('../models/products.model')
 const AppError = require('../utils/AppError')
 const { decryptCredential } = require('../utils/digitalCredentialCrypto')
 const cache = require('../../../config/redis')
+const { notifyBackInStockForProduct } = require('./backInStock.service')
 
 const PRODUCT_CACHE_PATTERNS = [
   'products:list:*',
@@ -18,15 +19,23 @@ function invalidateProductCaches() {
   cache.del(...PRODUCT_CACHE_PATTERNS).catch(() => {})
 }
 
-async function syncProductStock(productId, { invalidateCache = true } = {}) {
+async function syncProductStock(productId, { invalidateCache = true, notifyRestock = true } = {}) {
+  const productBefore = await Product.findById(productId).select('stock').lean()
   const availableCount = await ProductCredential.countDocuments({ productId, status: 'available' })
+
   await Product.updateOne(
     { _id: productId, deliveryType: 'instant_account' },
     { $set: { stock: availableCount } }
   )
+
   if (invalidateCache) {
     invalidateProductCaches()
   }
+
+  if (notifyRestock && Number(productBefore?.stock || 0) <= 0 && availableCount > 0) {
+    await notifyBackInStockForProduct(productId)
+  }
+
   return availableCount
 }
 

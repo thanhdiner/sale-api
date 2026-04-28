@@ -8,6 +8,18 @@ const mongoId = Joi.string()
 // ADMIN PRODUCTS
 // ─────────────────────────────────────────────
 
+const productTranslationSchema = Joi.object({
+  en: Joi.object({
+    title: Joi.string().max(500).allow('', null),
+    description: Joi.string().max(50000).allow('', null),
+    content: Joi.string().max(50000).allow('', null),
+    features: Joi.alternatives()
+      .try(Joi.array().items(Joi.string().allow('')), Joi.string().allow(''))
+      .optional(),
+    deliveryInstructions: Joi.string().max(5000).allow('', null)
+  }).optional()
+}).optional()
+
 const createProduct = Joi.object({
   title: Joi.string().min(2).max(500).required().messages({
     'string.min': 'Tên sản phẩm phải có ít nhất 2 ký tự',
@@ -16,6 +28,7 @@ const createProduct = Joi.object({
   slug: Joi.string().max(500).optional().allow('', null),
   description: Joi.string().max(50000).optional().allow('', null),
   content: Joi.string().max(50000).optional().allow('', null),
+  translations: productTranslationSchema,
   price: Joi.number().min(0).required().messages({ 'any.required': 'Giá là bắt buộc' }),
   costPrice: Joi.number().min(0).optional().allow(null),
   discountPercentage: Joi.number().min(0).max(100).default(0),

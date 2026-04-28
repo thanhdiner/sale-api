@@ -18,7 +18,10 @@ const handleKnownControllerError = (res, error) => {
 //# Get /api/v1/admin/product-categories
 module.exports.index = async (req, res) => {
   try {
-    const result = await productCategoriesService.listProductCategories(req.query)
+    const result = await productCategoriesService.listProductCategories({
+      ...req.query,
+      language: req.get('accept-language')
+    })
     res.json(result)
   } catch (err) {
     logger.error('[Admin] Error getting product categories:', err)

@@ -1,5 +1,5 @@
 const logger = require('../../../../config/logger')
-const { executeTool } = require('./ai.tools')
+const { executeTool, getToolByName } = require('./ai.tools')
 const { recordToolCall } = require('./toolCallLogger')
 const { parseFailedGeneration } = require('./ai.helpers')
 const { MAX_TOOL_ROUNDS } = require('./ai.constants')
@@ -17,6 +17,7 @@ async function executeToolAndLog({
 }) {
   const toolStartedAt = Date.now()
   const result = await executeTool(toolName, args, toolContext)
+  const durationMs = Date.now() - toolStartedAt
 
   await recordToolCall({
     conversationId: customerInfo.conversationId,
@@ -26,13 +27,49 @@ async function executeToolAndLog({
     toolName,
     toolArgs: args,
     result,
-    durationMs: Date.now() - toolStartedAt,
+    durationMs,
     provider,
     model,
     round
   })
 
-  return result
+  return { result, durationMs }
+}
+
+function buildToolActivity({ toolName, durationMs, round }) {
+  const toolMeta = getToolByName(toolName)
+
+  return {
+    type: 'tool',
+    status: 'done',
+    toolName,
+    toolLabel: toolMeta?.label || toolName,
+    durationMs,
+    round
+  }
+}
+
+function parseToolResult(result) {
+  if (typeof result !== 'string') return null
+
+  try {
+    return JSON.parse(result)
+  } catch {
+    return null
+  }
+}
+
+function getHandoffRequestFromToolResult({ toolName, args, result }) {
+  const payload = parseToolResult(result)
+  if (!payload?.handoffRequested && !payload?.escalate) return null
+
+  return {
+    toolName,
+    reason: payload.escalationReason || payload.reason || args?.reason || 'AI requested human support',
+    priority: payload.priority || args?.priority || 'normal',
+    summary: payload.summary || args?.summary || null,
+    message: payload.message || 'Minh da chuyen cuoc tro chuyen sang nhan vien ho tro. Ban vui long doi trong giay lat nhe.'
+  }
 }
 
 async function generateReplyWithTools({
@@ -45,14 +82,18 @@ async function generateReplyWithTools({
   temperature,
   sessionId,
   customerInfo,
-  promptText
+  promptText,
+  onActivity
 }) {
   let totalTokens = 0
   const toolsUsed = []
+  const agentActivity = []
   let reply = null
+  let handoffRequest = null
   const toolContext = {
     sessionId,
     customerInfo,
+    promptText,
     userId: customerInfo.userId || null
   }
 
@@ -64,7 +105,7 @@ async function generateReplyWithTools({
       temperature
     }
 
-    if (round < MAX_TOOL_ROUNDS - 1 && toolDefinitions.length > 0) {
+    if (!handoffRequest && round < MAX_TOOL_ROUNDS - 1 && toolDefinitions.length > 0) {
       requestParams.tools = toolDefinitions
       requestParams.tool_choice = 'auto'
     }
@@ -80,8 +121,19 @@ async function generateReplyWithTools({
         if (parsed) {
           logger.info(`[AI] Groq fallback: parsed failed_generation -> ${parsed.name}(${JSON.stringify(parsed.args)})`)
           toolsUsed.push(parsed.name)
+          const parsedToolMeta = getToolByName(parsed.name)
 
-          const toolResult = await executeToolAndLog({
+          if (typeof onActivity === 'function') {
+            onActivity({
+              type: 'tool',
+              status: 'running',
+              toolName: parsed.name,
+              toolLabel: parsedToolMeta?.label || parsed.name,
+              round: round + 1
+            })
+          }
+
+          const toolExecution = await executeToolAndLog({
             toolName: parsed.name,
             args: parsed.args,
             toolContext,
@@ -92,10 +144,24 @@ async function generateReplyWithTools({
             round: round + 1,
             sessionId
           })
+          const parsedHandoffRequest = getHandoffRequestFromToolResult({
+            toolName: parsed.name,
+            args: parsed.args,
+            result: toolExecution.result
+          })
+          if (parsedHandoffRequest) handoffRequest = parsedHandoffRequest
+
+          const parsedActivity = buildToolActivity({
+            toolName: parsed.name,
+            durationMs: toolExecution.durationMs,
+            round: round + 1
+          })
+          agentActivity.push(parsedActivity)
+          if (typeof onActivity === 'function') onActivity(parsedActivity)
 
           messages.push({
             role: 'assistant',
-            content: `Tôi đã tra cứu hệ thống và có kết quả sau: ${toolResult}`
+            content: `Tool result from ${parsed.name}: ${toolExecution.result}`
           })
 
           const followUp = await client.chat.completions.create({
@@ -135,8 +201,19 @@ async function generateReplyWithTools({
           }
 
           toolsUsed.push(toolName)
+          const toolMeta = getToolByName(toolName)
 
-          const result = await executeToolAndLog({
+          if (typeof onActivity === 'function') {
+            onActivity({
+              type: 'tool',
+              status: 'running',
+              toolName,
+              toolLabel: toolMeta?.label || toolName,
+              round: round + 1
+            })
+          }
+
+          const toolExecution = await executeToolAndLog({
             toolName,
             args,
             toolContext,
@@ -147,11 +224,25 @@ async function generateReplyWithTools({
             round: round + 1,
             sessionId
           })
+          const toolHandoffRequest = getHandoffRequestFromToolResult({
+            toolName,
+            args,
+            result: toolExecution.result
+          })
+          if (toolHandoffRequest) handoffRequest = toolHandoffRequest
+
+          const toolActivity = buildToolActivity({
+            toolName,
+            durationMs: toolExecution.durationMs,
+            round: round + 1
+          })
+          agentActivity.push(toolActivity)
+          if (typeof onActivity === 'function') onActivity(toolActivity)
 
           return {
             role: 'tool',
             tool_call_id: toolCall.id,
-            content: result
+            content: toolExecution.result
           }
         })
       )
@@ -167,7 +258,9 @@ async function generateReplyWithTools({
   return {
     reply,
     totalTokens,
-    toolsUsed
+    toolsUsed,
+    agentActivity,
+    handoffRequest
   }
 }
 

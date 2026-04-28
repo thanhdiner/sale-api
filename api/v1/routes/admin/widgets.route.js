@@ -9,18 +9,33 @@ const uploadCloud = require('../../middlewares/admin/uploadCloud.middleware')
 
 const checkPermission = require('../../middlewares/admin/checkPermission.middleware')
 const { invalidateWidgets } = require('../../middlewares/cacheInvalidation.middleware')
+const parseJsonBodyField = require('../../utils/parseJsonBodyField')
+
+const parseWidgetJsonBodyFields = (req, res, next) => {
+  parseJsonBodyField(req.body, 'translations')
+  next()
+}
 
 router.get('/', checkPermission.checkPermission('view_widgets'), controller.index)
-router.post('/', checkPermission.checkPermission('create_widget'), fileUpload.single('iconUrl'), uploadCloud.upload, controller.create, invalidateWidgets)
+router.post(
+  '/',
+  checkPermission.checkPermission('create_widget'),
+  fileUpload.single('iconUrl'),
+  uploadCloud.upload,
+  parseWidgetJsonBodyFields,
+  invalidateWidgets,
+  controller.create
+)
 router.patch(
   '/:id',
   checkPermission.checkPermission('edit_widget'),
   fileUpload.single('iconUrl'),
   uploadCloud.upload,
   uploadCloud.deleteImage,
-  controller.edit,
-  invalidateWidgets
+  parseWidgetJsonBodyFields,
+  invalidateWidgets,
+  controller.edit
 )
-router.delete('/:id', checkPermission.checkPermission('delete_widget'), controller.delete, invalidateWidgets)
+router.delete('/:id', checkPermission.checkPermission('delete_widget'), invalidateWidgets, controller.delete)
 
 module.exports = router

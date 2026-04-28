@@ -36,7 +36,8 @@ async function processMessage(sessionId, userMessage, customerInfo = {}, overrid
       agentTone,
       systemRules,
       toolSettings,
-      availableTools
+      availableTools,
+      onActivity
     } = runtimeConfig
     const toolDefinitions = getToolDefinitions(toolSettings)
 
@@ -78,7 +79,21 @@ async function processMessage(sessionId, userMessage, customerInfo = {}, overrid
     )
 
     const startTime = Date.now()
-    const { reply, totalTokens, toolsUsed } = await generateReplyWithTools({
+    if (typeof onActivity === 'function') {
+      onActivity({ type: 'understand', status: 'running' })
+    }
+
+    const markUnderstood = () => {
+      if (typeof onActivity === 'function') {
+        onActivity({ type: 'understand', status: 'done' })
+      }
+    }
+
+    markUnderstood()
+    if (typeof onActivity === 'function') {
+      onActivity({ type: 'compose', status: 'running' })
+    }
+    const { reply, totalTokens, toolsUsed, agentActivity, handoffRequest } = await generateReplyWithTools({
       client,
       messages,
       toolDefinitions,
@@ -88,11 +103,13 @@ async function processMessage(sessionId, userMessage, customerInfo = {}, overrid
       temperature,
       sessionId,
       customerInfo,
-      promptText
+      promptText,
+      onActivity
     })
     const elapsed = Date.now() - startTime
+    const finalReply = reply || (handoffRequest ? handoffRequest.message : '')
 
-    if (!reply) {
+    if (!finalReply) {
       logger.warn(`[AI] Empty response from ${provider} after tool loop (${elapsed}ms)`)
       return {
         text: fallbackMessage,
@@ -104,21 +121,30 @@ async function processMessage(sessionId, userMessage, customerInfo = {}, overrid
     logger.info(`[AI] Response from ${provider} (${elapsed}ms, ${totalTokens} tokens, tools: [${toolsUsed.join(', ')}])`)
 
     await conversationMemory.addMessage(sessionId, 'user', memoryInput)
-    await conversationMemory.addMessage(sessionId, 'assistant', reply)
+    await conversationMemory.addMessage(sessionId, 'assistant', finalReply)
 
-    const suggestions = extractSuggestions(reply)
+    const suggestions = extractSuggestions(finalReply)
+    if (typeof onActivity === 'function') {
+      onActivity({ type: 'compose', status: 'done', durationMs: elapsed })
+    }
 
     return {
-      text: removeSuggestionLines(reply),
+      text: removeSuggestionLines(finalReply),
       suggestions,
-      escalate: false,
-      escalateReason: null,
+      escalate: !!handoffRequest,
+      escalateReason: handoffRequest?.reason || null,
       metadata: {
+        ...(handoffRequest ? { intent: 'escalate', escalationReason: handoffRequest.reason } : {}),
         provider,
         model,
         tokensUsed: totalTokens,
         responseTime: elapsed,
-        toolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined
+        toolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined,
+        agentActivity: [
+          { type: 'understand', status: 'done' },
+          ...(Array.isArray(agentActivity) ? agentActivity : []),
+          { type: 'compose', status: 'done', durationMs: elapsed }
+        ]
       }
     }
   } catch (err) {

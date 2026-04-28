@@ -29,11 +29,26 @@ const normalizeCheckoutProfile = payload => {
     ...normalizedAddress,
     notes: normalizeStringField(payload?.notes),
     deliveryMethod: payload?.deliveryMethod === 'contact' ? 'contact' : 'pickup',
-    paymentMethod: ['transfer', 'contact', 'vnpay', 'momo', 'zalopay'].includes(payload?.paymentMethod)
+    paymentMethod: ['transfer', 'contact', 'vnpay', 'momo', 'zalopay', 'sepay'].includes(payload?.paymentMethod)
       ? payload.paymentMethod
       : 'transfer'
   }
 }
+
+const normalizeNotificationPreferences = payload => ({
+  channels: {
+    inApp: payload?.channels?.inApp !== false,
+    email: payload?.channels?.email !== false,
+    browser: payload?.channels?.browser !== false,
+    sms: payload?.channels?.sms === true
+  },
+  orderUpdates: payload?.orderUpdates !== false,
+  paymentUpdates: payload?.paymentUpdates !== false,
+  promotions: payload?.promotions !== false,
+  backInStock: payload?.backInStock !== false,
+  wishlistUpdates: payload?.wishlistUpdates !== false,
+  supportMessages: payload?.supportMessages !== false
+})
 
 const serializeAuthUser = user => ({
   _id: user._id,
@@ -43,7 +58,8 @@ const serializeAuthUser = user => ({
   phone: user.phone || '',
   avatarUrl: user.avatarUrl || '',
   lastLogin: user.lastLogin || null,
-  checkoutProfile: normalizeCheckoutProfile(user.checkoutProfile || {})
+  checkoutProfile: normalizeCheckoutProfile(user.checkoutProfile || {}),
+  notificationPreferences: normalizeNotificationPreferences(user.notificationPreferences || {})
 })
 
 function buildCookieOptions(remember) {

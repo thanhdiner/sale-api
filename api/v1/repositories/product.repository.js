@@ -170,6 +170,10 @@ async function bulkWrite(operations) {
   return Product.bulkWrite(operations)
 }
 
+async function updateOne(filter, update, options = {}) {
+  return Product.updateOne(filter, update, options)
+}
+
 async function incrementViewsCount(productId) {
   return Product.updateOne({ _id: productId }, { $inc: { viewsCount: 1 } })
 }
@@ -188,5 +192,6 @@ module.exports = {
   findDistinctCategoriesByIds,
   findById,
   bulkWrite,
+  updateOne,
   incrementViewsCount
 }

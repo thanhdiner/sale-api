@@ -53,10 +53,15 @@ const invalidateCategories = invalidateAfter(
 )
 
 // ─── Banner / Widget / BankInfo / Config ──────────────────────────────────────
-const invalidateBanners  = invalidateAfter('banners:active')
+const invalidateBanners  = invalidateAfter('banners:active', 'banners:active:*')
 const invalidateWidgets  = invalidateAfter('widgets:active')
 const invalidateBankInfo = invalidateAfter('bankinfo:active')
 const invalidateFlashSales = invalidateAfter('flashsales:list:*', 'flashsales:detail:*')
+const invalidateAboutContent = invalidateAfter('about:content:*')
+const invalidateTermsContent = invalidateAfter('terms:content:*')
+const invalidateCooperationContactContent = invalidateAfter('cooperation-contact:content:*')
+const invalidateHomeWhyChooseUsContent = invalidateAfter('home-why-choose-us:content:*')
+const invalidateBlog = invalidateAfter('blog:list:*', 'blog:detail:*')
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 // Dùng khi order status thay đổi
@@ -69,5 +74,10 @@ module.exports = {
   invalidateWidgets,
   invalidateBankInfo,
   invalidateFlashSales,
+  invalidateAboutContent,
+  invalidateTermsContent,
+  invalidateCooperationContactContent,
+  invalidateHomeWhyChooseUsContent,
+  invalidateBlog,
   invalidateDashboard
 }

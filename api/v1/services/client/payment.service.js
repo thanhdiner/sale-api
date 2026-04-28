@@ -106,13 +106,32 @@ async function getPaymentStartError(order, method) {
   return null
 }
 
-async function finalizeSuccessfulPayment(order, transactionId) {
+function isPaymentAmountMatched(order, paidAmount) {
+  if (paidAmount === undefined || paidAmount === null || paidAmount === '') {
+    return true
+  }
+
+  const normalizedPaidAmount = Math.round(Number(paidAmount))
+  const normalizedOrderTotal = Math.round(Number(order?.total))
+
+  return Number.isFinite(normalizedPaidAmount)
+    && Number.isFinite(normalizedOrderTotal)
+    && normalizedPaidAmount === normalizedOrderTotal
+}
+
+async function finalizeSuccessfulPayment(order, transactionId, paidAmount = null) {
   if (!order || order.paymentStatus === 'paid') {
     return false
   }
 
   if (isClosedForPayment(order) || isPaymentWindowExpired(order)) {
     await closeExpiredPaymentOrder(order)
+    return false
+  }
+
+  if (!isPaymentAmountMatched(order, paidAmount)) {
+    logger.warn(`[Payment] Amount mismatch for order ${order._id}: paid=${paidAmount}, expected=${order.total}`)
+    await failPayment(order)
     return false
   }
 
@@ -158,7 +177,7 @@ async function createVNPayUrl({ orderId, userId, req }) {
 }
 
 async function handleVNPayReturn(query) {
-  const { isValid, isSuccess, orderId, transactionId } = vnpay.verifyReturn(query)
+  const { isValid, isSuccess, orderId, transactionId, amount } = vnpay.verifyReturn(query)
 
   if (!isValid) {
     return { redirectUrl: `${CLIENT_URL}/order-success?status=failed&reason=invalid_signature` }
@@ -175,8 +194,12 @@ async function handleVNPayReturn(query) {
       return { redirectUrl: `${CLIENT_URL}/order-success?status=failed&reason=order_expired&orderId=${orderId}` }
     }
 
-    await finalizeSuccessfulPayment(order, transactionId)
-    return { redirectUrl: `${CLIENT_URL}/order-success?orderId=${orderId}&method=vnpay` }
+    const finalized = await finalizeSuccessfulPayment(order, transactionId, amount)
+    return {
+      redirectUrl: finalized
+        ? `${CLIENT_URL}/order-success?orderId=${orderId}&method=vnpay`
+        : `${CLIENT_URL}/order-success?status=failed&reason=amount_mismatch&orderId=${orderId}`
+    }
   }
 
   await failPayment(order)
@@ -202,7 +225,7 @@ async function createMoMoUrl({ orderId, userId }) {
 }
 
 async function handleMoMoCallback(payload) {
-  const { isValid, isSuccess, orderId, transactionId } = momo.verifyCallback(payload)
+  const { isValid, isSuccess, orderId, transactionId, amount } = momo.verifyCallback(payload)
 
   if (!isValid) {
     return { statusCode: 400, body: { message: 'Invalid signature' } }
@@ -216,7 +239,7 @@ async function handleMoMoCallback(payload) {
 
   if (isSuccess) {
     if (!isClosedForPayment(order)) {
-      await finalizeSuccessfulPayment(order, transactionId)
+      await finalizeSuccessfulPayment(order, transactionId, amount)
     }
   } else {
     await failPayment(order)
@@ -244,7 +267,7 @@ async function createZaloPayUrl({ orderId, userId }) {
 }
 
 async function handleZaloPayCallback(payload) {
-  const { isValid, isSuccess, orderId, transactionId } = zalopay.verifyCallback(payload)
+  const { isValid, isSuccess, orderId, transactionId, amount } = zalopay.verifyCallback(payload)
 
   if (!isValid) {
     return { statusCode: 200, body: { return_code: -1, return_message: 'Invalid mac' } }
@@ -258,7 +281,7 @@ async function handleZaloPayCallback(payload) {
 
   if (isSuccess) {
     if (!isClosedForPayment(order)) {
-      await finalizeSuccessfulPayment(order, transactionId)
+      await finalizeSuccessfulPayment(order, transactionId, amount)
     }
   } else {
     await failPayment(order)
@@ -273,5 +296,9 @@ module.exports = {
   createMoMoUrl,
   handleMoMoCallback,
   createZaloPayUrl,
-  handleZaloPayCallback
+  handleZaloPayCallback,
+  finalizeSuccessfulPayment,
+  isPaymentWindowExpired,
+  isClosedForPayment,
+  closeExpiredPaymentOrder
 }

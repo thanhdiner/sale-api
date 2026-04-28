@@ -7,6 +7,15 @@ const flashSaleSchema = new mongoose.Schema(
       required: true,
       trim: true
     },
+    translations: {
+      en: {
+        name: {
+          type: String,
+          trim: true,
+          default: ''
+        }
+      }
+    },
     startAt: {
       type: Date,
       required: true

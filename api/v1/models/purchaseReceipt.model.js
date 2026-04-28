@@ -9,6 +9,11 @@ const purchaseReceiptSchema = new mongoose.Schema(
     totalCost: { type: Number, required: true, min: 0 },
     supplierName: { type: String, default: '' },
     note: { type: String, default: '' },
+    translations: {
+      en: {
+        productName: { type: String, trim: true, default: '' }
+      }
+    },
     createdBy: {
       by: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminAccount' },
       at: Date

@@ -13,7 +13,10 @@ const handleKnownControllerError = (res, error) => {
 // GET /admin/reviews
 module.exports.getReviews = async (req, res) => {
   try {
-    const result = await reviewsService.listReviews(req.query)
+    const result = await reviewsService.listReviews({
+      ...req.query,
+      language: req.get('accept-language')
+    })
     res.json(result)
   } catch (err) {
     if (handleKnownControllerError(res, err)) return
@@ -25,7 +28,7 @@ module.exports.getReviews = async (req, res) => {
 // PUT /admin/reviews/:reviewId/reply
 module.exports.replyReview = async (req, res) => {
   try {
-    const result = await reviewsService.replyReview(req.params.reviewId, req.body.content)
+    const result = await reviewsService.replyReview(req.params.reviewId, req.body)
     res.json(result)
   } catch (err) {
     if (handleKnownControllerError(res, err)) return

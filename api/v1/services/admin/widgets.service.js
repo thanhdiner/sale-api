@@ -32,6 +32,35 @@ function parseOrder(value, defaultValue = 0) {
   return parsedValue
 }
 
+function normalizeLanguage(language) {
+  return String(language || '').toLowerCase().startsWith('en') ? 'en' : 'vi'
+}
+
+function buildTextSearch(value) {
+  const escapedValue = String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return { $regex: escapedValue, $options: 'i' }
+}
+
+function normalizeWidgetTranslations(translations = {}) {
+  let parsedTranslations = translations
+
+  if (typeof parsedTranslations === 'string') {
+    try {
+      parsedTranslations = JSON.parse(parsedTranslations)
+    } catch {
+      parsedTranslations = {}
+    }
+  }
+
+  const englishTitle = parsedTranslations?.en?.title
+
+  return {
+    en: {
+      title: typeof englishTitle === 'string' ? englishTitle.trim() : ''
+    }
+  }
+}
+
 function normalizeWriteError(message, error) {
   if (error instanceof AppError) {
     return error
@@ -56,14 +85,25 @@ async function getWidgetByIdOrThrow(id) {
 }
 
 async function listWidgets(params = {}) {
-  const { title, isActive, sortField, sortOrder } = params
+  const { title, isActive, sortField, sortOrder, language } = params
+  const normalizedLanguage = normalizeLanguage(language)
   const filter = {}
-  if (title) filter.title = { $regex: title, $options: 'i' }
+  if (title) {
+    const titleFilter = buildTextSearch(title)
+    filter.$or = [
+      { title: titleFilter },
+      { 'translations.en.title': titleFilter }
+    ]
+  }
   if (typeof isActive !== 'undefined') filter.isActive = parseBoolean(isActive, 'isActive')
 
   const sort = {}
-  if (sortField && sortOrder) sort[sortField] = sortOrder === 'descend' ? -1 : 1
-  else sort.order = 1
+  if (sortField && sortOrder) {
+    const sortDirection = sortOrder === 'descend' ? -1 : 1
+    const localizedSortField = sortField === 'title' && normalizedLanguage === 'en' ? 'translations.en.title' : sortField
+    sort[localizedSortField] = sortDirection
+    if (localizedSortField !== sortField) sort[sortField] = sortDirection
+  } else sort.order = 1
 
   const widgets = await widgetRepository.findAll(filter, { sort })
 
@@ -74,7 +114,7 @@ async function listWidgets(params = {}) {
 }
 
 async function createWidget(payload = {}, user = null) {
-  const { title, iconUrl, link, order, isActive } = payload
+  const { title, iconUrl, link, order, isActive, translations } = payload
 
   if (!title || !iconUrl) {
     throw new AppError('Title and iconUrl are required', 400)
@@ -91,6 +131,7 @@ async function createWidget(payload = {}, user = null) {
   try {
     const savedWidget = await widgetRepository.create({
       title,
+      translations: normalizeWidgetTranslations(translations),
       iconUrl,
       link: link || '',
       order: orderNumber,
@@ -113,6 +154,9 @@ async function updateWidget(id, payload = {}, user = null) {
   const updateData = {}
 
   if (Object.prototype.hasOwnProperty.call(payload, 'title')) updateData.title = payload.title
+  if (Object.prototype.hasOwnProperty.call(payload, 'translations')) {
+    updateData.translations = normalizeWidgetTranslations(payload.translations)
+  }
   if (Object.prototype.hasOwnProperty.call(payload, 'iconUrl')) updateData.iconUrl = payload.iconUrl
   if (Object.prototype.hasOwnProperty.call(payload, 'link')) updateData.link = payload.link
   if (Object.prototype.hasOwnProperty.call(payload, 'order')) updateData.order = parseOrder(payload.order)

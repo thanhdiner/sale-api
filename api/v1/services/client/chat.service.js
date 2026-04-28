@@ -3,6 +3,11 @@ const streamifier = require('streamifier')
 
 const chatMessageRepository = require('../../repositories/chatMessage.repository')
 const chatConversationRepository = require('../../repositories/chatConversation.repository')
+const adminAccountRepository = require('../../repositories/adminAccount.repository')
+const {
+  getEnglishConversationPreview,
+  getSystemMessageTranslations
+} = require('../../utils/chatLocalization')
 
 const DEFAULT_CONVERSATION_LIMIT = 50
 const MAX_CONVERSATION_LIMIT = 1000
@@ -27,15 +32,34 @@ const uploadBuffer = buffer =>
     streamifier.createReadStream(buffer).pipe(stream)
   })
 
-async function createSystemMessage(conversationId, sessionId, text) {
-  return chatMessageRepository.create({
+async function createSystemMessage(conversationId, sessionId, text, metadata = null) {
+  const translations = getSystemMessageTranslations(metadata)
+  const systemMessage = await chatMessageRepository.create({
     conversationId,
     sessionId,
     sender: 'system',
     type: 'system',
     senderName: 'System',
-    message: text
+    message: text,
+    metadata,
+    ...(translations ? { translations } : {})
   })
+
+  await chatConversationRepository.updateOne(
+    { sessionId },
+    {
+      $set: {
+        lastMessage: text,
+        lastMessageAt: new Date(),
+        lastMessageSender: 'system',
+        lastMessageMetadata: metadata || null,
+        'translations.en.lastMessage': getEnglishConversationPreview({ type: 'system', metadata }) || ''
+      },
+      $inc: { messageCount: 1 }
+    }
+  )
+
+  return systemMessage
 }
 
 function getUploadFiles(files = {}) {
@@ -86,9 +110,61 @@ function buildConversationSearchFilter(search) {
       { 'customer.email': pattern },
       { 'customer.currentPage': pattern },
       { 'assignedAgent.agentName': pattern },
-      { lastMessage: pattern }
+      { lastMessage: pattern },
+      { 'translations.en.lastMessage': pattern }
     ]
   }
+}
+
+async function getAgentProfile(agent = {}) {
+  let account = null
+
+  if (agent.agentId && (!agent.agentName || !agent.agentAvatar)) {
+    account = await adminAccountRepository.findById(agent.agentId, {
+      select: 'fullName avatarUrl',
+      lean: true
+    })
+  }
+
+  return {
+    agentId: agent.agentId || null,
+    agentName: agent.agentName || account?.fullName || 'Agent',
+    agentAvatar: agent.agentAvatar || account?.avatarUrl || null
+  }
+}
+
+async function hydrateConversationAgent(conversation, { persist = false } = {}) {
+  const agentId = conversation?.assignedAgent?.agentId
+  if (!agentId || conversation.assignedAgent.agentAvatar) return conversation
+
+  const agent = await getAgentProfile({
+    agentId,
+    agentName: conversation.assignedAgent.agentName,
+    agentAvatar: conversation.assignedAgent.agentAvatar
+  })
+
+  const hydratedConversation = {
+    ...conversation,
+    assignedAgent: {
+      ...conversation.assignedAgent,
+      agentName: agent.agentName,
+      agentAvatar: agent.agentAvatar
+    }
+  }
+
+  if (persist && agent.agentAvatar) {
+    await chatConversationRepository.updateOne(
+      { sessionId: conversation.sessionId },
+      {
+        $set: {
+          'assignedAgent.agentName': agent.agentName,
+          'assignedAgent.agentAvatar': agent.agentAvatar
+        }
+      }
+    )
+  }
+
+  return hydratedConversation
 }
 
 async function getHistory({ sessionId, showInternal }) {
@@ -108,7 +184,8 @@ async function getHistory({ sessionId, showInternal }) {
 
 async function getConversation(sessionId) {
   const conversation = await chatConversationRepository.findOne({ sessionId }, { lean: true })
-  return { success: true, data: conversation }
+  const hydratedConversation = await hydrateConversationAgent(conversation, { persist: true })
+  return { success: true, data: hydratedConversation }
 }
 
 async function getConversations(query = {}) {
@@ -120,7 +197,7 @@ async function getConversations(query = {}) {
   if (agentId) filter['assignedAgent.agentId'] = agentId
   if (searchFilter) Object.assign(filter, searchFilter)
 
-  const [conversations, total] = await Promise.all([
+  const [rawConversations, total] = await Promise.all([
     chatConversationRepository.findByQuery(filter, {
       sort: { lastMessageAt: -1, createdAt: -1 },
       limit,
@@ -129,6 +206,9 @@ async function getConversations(query = {}) {
     }),
     chatConversationRepository.countByQuery(filter)
   ])
+  const conversations = await Promise.all(
+    rawConversations.map(conversation => hydrateConversationAgent(conversation, { persist: true }))
+  )
 
   return {
     success: true,
@@ -175,7 +255,7 @@ async function uploadImage(files) {
 }
 
 async function assignConversation(sessionId, payload) {
-  const { agentId, agentName, agentAvatar } = payload
+  const { agentId, agentName, agentAvatar } = await getAgentProfile(payload)
 
   const conversation = await chatConversationRepository.findOneAndUpdate(
     { sessionId },
@@ -197,8 +277,18 @@ async function assignConversation(sessionId, payload) {
     return { statusCode: 404, body: { success: false, message: 'Không tìm thấy' } }
   }
 
-  const systemMessage = await createSystemMessage(conversation._id, sessionId, `${agentName} đã tham gia cuộc trò chuyện`)
-  return { statusCode: 200, body: { success: true, data: conversation, systemMessage } }
+  const displayAgentName = agentName || 'Agent'
+  const systemMessage = await createSystemMessage(
+    conversation._id,
+    sessionId,
+    `${displayAgentName} đã tham gia cuộc trò chuyện`,
+    {
+      i18nKey: 'system.agentJoined',
+      i18nValues: { agentName: displayAgentName }
+    }
+  )
+  const updatedConversation = await chatConversationRepository.findOne({ sessionId }, { lean: true })
+  return { statusCode: 200, body: { success: true, data: updatedConversation || conversation, systemMessage } }
 }
 
 async function resolveConversation(sessionId) {
@@ -212,8 +302,14 @@ async function resolveConversation(sessionId) {
     return { statusCode: 404, body: { success: false, message: 'Không tìm thấy' } }
   }
 
-  const systemMessage = await createSystemMessage(conversation._id, sessionId, 'Cuộc trò chuyện đã được đánh dấu giải quyết')
-  return { statusCode: 200, body: { success: true, data: conversation, systemMessage } }
+  const systemMessage = await createSystemMessage(
+    conversation._id,
+    sessionId,
+    'Cuộc trò chuyện đã được đánh dấu giải quyết',
+    { i18nKey: 'system.resolved' }
+  )
+  const updatedConversation = await chatConversationRepository.findOne({ sessionId }, { lean: true })
+  return { statusCode: 200, body: { success: true, data: updatedConversation || conversation, systemMessage } }
 }
 
 async function reopenConversation(sessionId) {
@@ -227,8 +323,14 @@ async function reopenConversation(sessionId) {
     return { statusCode: 404, body: { success: false, message: 'Không tìm thấy' } }
   }
 
-  const systemMessage = await createSystemMessage(conversation._id, sessionId, 'Cuộc trò chuyện được mở lại')
-  return { statusCode: 200, body: { success: true, data: conversation, systemMessage } }
+  const systemMessage = await createSystemMessage(
+    conversation._id,
+    sessionId,
+    'Cuộc trò chuyện được mở lại',
+    { i18nKey: 'system.reopened' }
+  )
+  const updatedConversation = await chatConversationRepository.findOne({ sessionId }, { lean: true })
+  return { statusCode: 200, body: { success: true, data: updatedConversation || conversation, systemMessage } }
 }
 
 async function markRead(sessionId, reader) {

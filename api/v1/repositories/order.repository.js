@@ -12,8 +12,23 @@ async function deleteOne(filter) {
   return Order.deleteOne(filter)
 }
 
-async function findByIdNotDeleted(id) {
-  return Order.findOne({ _id: id, isDeleted: false })
+async function findByIdNotDeleted(id, options = {}) {
+  const { select, populate, lean = false } = options
+  let cursor = Order.findOne({ _id: id, isDeleted: false })
+
+  if (select) {
+    cursor = cursor.select(select)
+  }
+
+  if (populate) {
+    cursor = cursor.populate(populate)
+  }
+
+  if (lean) {
+    cursor = cursor.lean()
+  }
+
+  return cursor
 }
 
 async function findOne(query = {}, options = {}) {
@@ -53,13 +68,18 @@ async function findByQuery(query, options = {}) {
     sort = { createdAt: -1 },
     skip = 0,
     limit,
-    lean = false
+    lean = false,
+    populate
   } = options
 
   let cursor = Order.find(query).sort(sort).skip(skip)
 
   if (select) {
     cursor = cursor.select(select)
+  }
+
+  if (populate) {
+    cursor = cursor.populate(populate)
   }
 
   if (typeof limit === 'number') {

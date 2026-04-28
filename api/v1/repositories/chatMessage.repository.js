@@ -22,12 +22,23 @@ async function findByQuery(query = {}, options = {}) {
   return cursor
 }
 
+async function findById(id, options = {}) {
+  let cursor = ChatMessage.findById(id)
+
+  if (options.lean) {
+    cursor = cursor.lean()
+  }
+
+  return cursor
+}
+
 async function updateMany(filter = {}, update = {}) {
   return ChatMessage.updateMany(filter, update)
 }
 
 module.exports = {
   create,
+  findById,
   findByQuery,
   updateMany
 }

@@ -1,5 +1,6 @@
 const logger = require('../../../../config/logger')
 const dashboardService = require('../../services/admin/dashboard.service')
+const getRequestLanguage = require('../../utils/getRequestLanguage')
 
 function createDashboardHandler(label, fetcher) {
   return async (req, res) => {
@@ -15,7 +16,7 @@ function createDashboardHandler(label, fetcher) {
 
 //# [GET] /api/v1/admin/dashboard
 module.exports.dashboard = createDashboardHandler('data', req =>
-  dashboardService.getDashboard(req.query.range || '7days')
+  dashboardService.getDashboard(req.query.range || '7days', getRequestLanguage(req))
 )
 
 //# [GET] /api/v1/admin/dashboard/summary
@@ -25,7 +26,7 @@ module.exports.summary = createDashboardHandler('summary', () =>
 
 //# [GET] /api/v1/admin/dashboard/charts
 module.exports.charts = createDashboardHandler('charts', req =>
-  dashboardService.getDashboardCharts(req.query.range || '7days')
+  dashboardService.getDashboardCharts(req.query.range || '7days', getRequestLanguage(req))
 )
 
 //# [GET] /api/v1/admin/dashboard/top-customers
@@ -40,5 +41,5 @@ module.exports.recentOrders = createDashboardHandler('recent orders', req =>
 
 //# [GET] /api/v1/admin/dashboard/best-selling-products
 module.exports.bestSellingProducts = createDashboardHandler('best selling products', req =>
-  dashboardService.getDashboardBestSellingProducts(req.query.limit)
+  dashboardService.getDashboardBestSellingProducts(req.query.limit, getRequestLanguage(req))
 )

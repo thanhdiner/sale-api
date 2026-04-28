@@ -13,7 +13,10 @@ const handleKnownControllerError = (res, error) => {
 //# GET /api/v1/orders
 module.exports.getAllOrders = async (req, res) => {
   try {
-    const result = await ordersService.listOrders(req.query)
+    const result = await ordersService.listOrders({
+      ...req.query,
+      language: req.get('accept-language')
+    })
     res.json(result)
   } catch (err) {
     if (handleKnownControllerError(res, err)) return
@@ -25,7 +28,7 @@ module.exports.getAllOrders = async (req, res) => {
 //# GET /api/v1/orders/:id
 module.exports.getOrderDetailAdmin = async (req, res) => {
   try {
-    const result = await ordersService.getOrderDetail(req.params.id)
+    const result = await ordersService.getOrderDetail(req.params.id, req.get('accept-language'))
     res.json(result)
   } catch (err) {
     if (handleKnownControllerError(res, err)) return
@@ -37,7 +40,7 @@ module.exports.getOrderDetailAdmin = async (req, res) => {
 //# POST /api/v1/orders/:id
 module.exports.updateOrderStatus = async (req, res) => {
   try {
-    const result = await ordersService.updateOrderStatus(req.params.id, req.body)
+    const result = await ordersService.updateOrderStatus(req.params.id, req.body, req.get('accept-language'))
     res.json(result)
   } catch (err) {
     if (handleKnownControllerError(res, err)) return

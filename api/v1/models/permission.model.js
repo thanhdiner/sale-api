@@ -5,6 +5,12 @@ const permissionSchema = new mongoose.Schema(
     name: { type: String, required: true, unique: true },
     title: { type: String, required: true },
     description: { type: String },
+    translations: {
+      en: {
+        title: { type: String, trim: true, default: '' },
+        description: { type: String, default: '' }
+      }
+    },
     group: { type: String },
     deleted: { type: Boolean, default: false },
     deletedAt: Date

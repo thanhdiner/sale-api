@@ -8,6 +8,26 @@ const generateBackupCodes = require('../../utils/generateBackupCodes')
 
 const ADMIN_ACCOUNT_ALLOWED_STATUSES = ['active', 'inactive', 'banned']
 
+function normalizeAccountTranslations(translations = {}) {
+  let parsedTranslations = translations
+
+  if (typeof parsedTranslations === 'string') {
+    try {
+      parsedTranslations = JSON.parse(parsedTranslations)
+    } catch {
+      parsedTranslations = {}
+    }
+  }
+
+  const englishFullName = parsedTranslations?.en?.fullName
+
+  return {
+    en: {
+      fullName: typeof englishFullName === 'string' ? englishFullName.trim() : ''
+    }
+  }
+}
+
 const toPlainAdminAccount = admin => {
   const account = admin?.toObject ? admin.toObject() : { ...admin }
   delete account.passwordHash
@@ -45,7 +65,7 @@ async function listAccounts() {
 }
 
 async function createAccount(payload) {
-  const { username, email, password, fullName, role_id, status, avatarUrl } = payload
+  const { username, email, password, fullName, role_id, status, avatarUrl, translations } = payload
 
   const existingAccount = await adminAccountRepository.findOne({
     $or: [{ username }, { email }]
@@ -69,6 +89,7 @@ async function createAccount(payload) {
     username,
     email,
     fullName,
+    translations: normalizeAccountTranslations(translations),
     role_id,
     status,
     avatarUrl,
@@ -79,7 +100,7 @@ async function createAccount(payload) {
 }
 
 async function editAccount(id, payload) {
-  const { email, fullName, role_id, status, avatarUrl, newPassword } = payload
+  const { email, fullName, role_id, status, avatarUrl, newPassword, translations } = payload
 
   if (!email) {
     throw new AppError('Email là bắt buộc!', 400)
@@ -91,7 +112,14 @@ async function editAccount(id, payload) {
     throw new AppError('Email đã tồn tại.', 400)
   }
 
-  const updateData = { email, fullName, role_id, status, avatarUrl }
+  const updateData = {
+    email,
+    fullName,
+    translations: normalizeAccountTranslations(translations),
+    role_id,
+    status,
+    avatarUrl
+  }
 
   if (newPassword && newPassword.length >= 6) {
     updateData.passwordHash = await bcrypt.hash(newPassword, 10)

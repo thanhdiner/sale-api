@@ -135,7 +135,7 @@
                     quantity: { type: integer }
               paymentMethod:
                 type: string
-                enum: [transfer, contact, vnpay, momo, zalopay]
+                enum: [transfer, contact, vnpay, momo, zalopay, sepay]
               promoCode: { type: string }
     responses:
       "200":
@@ -170,7 +170,7 @@
                   properties:
                     productId: { type: string }
                     quantity: { type: integer }
-              paymentMethod: { type: string, enum: [vnpay, momo, zalopay] }
+              paymentMethod: { type: string, enum: [vnpay, momo, zalopay, sepay] }
               promoCode: { type: string }
     responses:
       "200":

@@ -8,11 +8,18 @@ const mongoId = Joi.string()
 // FLASH SALE
 // ─────────────────────────────────────────────
 
+const flashSaleTranslationSchema = Joi.object({
+  en: Joi.object({
+    name: Joi.string().max(200).allow('', null)
+  }).optional()
+}).optional()
+
 const createFlashSale = Joi.object({
   name: Joi.string().min(2).max(200).required().messages({
     'string.min': 'Tên flash sale quá ngắn',
     'any.required': 'Tên flash sale là bắt buộc'
   }),
+  translations: flashSaleTranslationSchema,
   startAt: Joi.date().iso().required().messages({
     'date.iso': 'startAt phải là định dạng ISO date',
     'any.required': 'startAt là bắt buộc'
@@ -38,6 +45,7 @@ const createFlashSale = Joi.object({
 
 const editFlashSale = Joi.object({
   name: Joi.string().min(2).max(200).optional(),
+  translations: flashSaleTranslationSchema,
   startAt: Joi.date().iso().optional(),
   endAt: Joi.date().iso().optional(),
   discountPercent: Joi.number().min(1).max(100).optional(),

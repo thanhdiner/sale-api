@@ -19,11 +19,72 @@ const ADMIN_ORDER_LIST_FIELDS = [
   'contact.phone',
   'contact.email',
   'contact.notes',
+  'orderItems.productId',
   'orderItems.name',
+  'orderItems.image',
+  'orderItems.quantity',
+  'orderItems.deliveryType',
   'status',
+  'paymentStatus',
+  'paymentMethod',
+  'deliveryMethod',
   'total',
   'createdAt'
 ].join(' ')
+
+const ADMIN_ORDER_ITEM_PRODUCT_POPULATE = {
+  path: 'orderItems.productId',
+  select: 'title translations thumbnail slug deliveryInstructions'
+}
+
+const normalizeLanguage = language => (String(language || '').toLowerCase().startsWith('en') ? 'en' : 'vi')
+
+const hasText = value => typeof value === 'string' && value.trim().length > 0
+
+const toPlainObject = item => {
+  if (!item) return item
+  return item.toObject ? item.toObject() : { ...item }
+}
+
+const getLocalizedOrderItemName = (item, language) => {
+  const product = item?.productId && typeof item.productId === 'object' ? item.productId : null
+  const translatedTitle = language === 'en' ? product?.translations?.en?.title : null
+
+  if (hasText(translatedTitle)) return translatedTitle
+  if (hasText(product?.title)) return product.title
+  if (hasText(item?.name)) return item.name
+
+  return item?.name || ''
+}
+
+const getLocalizedOrderItemDeliveryInstructions = (item, language) => {
+  const product = item?.productId && typeof item.productId === 'object' ? item.productId : null
+  const translatedInstructions = language === 'en' ? product?.translations?.en?.deliveryInstructions : null
+
+  if (hasText(translatedInstructions)) return translatedInstructions
+  if (hasText(product?.deliveryInstructions)) return product.deliveryInstructions
+  if (hasText(item?.deliveryInstructions)) return item.deliveryInstructions
+
+  return item?.deliveryInstructions || ''
+}
+
+const localizeOrder = (order, languageInput) => {
+  const language = normalizeLanguage(languageInput)
+  const plainOrder = toPlainObject(order)
+
+  if (!plainOrder) return plainOrder
+
+  return {
+    ...plainOrder,
+    orderItems: Array.isArray(plainOrder.orderItems)
+      ? plainOrder.orderItems.map(item => ({
+          ...item,
+          localizedName: getLocalizedOrderItemName(item, language),
+          localizedDeliveryInstructions: getLocalizedOrderItemDeliveryInstructions(item, language)
+        }))
+      : []
+  }
+}
 
 const normalizeSearchValue = value =>
   removeAccents(String(value || ''))
@@ -141,7 +202,16 @@ const getOrderSearchValues = order => {
   const lastName = order?.contact?.lastName || ''
   const fullName = [firstName, lastName].filter(Boolean).join(' ')
   const reverseFullName = [lastName, firstName].filter(Boolean).join(' ')
-  const itemNames = Array.isArray(order?.orderItems) ? order.orderItems.map(item => item?.name).filter(Boolean).join(' ') : ''
+  const itemNames = Array.isArray(order?.orderItems)
+    ? order.orderItems
+        .flatMap(item => [
+          item?.name,
+          item?.productId && typeof item.productId === 'object' ? item.productId.title : '',
+          item?.productId && typeof item.productId === 'object' ? item.productId.translations?.en?.title : ''
+        ])
+        .filter(Boolean)
+        .join(' ')
+    : ''
 
   return [
     ...getOrderCodeFragments(order?._id),
@@ -231,10 +301,10 @@ function ensureValidObjectId(id, message = 'ID đơn hàng không hợp lệ') {
   }
 }
 
-async function getOrderByIdOrThrow(id, message = 'Không tìm thấy đơn hàng') {
+async function getOrderByIdOrThrow(id, message = 'Không tìm thấy đơn hàng', options = {}) {
   ensureValidObjectId(id)
 
-  const order = await orderRepository.findByIdNotDeleted(id)
+  const order = await orderRepository.findByIdNotDeleted(id, options)
 
   if (!order) {
     throw new AppError(message, 404)
@@ -290,7 +360,7 @@ function queueOrderStatusEmail(order) {
 }
 
 async function listOrders(params = {}) {
-  const { page = 1, limit = 20, keyword = '', search = '', status = '' } = params
+  const { page = 1, limit = 20, keyword = '', search = '', status = '', language } = params
   const pageNum = parseInt(page, 10) || 1
   const pageLimit = parseInt(limit, 10) || 20
   const trimmedKeyword = String(keyword || search || '').trim()
@@ -308,17 +378,19 @@ async function listOrders(params = {}) {
         sort: { createdAt: -1 },
         skip: (pageNum - 1) * pageLimit,
         limit: pageLimit,
+        populate: ADMIN_ORDER_ITEM_PRODUCT_POPULATE,
         lean: true
       })
     ])
 
-    return { success: true, orders, total }
+    return { success: true, orders: orders.map(order => localizeOrder(order, language)), total }
   }
 
   const searchMeta = createOrderSearchMeta(trimmedKeyword)
   const orders = await orderRepository.findByQuery(baseQuery, {
     select: ADMIN_ORDER_LIST_FIELDS,
     sort: { createdAt: -1 },
+    populate: ADMIN_ORDER_ITEM_PRODUCT_POPULATE,
     lean: true
   })
 
@@ -339,17 +411,19 @@ async function listOrders(params = {}) {
   const total = matchedOrders.length
   const paginatedOrders = matchedOrders
     .slice((pageNum - 1) * pageLimit, pageNum * pageLimit)
-    .map(entry => entry.order)
+    .map(entry => localizeOrder(entry.order, language))
 
   return { success: true, orders: paginatedOrders, total }
 }
 
-async function getOrderDetail(id) {
-  const order = await getOrderByIdOrThrow(id)
-  return { success: true, order }
+async function getOrderDetail(id, language) {
+  const order = await getOrderByIdOrThrow(id, undefined, {
+    populate: ADMIN_ORDER_ITEM_PRODUCT_POPULATE
+  })
+  return { success: true, order: localizeOrder(order, language) }
 }
 
-async function updateOrderStatus(id, payload = {}) {
+async function updateOrderStatus(id, payload = {}, language) {
   const { status, paymentStatus, transferInfo } = payload
   const order = await getOrderByIdOrThrow(id)
 
@@ -369,7 +443,11 @@ async function updateOrderStatus(id, payload = {}) {
   emitOrderStatusUpdate(order)
   queueOrderStatusEmail(order)
 
-  return { success: true, order }
+  const populatedOrder = await getOrderByIdOrThrow(id, undefined, {
+    populate: ADMIN_ORDER_ITEM_PRODUCT_POPULATE
+  })
+
+  return { success: true, order: localizeOrder(populatedOrder, language) }
 }
 
 async function deleteOrder(id) {

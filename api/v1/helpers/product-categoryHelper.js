@@ -10,7 +10,10 @@ const buildTree = (categories, parent = null) => {
       title: item.title,
       value: item._id.toString(),
       slug: item.slug,
+      description: item.description,
+      content: item.content,
       thumbnail: item.thumbnail,
+      translations: item.translations,
       children: buildTree(categories, item._id)
     }))
 }

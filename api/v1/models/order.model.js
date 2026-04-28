@@ -1,7 +1,59 @@
 const mongoose = require('mongoose')
 
+const generateOrderCode = () => `SM${Date.now()}${Math.floor(1000 + Math.random() * 9000)}`
+
+const returnRefundItemSchema = new mongoose.Schema(
+  {
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+    productQuery: { type: String, trim: true },
+    name: { type: String, trim: true },
+    quantity: { type: Number },
+    reason: { type: String, trim: true }
+  },
+  { _id: false }
+)
+
+const returnRefundSchema = new mongoose.Schema(
+  {
+    requestType: {
+      type: String,
+      enum: ['return', 'refund', 'exchange', 'return_refund']
+    },
+    preferredResolution: {
+      type: String,
+      enum: ['refund', 'exchange', 'store_credit', 'repair', 'support']
+    },
+    status: {
+      type: String,
+      enum: ['requested', 'under_review', 'approved', 'rejected', 'processing', 'completed', 'cancelled'],
+      default: 'requested'
+    },
+    refundStatus: {
+      type: String,
+      enum: ['not_applicable', 'requested', 'under_review', 'approved', 'processing', 'completed', 'rejected', 'cancelled'],
+      default: 'not_applicable'
+    },
+    exchangeStatus: {
+      type: String,
+      enum: ['not_applicable', 'requested', 'under_review', 'approved', 'processing', 'completed', 'rejected', 'cancelled'],
+      default: 'not_applicable'
+    },
+    ticketId: { type: String, trim: true },
+    reason: { type: String, trim: true },
+    details: { type: String, trim: true },
+    items: [returnRefundItemSchema],
+    requestedAt: { type: Date },
+    updatedAt: { type: Date },
+    resolvedAt: { type: Date },
+    source: { type: String, trim: true },
+    priority: { type: String, trim: true }
+  },
+  { _id: false }
+)
+
 const OrderSchema = new mongoose.Schema(
   {
+    orderCode: { type: String, trim: true, default: generateOrderCode },
     contact: {
       firstName: { type: String, required: true },
       lastName: { type: String, required: true },
@@ -53,7 +105,7 @@ const OrderSchema = new mongoose.Schema(
     ],
 
     deliveryMethod: { type: String, enum: ['pickup', 'contact'], required: true },
-    paymentMethod: { type: String, enum: ['transfer', 'contact', 'vnpay', 'momo', 'zalopay'], required: true },
+    paymentMethod: { type: String, enum: ['transfer', 'contact', 'vnpay', 'momo', 'zalopay', 'sepay'], required: true },
     paymentStatus: { type: String, enum: ['pending', 'paid', 'failed'], default: 'pending' },
     paymentTransactionId: { type: String },
     reservationExpiresAt: { type: Date },
@@ -75,6 +127,8 @@ const OrderSchema = new mongoose.Schema(
       default: 'pending'
     },
 
+    returnRefund: { type: returnRefundSchema, default: undefined },
+
     transferInfo: {
       bank: { type: String },
       accountNumber: { type: String },
@@ -94,5 +148,7 @@ OrderSchema.index({ userId: 1, createdAt: -1 })
 OrderSchema.index({ isDeleted: 1, createdAt: -1 })
 OrderSchema.index({ createdAt: -1 })
 OrderSchema.index({ status: 1, paymentStatus: 1, createdAt: -1 })
+OrderSchema.index({ orderCode: 1 }, { unique: true, sparse: true })
+OrderSchema.index({ 'returnRefund.ticketId': 1 }, { sparse: true })
 
 module.exports = mongoose.model('Order', OrderSchema, 'orders')

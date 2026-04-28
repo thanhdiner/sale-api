@@ -137,7 +137,8 @@ async function getRuntimeConfig(overrides = {}) {
         ? dbConfig.autoEscalateKeywords
         : DEFAULT_ESCALATE_KEYWORDS),
     toolSettings,
-    availableTools
+    availableTools,
+    onActivity: overrides.onActivity
   }
 }
 

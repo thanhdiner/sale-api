@@ -1,5 +1,6 @@
 const cartsService = require('../../services/client/carts.service')
 const logger = require('../../../../config/logger')
+const getRequestLanguage = require('../../utils/getRequestLanguage')
 
 const handleKnownControllerError = (res, error) => {
   if (!error?.statusCode) {
@@ -17,7 +18,7 @@ const handleKnownControllerError = (res, error) => {
 
 exports.index = async (req, res) => {
   try {
-    const result = await cartsService.getCart(req.user?.userId)
+    const result = await cartsService.getCart(req.user?.userId, getRequestLanguage(req))
     res.json(result)
   } catch (err) {
     if (handleKnownControllerError(res, err)) return

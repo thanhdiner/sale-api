@@ -2,6 +2,8 @@
  * Input validation cho socket events
  */
 
+const ALLOWED_REACTION_EMOJIS = new Set(['👍', '❤️', '😂', '😮', '😢', '🙏'])
+
 /**
  * Validate string field: phải có giá trị, trim, giới hạn length
  */
@@ -45,4 +47,14 @@ function validateObjectId(value, fieldName, { required = false } = {}) {
   return value
 }
 
-module.exports = { validateString, validateSessionId, validateObjectId }
+function validateReactionEmoji(value) {
+  const emoji = validateString(value, 'emoji', { maxLength: 12 })
+
+  if (!ALLOWED_REACTION_EMOJIS.has(emoji)) {
+    throw new Error('emoji khong hop le')
+  }
+
+  return emoji
+}
+
+module.exports = { validateString, validateSessionId, validateObjectId, validateReactionEmoji }

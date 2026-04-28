@@ -23,6 +23,11 @@ const adminAccountSchema = new mongoose.Schema(
       required: true
     },
     fullName: String,
+    translations: {
+      en: {
+        fullName: { type: String, trim: true, default: '' }
+      }
+    },
     avatarUrl: String,
     role_id: {
       type: mongoose.Schema.Types.ObjectId,

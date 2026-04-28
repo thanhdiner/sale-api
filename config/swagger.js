@@ -147,7 +147,7 @@ const options = {
             total: { type: 'number' },
             paymentMethod: {
               type: 'string',
-              enum: ['transfer', 'contact', 'vnpay', 'momo', 'zalopay']
+              enum: ['transfer', 'contact', 'vnpay', 'momo', 'zalopay', 'sepay']
             },
             paymentStatus: { type: 'string', enum: ['pending', 'paid', 'failed'] },
             status: {
@@ -226,7 +226,7 @@ const options = {
       { name: 'Cart', description: 'Giỏ hàng (cần đăng nhập)' },
       { name: 'Orders', description: 'Đơn hàng (cần đăng nhập)' },
       { name: 'Reviews', description: 'Đánh giá sản phẩm' },
-      { name: 'Payment', description: 'Thanh toán: VNPay, MoMo, ZaloPay' },
+      { name: 'Payment', description: 'Thanh toán: VNPay, MoMo, ZaloPay, Sepay' },
       { name: 'Promo Codes', description: 'Mã khuyến mãi' },
       { name: 'Flash Sales', description: 'Flash sale (public)' },
       { name: 'Banners', description: 'Banner quảng cáo (public)' },

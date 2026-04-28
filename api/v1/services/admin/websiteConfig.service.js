@@ -27,7 +27,9 @@ async function updateWebsiteConfig(payload = {}) {
     logo,
     favicon,
     dailySuggestionBanner,
-    dailySuggestionBannerImg
+    dailySuggestionBannerImg,
+    shoppingGuide,
+    specialPackage
   } = payload
 
   const contactObj = parseJsonField(contactInfo, 'contactInfo')
@@ -51,6 +53,14 @@ async function updateWebsiteConfig(payload = {}) {
       ...config.dailySuggestionBanner,
       imageUrl: dailySuggestionBannerImg
     }
+  }
+
+  if (shoppingGuide) {
+    config.shoppingGuide = parseJsonField(shoppingGuide, 'shoppingGuide')
+  }
+
+  if (specialPackage) {
+    config.specialPackage = parseJsonField(specialPackage, 'specialPackage')
   }
 
   config.siteName = siteName

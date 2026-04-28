@@ -1,5 +1,6 @@
 const logger = require('../../../../config/logger')
 const bankInfoService = require('../../services/client/bankInfo.service')
+const getRequestLanguage = require('../../utils/getRequestLanguage')
 
 const handleKnownControllerError = (res, error) => {
   if (!error?.statusCode) {
@@ -11,9 +12,9 @@ const handleKnownControllerError = (res, error) => {
 }
 
 // # GET /api/v1/client/bank-info/active
-module.exports.getActiveBankInfo = async (_req, res) => {
+module.exports.getActiveBankInfo = async (req, res) => {
   try {
-    const result = await bankInfoService.getActiveBankInfo()
+    const result = await bankInfoService.getActiveBankInfo(getRequestLanguage(req))
     res.json(result)
   } catch (err) {
     if (handleKnownControllerError(res, err)) return

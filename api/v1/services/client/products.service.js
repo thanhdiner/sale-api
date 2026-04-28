@@ -1,20 +1,62 @@
 const mongoose = require('mongoose')
 const AppError = require('../../utils/AppError')
 const productRepository = require('../../repositories/product.repository')
+const productCategoryRepository = require('../../repositories/productCategory.repository')
 const cartRepository = require('../../repositories/cart.repository')
 const wishlistRepository = require('../../repositories/wishlist.repository')
 const productViewRepository = require('../../repositories/productView.repository')
 const productsHelper = require('../../helpers/product')
 const { getCheapDeals } = require('../../helpers/cheapDeals')
+const applyTranslation = require('../../utils/applyTranslation')
 const cache = require('../../../../config/redis')
+const removeAccents = require('remove-accents')
 
 const TTL_LIST = 180
 const TTL_DETAIL = 300
 const TTL_SUGGEST = 60
+const SEARCH_SUGGESTION_PRODUCT_SELECT = 'title slug thumbnail price discountPercentage rate stock productCategory soldQuantity recommendScore position createdAt'
+const PRODUCT_TRANSLATION_FIELDS = [
+  'title',
+  'description',
+  'content',
+  'features',
+  'deliveryInstructions'
+]
+
+function normalizeLanguage(lang) {
+  return String(lang || '').toLowerCase().startsWith('en') ? 'en' : 'vi'
+}
+
+function escapeRegex(value = '') {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function normalizeSearchKeyword(value = '') {
+  return removeAccents(String(value).replace(/\+/g, ' ').trim())
+}
+
+function localizeProduct(product, lang) {
+  const localized = applyTranslation(product, normalizeLanguage(lang), PRODUCT_TRANSLATION_FIELDS)
+
+  if (localized && product?.priceNew !== undefined && localized.priceNew === undefined) {
+    localized.priceNew = product.priceNew
+  }
+
+  return localized
+}
+
+function localizeProductListResult(result, lang) {
+  return {
+    ...result,
+    data: Array.isArray(result.data)
+      ? result.data.map(product => localizeProduct(product, lang))
+      : []
+  }
+}
 
 function normalizeListParams(query = {}) {
   return {
-    search: (query.search || '').replace(/\+/g, ' '),
+    search: normalizeSearchKeyword(query.q || query.search || ''),
     sort: query.sort || 'newest',
     page: parseInt(query.page, 10) || 1,
     limit: parseInt(query.limit, 10) || 20,
@@ -44,7 +86,7 @@ function buildListQuery(params) {
 
   if (params.isTopDeal === 'true') query.isTopDeal = true
   if (params.isFeatured === 'true') query.isFeatured = true
-  if (params.search) query.titleNoAccent = { $regex: params.search, $options: 'i' }
+  if (params.search) query.titleNoAccent = { $regex: escapeRegex(params.search), $options: 'i' }
   if (params.category) query.productCategory = params.category
   if (params.minRate > 0) query.rate = { $gte: params.minRate }
 
@@ -84,6 +126,8 @@ function getSortObject(sort) {
       return { soldQuantity: -1 }
     case 'rate_desc':
       return { rate: -1 }
+    case 'relevance':
+      return { recommendScore: -1, soldQuantity: -1, viewsCount: -1, rate: -1, createdAt: -1 }
     case 'newest':
     default:
       return { createdAt: -1 }
@@ -127,7 +171,7 @@ function ensureValidObjectId(id, message = 'Product không hợp lệ') {
   }
 }
 
-async function getProductsList(query = {}) {
+async function getProductsList(query = {}, lang = 'vi') {
   const params = normalizeListParams(query)
   const cacheKey = `products:list:${params.search}:${params.sort}:${params.page}:${params.limit}:${params.isTopDeal}:${params.isFeatured}`
 
@@ -150,29 +194,30 @@ async function getProductsList(query = {}) {
   }
 
   if (hasAdvancedFilters(params)) {
-    return fetchFn()
+    return localizeProductListResult(await fetchFn(), lang)
   }
 
-  return cache.getOrSet(cacheKey, fetchFn, TTL_LIST)
+  const result = await cache.getOrSet(cacheKey, fetchFn, TTL_LIST)
+  return localizeProductListResult(result, lang)
 }
 
 async function getSuggestions(query = {}) {
-  const queryStr = String(query.query || '').replace(/\+/g, ' ')
+  const queryStr = normalizeSearchKeyword(query.q || query.query || query.search || '')
   if (!queryStr.trim()) {
     return { suggestions: [] }
   }
 
-  const limit = parseInt(query.limit, 10) || 8
+  const limit = Math.min(parseInt(query.limit, 10) || 8, 12)
   const cacheKey = `products:suggest:${queryStr.toLowerCase()}:${limit}`
 
   return cache.getOrSet(cacheKey, async () => {
     const suggestions = await productRepository.findByQuery({
-      titleNoAccent: { $regex: queryStr, $options: 'i' },
+      titleNoAccent: { $regex: escapeRegex(queryStr), $options: 'i' },
       deleted: false,
       status: 'active',
       stock: { $gt: 0 }
     }, {
-      sort: { sold: -1, position: -1 },
+      sort: { soldQuantity: -1, recommendScore: -1, position: -1, createdAt: -1 },
       limit,
       select: 'title -_id'
     })
@@ -181,7 +226,119 @@ async function getSuggestions(query = {}) {
   }, TTL_SUGGEST)
 }
 
-async function getProductDetail(slug) {
+function normalizeSuggestionProduct(product) {
+  const price = Number(product.price || 0)
+  const discountPercentage = Number(product.discountPercentage || 0)
+  const priceNew = Math.round((price * (100 - discountPercentage)) / 100)
+  const category = product.productCategory && typeof product.productCategory === 'object'
+    ? {
+        id: product.productCategory._id?.toString(),
+        title: product.productCategory.title,
+        slug: product.productCategory.slug
+      }
+    : null
+
+  return {
+    id: product._id?.toString(),
+    title: product.title,
+    slug: product.slug,
+    thumbnail: product.thumbnail,
+    price,
+    priceNew,
+    discountPercentage,
+    rate: product.rate,
+    stock: product.stock,
+    category
+  }
+}
+
+function uniqueBy(items, getKey) {
+  const seen = new Set()
+  const result = []
+
+  for (const item of items) {
+    const key = getKey(item)
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    result.push(item)
+  }
+
+  return result
+}
+
+async function getSearchSuggestions(query = {}) {
+  const keyword = String(query.q || query.query || query.search || '').replace(/\+/g, ' ').trim()
+  const normalizedKeyword = normalizeSearchKeyword(keyword)
+  const limit = Math.min(Math.max(parseInt(query.limit, 10) || 6, 1), 10)
+
+  if (!normalizedKeyword) {
+    return {
+      keyword,
+      suggestions: [],
+      categories: [],
+      products: []
+    }
+  }
+
+  const cacheKey = `products:search-suggestions:${normalizedKeyword.toLowerCase()}:${limit}`
+
+  return cache.getOrSet(cacheKey, async () => {
+    const regex = escapeRegex(normalizedKeyword)
+    const categoryRegex = escapeRegex(keyword)
+
+    const [products, matchedCategories] = await Promise.all([
+      productRepository.findByQuery({
+        titleNoAccent: { $regex: regex, $options: 'i' },
+        deleted: false,
+        status: 'active',
+        stock: { $gt: 0 }
+      }, {
+        sort: { recommendScore: -1, soldQuantity: -1, viewsCount: -1, rate: -1, createdAt: -1 },
+        limit,
+        select: SEARCH_SUGGESTION_PRODUCT_SELECT,
+        populate: { path: 'productCategory', select: 'title slug' },
+        lean: true
+      }),
+      productCategoryRepository.findAll({
+        title: { $regex: categoryRegex || regex, $options: 'i' },
+        deleted: false,
+        status: 'active'
+      }, {
+        sort: { position: -1, createdAt: -1 },
+        limit: 4,
+        select: 'title slug',
+        lean: true
+      })
+    ])
+
+    const productCategories = products
+      .map(product => product.productCategory)
+      .filter(category => category && typeof category === 'object')
+
+    const categories = uniqueBy([...matchedCategories, ...productCategories], category => category._id?.toString())
+      .slice(0, 4)
+      .map(category => ({
+        id: category._id?.toString(),
+        title: category.title,
+        slug: category.slug
+      }))
+
+    const suggestions = uniqueBy([
+      ...products.map(product => product.title),
+      ...categories.map(category => category.title)
+    ], item => String(item || '').toLowerCase())
+      .slice(0, 6)
+
+    return {
+      keyword,
+      suggestions,
+      categories,
+      products: products.map(normalizeSuggestionProduct)
+    }
+  }, TTL_SUGGEST)
+}
+
+async function getProductDetail(slug, lang = 'vi') {
   const cacheKey = `products:detail:${slug}`
 
   const result = await cache.getOrSet(cacheKey, async () => {
@@ -201,7 +358,7 @@ async function getProductDetail(slug) {
     throw new AppError('Không tìm thấy sản phẩm', 404)
   }
 
-  return result
+  return localizeProduct(result, lang)
 }
 
 async function getExploreMore(productId, limitValue) {
@@ -347,6 +504,7 @@ async function trackProductView({ slug, user, ip }) {
 module.exports = {
   getProductsList,
   getSuggestions,
+  getSearchSuggestions,
   getProductDetail,
   getExploreMore,
   getRecommendations,

@@ -60,6 +60,7 @@ async function create(payload) {
 async function updateById(id, payload, options = {}) {
   return FlashSale.findByIdAndUpdate(id, payload, {
     new: true,
+    runValidators: true,
     ...options
   })
 }

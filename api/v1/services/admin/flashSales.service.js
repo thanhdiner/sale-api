@@ -20,6 +20,16 @@ function normalizeWriteError(error, fallbackMessage) {
   return error
 }
 
+function normalizeFlashSaleTranslations(translations = {}) {
+  const englishName = translations?.en?.name
+
+  return {
+    en: {
+      name: typeof englishName === 'string' ? englishName.trim() : ''
+    }
+  }
+}
+
 function getRealStatus(flashSale) {
   const now = new Date()
 
@@ -67,11 +77,17 @@ async function listFlashSales(params = {}) {
   const filter = {}
 
   if (status && status !== 'all') filter.status = status
-  if (name) filter.name = { $regex: name, $options: 'i' }
+  if (name) {
+    const nameFilter = { $regex: name, $options: 'i' }
+    filter.$or = [
+      { name: nameFilter },
+      { 'translations.en.name': nameFilter }
+    ]
+  }
 
   const total = await flashSaleRepository.countByQuery(filter)
   const flashSales = await flashSaleRepository.findByQuery(filter, {
-    populate: { path: 'products', select: 'name' },
+    populate: { path: 'products', select: 'title translations' },
     sort: { createdAt: -1 },
     skip: (pageNum - 1) * limitNum,
     limit: limitNum
@@ -85,7 +101,7 @@ async function listFlashSales(params = {}) {
 
 async function getFlashSaleDetail(id) {
   const flashSale = await getFlashSaleByIdOrThrow(id, {
-    populate: { path: 'products', select: 'name price' }
+    populate: { path: 'products', select: 'title translations price' }
   })
 
   return {
@@ -110,6 +126,7 @@ async function createFlashSale(payload = {}) {
   try {
     const flashSale = await flashSaleRepository.create({
       name,
+      translations: normalizeFlashSaleTranslations(payload.translations),
       startAt,
       endAt,
       discountPercent,
@@ -130,24 +147,31 @@ async function createFlashSale(payload = {}) {
 }
 
 async function updateFlashSale(id, payload = {}) {
-  const flashSale = await getFlashSaleByIdOrThrow(id)
+  ensureValidObjectId(id)
 
-  if (payload.name !== undefined) flashSale.name = payload.name
-  if (payload.startAt !== undefined) flashSale.startAt = payload.startAt
-  if (payload.endAt !== undefined) flashSale.endAt = payload.endAt
-  if (payload.discountPercent !== undefined) flashSale.discountPercent = payload.discountPercent
-  if (payload.maxQuantity !== undefined) flashSale.maxQuantity = payload.maxQuantity
-  if (payload.products !== undefined) flashSale.products = payload.products
+  const updateFields = {}
+
+  if (payload.name !== undefined) updateFields.name = payload.name
+  if (payload.translations !== undefined) updateFields.translations = normalizeFlashSaleTranslations(payload.translations)
+  if (payload.startAt !== undefined) updateFields.startAt = payload.startAt
+  if (payload.endAt !== undefined) updateFields.endAt = payload.endAt
+  if (payload.discountPercent !== undefined) updateFields.discountPercent = payload.discountPercent
+  if (payload.maxQuantity !== undefined) updateFields.maxQuantity = payload.maxQuantity
+  if (payload.products !== undefined) updateFields.products = payload.products
 
   try {
-    await flashSale.save()
+    const updatedFlashSale = await flashSaleRepository.updateById(id, updateFields)
+
+    if (!updatedFlashSale) {
+      throw new AppError('Khong tim thay flash sale', 404)
+    }
+
+    return {
+      message: 'Cap nhat thanh cong',
+      flashSale: updatedFlashSale
+    }
   } catch (error) {
     throw normalizeWriteError(error, 'Cap nhat flash sale that bai')
-  }
-
-  return {
-    message: 'Cap nhat thanh cong',
-    flashSale
   }
 }
 

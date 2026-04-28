@@ -14,9 +14,11 @@ const handleKnownControllerError = (res, error) => {
 }
 
 //# GET /api/v1/admin/permission-groups
-module.exports.index = async (_req, res) => {
+module.exports.index = async (req, res) => {
   try {
-    const result = await permissionGroupsService.listPermissionGroups()
+    const result = await permissionGroupsService.listPermissionGroups({
+      language: req.get('accept-language')
+    })
     res.json(result)
   } catch (err) {
     logger.error('[Admin] Error getting permission groups:', err)

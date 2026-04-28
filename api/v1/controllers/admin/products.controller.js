@@ -8,6 +8,8 @@ const mongoose = require('mongoose')
 const removeAccents = require('remove-accents')
 const logger = require('../../../../config/logger')
 const { syncProductStock } = require('../../services/digitalDelivery.service')
+const { notifyBackInStockForProduct } = require('../../services/backInStock.service')
+const getRequestLanguage = require('../../utils/getRequestLanguage')
 
 const getUploadedFileUrl = file => {
   if (!file) return ''
@@ -48,6 +50,11 @@ const setTitleNoAccent = body => {
   }
 }
 
+const buildTextSearch = value => {
+  const escapedValue = String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return { $regex: escapedValue, $options: 'i' }
+}
+
 const summarizeUploadFile = file => {
   if (!file) return null
 
@@ -68,6 +75,21 @@ const summarizeUploadFiles = files => {
       Array.isArray(items) ? items.map(summarizeUploadFile) : summarizeUploadFile(items)
     ])
   )
+}
+
+const summarizeProductTranslations = translations => {
+  const en = translations?.en || {}
+
+  return {
+    hasTranslations: Boolean(translations),
+    en: {
+      titleLength: en.title?.length || 0,
+      descriptionLength: en.description?.length || 0,
+      contentLength: en.content?.length || 0,
+      featuresCount: Array.isArray(en.features) ? en.features.length : en.features ? 1 : 0,
+      deliveryInstructionsLength: en.deliveryInstructions?.length || 0
+    }
+  }
 }
 
 const summarizeProductBody = body => ({
@@ -91,6 +113,7 @@ const summarizeProductBody = body => ({
   featuresCount: Array.isArray(body.features) ? body.features.length : body.features ? 1 : 0,
   descriptionLength: body.description?.length || 0,
   contentLength: body.content?.length || 0,
+  translations: summarizeProductTranslations(body.translations),
   timeStart: body.timeStart,
   timeFinish: body.timeFinish
 })
@@ -103,9 +126,19 @@ module.exports.index = async (req, res) => {
     }
 
     const { status, productName, price, stock, discountPercentage, position, sortField, sortOrder, product_category } = req.query
+    const language = getRequestLanguage(req)
 
     if (status && status !== 'all') find.status = status
-    if (productName) find.title = { $regex: productName, $options: 'i' }
+    if (productName) {
+      const textSearch = buildTextSearch(productName)
+      const noAccentSearch = buildTextSearch(removeAccents(productName))
+
+      find.$or = [
+        { title: textSearch },
+        { titleNoAccent: noAccentSearch },
+        { 'translations.en.title': textSearch }
+      ]
+    }
     if (price) find.price = +price
     if (stock) find.stock = +stock
     if (discountPercentage) find.discountPercentage = +discountPercentage
@@ -121,11 +154,15 @@ module.exports.index = async (req, res) => {
     const objectPagination = paginationHelper(initPagination, req.query, countProducts)
 
     let sort = {}
-    if (sortField && sortOrder) sort[sortField] = sortOrder === 'descend' ? -1 : 1
-    else sort.position = -1
+    if (sortField && sortOrder) {
+      const sortDirection = sortOrder === 'descend' ? -1 : 1
+      const localizedSortField = sortField === 'title' && language === 'en' ? 'translations.en.title' : sortField
+      sort[localizedSortField] = sortDirection
+      if (localizedSortField !== sortField) sort[sortField] = sortDirection
+    } else sort.position = -1
 
     const products = await Product.find(find)
-      .populate('productCategory', 'title')
+      .populate('productCategory', 'title translations')
       .populate('createdBy.by', 'fullName avatarUrl')
       .populate('updateBy.by', 'fullName avatarUrl')
       .sort(sort)
@@ -149,6 +186,7 @@ module.exports.index = async (req, res) => {
 module.exports.detail = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id)
+      .populate('productCategory', 'title translations')
       .populate('createdBy.by', 'fullName avatarUrl')
       .populate('updateBy.by', 'fullName avatarUrl')
 
@@ -545,7 +583,9 @@ module.exports.edit = async (req, res) => {
     })
 
     const updateFields = {
-      ...req.body,
+      $set: {
+        ...req.body
+      },
       $push: {
         updateBy: {
           by: req.user?.userId,
@@ -560,6 +600,9 @@ module.exports.edit = async (req, res) => {
       updateByUserId: req.user?.userId
     })
 
+    const existingProduct = await Product.findById(productId).select('stock deliveryType').lean()
+    const previousStock = Number(existingProduct?.stock || 0)
+
     const updatedProduct = await Product.findByIdAndUpdate(productId, updateFields, {
       new: true,
       runValidators: true
@@ -567,6 +610,8 @@ module.exports.edit = async (req, res) => {
 
     if (updatedProduct?.deliveryType === 'instant_account') {
       updatedProduct.stock = await syncProductStock(updatedProduct._id)
+    } else if (previousStock <= 0 && Number(updatedProduct?.stock || 0) > 0) {
+      await notifyBackInStockForProduct(updatedProduct._id)
     }
 
     logger.debug('[Admin][EditProduct] Updated product', {

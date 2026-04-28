@@ -21,8 +21,61 @@ async function getReviewByIdOrThrow(reviewId) {
   return review
 }
 
+const normalizeLanguage = language => (String(language || '').toLowerCase().startsWith('en') ? 'en' : 'vi')
+
+const hasText = value => typeof value === 'string' && value.trim().length > 0
+
+const toPlainObject = item => {
+  if (!item) return item
+  return item.toObject ? item.toObject() : { ...item }
+}
+
+const buildTextSearch = value => {
+  const escapedValue = String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return { $regex: escapedValue, $options: 'i' }
+}
+
+function normalizeSellerReplyTranslations(translations = {}) {
+  const en = translations?.en || {}
+
+  return {
+    en: {
+      content: typeof en.content === 'string' ? en.content.trim() : ''
+    }
+  }
+}
+
+function localizeReview(review, languageInput) {
+  const language = normalizeLanguage(languageInput)
+  const plainReview = toPlainObject(review)
+
+  if (!plainReview) return plainReview
+
+  const product = plainReview.productId && typeof plainReview.productId === 'object'
+    ? toPlainObject(plainReview.productId)
+    : plainReview.productId
+  const translatedProductTitle = language === 'en' ? product?.translations?.en?.title : ''
+  const sellerReply = plainReview.sellerReply || {}
+  const translatedReplyContent = language === 'en' ? sellerReply.translations?.en?.content : ''
+
+  return {
+    ...plainReview,
+    productId:
+      product && typeof product === 'object'
+        ? {
+            ...product,
+            localizedTitle: hasText(translatedProductTitle) ? translatedProductTitle : product.title
+          }
+        : product,
+    sellerReply: {
+      ...sellerReply,
+      localizedContent: hasText(translatedReplyContent) ? translatedReplyContent : sellerReply.content
+    }
+  }
+}
+
 async function listReviews(params = {}) {
-  const { page = 1, limit = 20, productId, hidden, rating } = params
+  const { page = 1, limit = 20, productId, hidden, rating, search, language } = params
   const query = { deleted: false }
 
   if (productId) {
@@ -33,6 +86,15 @@ async function listReviews(params = {}) {
   if (hidden === 'true') query.hidden = true
   if (hidden === 'false') query.hidden = { $ne: true }
   if (rating) query.rating = Number(rating)
+  if (search?.trim()) {
+    const textSearch = buildTextSearch(search.trim())
+    query.$or = [
+      { title: textSearch },
+      { content: textSearch },
+      { 'sellerReply.content': textSearch },
+      { 'sellerReply.translations.en.content': textSearch }
+    ]
+  }
 
   const skip = (Number(page) - 1) * Number(limit)
   const total = await reviewRepository.countByQuery(query)
@@ -42,17 +104,24 @@ async function listReviews(params = {}) {
     limit: Number(limit),
     populate: [
       { path: 'userId', select: 'fullName avatarUrl username email' },
-      { path: 'productId', select: 'title thumbnail slug' },
+      { path: 'productId', select: 'title translations thumbnail slug' },
       { path: 'hiddenBy', select: 'fullName username' }
     ]
   })
 
-  return { reviews, total }
+  return { reviews: reviews.map(review => localizeReview(review, language)), total }
 }
 
-async function replyReview(reviewId, content) {
+async function replyReview(reviewId, payload = {}) {
   const review = await getReviewByIdOrThrow(reviewId)
-  review.sellerReply = { content: content || '', repliedAt: new Date() }
+  const content = typeof payload === 'string' ? payload : payload.content
+  const translations = typeof payload === 'string' ? {} : payload.translations
+
+  review.sellerReply = {
+    content: content || '',
+    translations: normalizeSellerReplyTranslations(translations),
+    repliedAt: new Date()
+  }
   await review.save()
 
   return { sellerReply: review.sellerReply }
@@ -60,7 +129,15 @@ async function replyReview(reviewId, content) {
 
 async function deleteReply(reviewId) {
   const review = await getReviewByIdOrThrow(reviewId)
-  review.sellerReply = { content: '', repliedAt: null }
+  review.sellerReply = {
+    content: '',
+    translations: {
+      en: {
+        content: ''
+      }
+    },
+    repliedAt: null
+  }
   await review.save()
 
   return { message: 'Reply deleted' }

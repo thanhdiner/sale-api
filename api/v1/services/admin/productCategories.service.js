@@ -32,15 +32,31 @@ function normalizeWriteError(error, fallbackMessage) {
   return error
 }
 
+function buildTextSearch(value) {
+  const escapedValue = String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return { $regex: escapedValue, $options: 'i' }
+}
+
+function normalizeLanguage(language) {
+  return String(language || '').toLowerCase().startsWith('en') ? 'en' : 'vi'
+}
+
 async function listProductCategories(params = {}) {
   const find = {
     deleted: false
   }
 
-  const { status, categoryName, position, sortField, sortOrder } = params
+  const { status, categoryName, position, sortField, sortOrder, language } = params
+  const normalizedLanguage = normalizeLanguage(language)
 
   if (status && status !== 'all') find.status = status
-  if (categoryName) find.title = { $regex: categoryName, $options: 'i' }
+  if (categoryName) {
+    const textSearch = buildTextSearch(categoryName)
+    find.$or = [
+      { title: textSearch },
+      { 'translations.en.title': textSearch }
+    ]
+  }
   if (position) find.position = +position
 
   const initPagination = {
@@ -52,14 +68,19 @@ async function listProductCategories(params = {}) {
   const objectPagination = paginationHelper(initPagination, params, countProductCategories)
 
   const sort = {}
-  if (sortField && sortOrder) sort[sortField] = sortOrder === 'descend' ? -1 : 1
-  else sort.position = -1
+  if (sortField && sortOrder) {
+    const sortDirection = sortOrder === 'descend' ? -1 : 1
+    const localizedSortField = sortField === 'title' && normalizedLanguage === 'en' ? 'translations.en.title' : sortField
+    sort[localizedSortField] = sortDirection
+    if (localizedSortField !== sortField) sort[sortField] = sortDirection
+  } else sort.position = -1
 
   const productCategories = await productCategoryRepository.findAll(find, {
     sort,
     limit: objectPagination.limitItems,
     skip: objectPagination.skip,
     populate: [
+      { path: 'parent_id', select: 'title translations' },
       { path: 'createdBy.by', select: 'fullName avatarUrl' },
       { path: 'updateBy.by', select: 'fullName avatarUrl' }
     ]
@@ -268,7 +289,7 @@ async function getProductCategoryDetail(id) {
   ensureValidObjectId(id)
 
   const productCategory = await productCategoryRepository.findById(id, {
-    populate: { path: 'parent_id', select: 'title' }
+    populate: { path: 'parent_id', select: 'title translations' }
   })
   if (!productCategory) {
     throw new AppError('Product Category not found', 404)

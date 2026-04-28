@@ -15,6 +15,28 @@ const websiteConfigSchema = new mongoose.Schema(
       email: String,
       address: String,
       website: String,
+      supportHours: String,
+      workingTime: String,
+      businessHours: String,
+      locations: [
+        {
+          name: String,
+          address: String,
+          addressLine1: String,
+          provinceName: String,
+          districtName: String,
+          wardName: String,
+          phone: String,
+          email: String,
+          workingHours: String,
+          mapUrl: String,
+          googleMapUrl: String,
+          latitude: Number,
+          longitude: Number,
+          isPrimary: Boolean,
+          note: String
+        }
+      ],
       socialMedia: {
         facebook: String,
         twitter: String,
@@ -37,7 +59,10 @@ const websiteConfigSchema = new mongoose.Schema(
       title: String,
       subtitle: String,
       link: String
-    }
+    },
+
+    shoppingGuide: mongoose.Schema.Types.Mixed,
+    specialPackage: mongoose.Schema.Types.Mixed
   },
   { timestamps: true }
 )

@@ -14,21 +14,21 @@ router.get('/active', checkPermission.checkPermission('view_bank_info'), control
 router.post(
   '/',
   checkPermission.checkPermission('create_bank_info'),
+  invalidateBankInfo,
   fileUpload.single('qrCode'),
   uploadCloud.upload,
-  controller.createBankInfo,
-  invalidateBankInfo
+  controller.createBankInfo
 )
 router.patch(
   '/:id',
   checkPermission.checkPermission('edit_bank_info'),
+  invalidateBankInfo,
   fileUpload.single('qrCode'),
   uploadCloud.deleteImage,
   uploadCloud.upload,
-  controller.updateBankInfo,
-  invalidateBankInfo
+  controller.updateBankInfo
 )
-router.patch('/:id/delete', checkPermission.checkPermission('delete_bank_info'), controller.deleteBankInfo, invalidateBankInfo)
-router.patch('/:id/activate', checkPermission.checkPermission('edit_bank_info'), controller.activateBankInfo, invalidateBankInfo)
+router.patch('/:id/delete', checkPermission.checkPermission('delete_bank_info'), invalidateBankInfo, controller.deleteBankInfo)
+router.patch('/:id/activate', checkPermission.checkPermission('edit_bank_info'), invalidateBankInfo, controller.activateBankInfo)
 
 module.exports = router
