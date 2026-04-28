@@ -15,12 +15,6 @@ const requireAnyPermission = permissions => checkPermission.checkAnyPermission
 const parseBlogJsonBodyFields = (req, res, next) => {
   parseJsonBodyField(req.body, 'tags')
   parseJsonBodyField(req.body, 'translations')
-  parseJsonBodyField(req.body, 'relatedProducts')
-  parseJsonBodyField(req.body, 'relatedProductIds')
-  parseJsonBodyField(req.body, 'seo')
-  parseJsonBodyField(req.body, 'seoKeywords')
-  parseJsonBodyField(req.body, 'autoPublish')
-  parseJsonBodyField(req.body, 'ai')
   next()
 }
 

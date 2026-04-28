@@ -55,6 +55,7 @@ const {
   normalizePolicyLanguage,
   normalizeQuantity,
   normalizeSearchTerms,
+  normalizeSearchTermVariants,
   normalizeSearchText,
   normalizeSubtotal,
   normalizeUserId,
@@ -77,8 +78,8 @@ const {
 function normalizeSearchProductsArgs(args = {}) {
   args = args || {}
 
-  let minPrice = normalizeSearchProductsNumber(args.minPrice)
-  let maxPrice = normalizeSearchProductsNumber(args.maxPrice)
+  let minPrice = normalizeSearchProductsPriceBound(args.minPrice)
+  let maxPrice = normalizeSearchProductsPriceBound(args.maxPrice)
 
   if (minPrice != null && maxPrice != null && maxPrice < minPrice) {
     const nextMinPrice = maxPrice
@@ -102,6 +103,11 @@ function normalizeSearchProductsNumber(value) {
   if (value === undefined || value === null || value === '') return null
   const normalized = Number(value)
   return Number.isFinite(normalized) && normalized >= 0 ? normalized : null
+}
+
+function normalizeSearchProductsPriceBound(value) {
+  const normalized = normalizeSearchProductsNumber(value)
+  return normalized > 0 ? normalized : null
 }
 
 function normalizeSearchProductsRating(value) {
@@ -174,12 +180,22 @@ function applySearchProductsKeywordFilter(query, keyword) {
   if (terms.length === 0) return
 
   query.$and = terms.map(term => {
-    const variants = [...new Set([term, removeAccents(term)].map(cleanString).filter(Boolean))]
+    const variants = [...new Set([
+      ...normalizeSearchTermVariants(term),
+      term,
+      removeAccents(term)
+    ].map(cleanString).filter(Boolean))]
     const conditions = variants.flatMap(variant => {
       const escaped = escapeRegExp(variant)
       return [
         { title: { $regex: escaped, $options: 'i' } },
-        { titleNoAccent: { $regex: escaped, $options: 'i' } }
+        { titleNoAccent: { $regex: escaped, $options: 'i' } },
+        { description: { $regex: escaped, $options: 'i' } },
+        { content: { $regex: escaped, $options: 'i' } },
+        { features: { $regex: escaped, $options: 'i' } },
+        { 'translations.en.title': { $regex: escaped, $options: 'i' } },
+        { 'translations.en.description': { $regex: escaped, $options: 'i' } },
+        { 'translations.en.content': { $regex: escaped, $options: 'i' } }
       ]
     })
 
@@ -2390,6 +2406,24 @@ async function searchProducts(args = {}) {
     const products = await productRepository.aggregate(buildSearchProductsPipeline(query, filters))
 
     if (products.length === 0) {
+      if (filters.inStock === true) {
+        const fallbackQuery = { ...query }
+        delete fallbackQuery.stock
+
+        const unavailableProducts = await productRepository.aggregate(buildSearchProductsPipeline(fallbackQuery, filters))
+
+        if (unavailableProducts.length > 0) {
+          return JSON.stringify({
+            found: false,
+            outOfStockOnly: true,
+            filters: buildSearchProductsFilterSummary(filters, categoryFilter),
+            message: 'Co san pham phu hop voi tu khoa nhung hien dang het hang.',
+            suggestion: 'Goi y thong bao het hang ro rang va hoi khach co muon dang ky bao khi co hang lai hoac xem san pham AI/phan mem tuong tu.',
+            unavailableProducts: unavailableProducts.map(buildCatalogProductPayload)
+          })
+        }
+      }
+
       return JSON.stringify({
         found: false,
         filters: buildSearchProductsFilterSummary(filters, categoryFilter),

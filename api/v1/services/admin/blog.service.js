@@ -60,8 +60,9 @@ function normalizeTags(value) {
   const parsedValue = parseJson(value, value)
   const tags = Array.isArray(parsedValue)
     ? parsedValue
-    : String(parsedValue || '')
-      .split(',')
+    : (typeof parsedValue === 'string' || typeof parsedValue === 'number'
+        ? String(parsedValue || '').split(',')
+        : [])
 
   return Array.from(new Set(
     tags
@@ -74,8 +75,9 @@ function normalizeObjectIdArray(value, fieldName) {
   const parsedValue = parseJson(value, value)
   const ids = Array.isArray(parsedValue)
     ? parsedValue
-    : String(parsedValue || '')
-      .split(',')
+    : (typeof parsedValue === 'string' || typeof parsedValue === 'number'
+        ? String(parsedValue || '').split(',')
+        : [])
 
   return Array.from(new Set(
     ids
