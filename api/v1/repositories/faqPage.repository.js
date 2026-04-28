@@ -1,20 +1,7 @@
-const FaqPage = require('../models/faqPage.model')
+const { createContentPageRepository } = require('./contentPage.repository')
 
-async function findOne(query = {}, options = {}) {
-  let cursor = FaqPage.findOne(query)
-
-  if (options.lean) {
-    cursor = cursor.lean()
+module.exports = createContentPageRepository({
+  legacy: {
+    collectionName: 'faqPages'
   }
-
-  return cursor
-}
-
-async function create(payload) {
-  return FaqPage.create(payload)
-}
-
-module.exports = {
-  findOne,
-  create
-}
+})

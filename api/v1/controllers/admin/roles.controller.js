@@ -50,6 +50,18 @@ module.exports.edit = async (req, res) => {
   }
 }
 
+//# PATCH /api/v1/admin/roles/permissions/:id
+module.exports.editPermissions = async (req, res) => {
+  try {
+    const result = await rolesService.editRolePermissions(req.params.id, req.body)
+    res.status(200).json(result)
+  } catch (err) {
+    if (handleKnownControllerError(res, err)) return
+    logger.error('[Admin] Error editing role permissions:', err)
+    return res.status(500).json({ error: 'Internal server error', message: 'Updated unsuccessful' })
+  }
+}
+
 //# DELETE /api/v1/admin/roles/delete/:id
 module.exports.delete = async (req, res) => {
   try {

@@ -1,20 +1,7 @@
-const ContactPage = require('../models/contactPage.model')
+const { createContentPageRepository } = require('./contentPage.repository')
 
-async function findOne(query = {}, options = {}) {
-  let cursor = ContactPage.findOne(query)
-
-  if (options.lean) {
-    cursor = cursor.lean()
+module.exports = createContentPageRepository({
+  legacy: {
+    collectionName: 'contactPages'
   }
-
-  return cursor
-}
-
-async function create(payload) {
-  return ContactPage.create(payload)
-}
-
-module.exports = {
-  findOne,
-  create
-}
+})

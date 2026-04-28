@@ -1,4 +1,5 @@
 const cooperationContactContentRepository = require('../../repositories/cooperationContactContent.repository')
+const { createSingletonContentModule } = require('../../factories/singletonContent.factory')
 
 const isObjectString = value => typeof value === 'string' && value.trim() === '[object Object]'
 const cleanString = value => (typeof value === 'string' && !isObjectString(value) ? value.trim() : '')
@@ -27,39 +28,17 @@ function normalizeTranslations(translations = {}) {
   }
 }
 
-async function getCooperationContactContent() {
-  return {
-    message: 'Cooperation contact content fetched successfully',
-    data: await cooperationContactContentRepository.findOne({ lean: true })
+const { service } = createSingletonContentModule({
+  repository: cooperationContactContentRepository,
+  normalizeContent,
+  normalizeTranslations,
+  messages: {
+    fetched: 'Cooperation contact content fetched successfully',
+    saved: 'Cooperation contact content saved successfully'
   }
-}
-
-async function updateCooperationContactContent(payload = {}, user = null) {
-  const existingContent = await cooperationContactContentRepository.findOne()
-  const data = {
-    ...normalizeContent(payload),
-    translations: normalizeTranslations(payload.translations),
-    updatedBy: user?.userId || null
-  }
-
-  let savedContent
-
-  if (existingContent) {
-    savedContent = await cooperationContactContentRepository.updateById(existingContent._id, data)
-  } else {
-    savedContent = await cooperationContactContentRepository.create({
-      ...data,
-      createdBy: user?.userId || null
-    })
-  }
-
-  return {
-    message: 'Cooperation contact content saved successfully',
-    data: savedContent
-  }
-}
+})
 
 module.exports = {
-  getCooperationContactContent,
-  updateCooperationContactContent
+  getCooperationContactContent: service.getAdminContent,
+  updateCooperationContactContent: service.updateContent
 }

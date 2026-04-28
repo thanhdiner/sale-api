@@ -1,22 +1,14 @@
-const logger = require('../../../../config/logger')
 const gameAccountContentService = require('../../services/gameAccountContent.service')
+const { createControllerAction } = require('../../factories/singletonContent.factory')
 
-exports.show = async (_req, res) => {
-  try {
-    const result = await gameAccountContentService.getAdminGameAccountContent()
-    res.status(200).json(result)
-  } catch (error) {
-    logger.error('[Admin] Error retrieving game account content:', error)
-    res.status(500).json({ success: false, message: 'Failed to retrieve game account content' })
-  }
-}
+exports.show = createControllerAction({
+  handler: () => gameAccountContentService.getAdminGameAccountContent(),
+  logMessage: '[Admin] Error retrieving game account content:',
+  errorMessage: 'Failed to retrieve game account content'
+})
 
-exports.update = async (req, res) => {
-  try {
-    const result = await gameAccountContentService.updateGameAccountContent(req.body, req.user)
-    res.status(200).json(result)
-  } catch (error) {
-    logger.error('[Admin] Error updating game account content:', error)
-    res.status(500).json({ success: false, message: 'Failed to update game account content' })
-  }
-}
+exports.update = createControllerAction({
+  handler: req => gameAccountContentService.updateGameAccountContent(req.body, req.user),
+  logMessage: '[Admin] Error updating game account content:',
+  errorMessage: 'Failed to update game account content'
+})

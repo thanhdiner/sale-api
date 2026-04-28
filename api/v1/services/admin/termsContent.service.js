@@ -1,4 +1,5 @@
 const termsContentRepository = require('../../repositories/termsContent.repository')
+const { createSingletonContentModule } = require('../../factories/singletonContent.factory')
 
 const cleanString = value => (typeof value === 'string' ? value.trim() : '')
 const cleanText = value => (typeof value === 'string' ? value : '')
@@ -47,39 +48,17 @@ function normalizeTranslations(translations = {}) {
   }
 }
 
-async function getTermsContent() {
-  return {
-    message: 'Terms content fetched successfully',
-    data: await termsContentRepository.findOne({ lean: true })
+const { service } = createSingletonContentModule({
+  repository: termsContentRepository,
+  normalizeContent: normalizeTermsContent,
+  normalizeTranslations,
+  messages: {
+    fetched: 'Terms content fetched successfully',
+    saved: 'Terms content saved successfully'
   }
-}
-
-async function updateTermsContent(payload = {}, user = null) {
-  const existingContent = await termsContentRepository.findOne()
-  const data = {
-    ...normalizeTermsContent(payload),
-    translations: normalizeTranslations(payload.translations),
-    updatedBy: user?.userId || null
-  }
-
-  let savedContent
-
-  if (existingContent) {
-    savedContent = await termsContentRepository.updateById(existingContent._id, data)
-  } else {
-    savedContent = await termsContentRepository.create({
-      ...data,
-      createdBy: user?.userId || null
-    })
-  }
-
-  return {
-    message: 'Terms content saved successfully',
-    data: savedContent
-  }
-}
+})
 
 module.exports = {
-  getTermsContent,
-  updateTermsContent
+  getTermsContent: service.getAdminContent,
+  updateTermsContent: service.updateContent
 }

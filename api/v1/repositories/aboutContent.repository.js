@@ -1,28 +1,8 @@
-const AboutContent = require('../models/aboutContent.model')
+const { createFlatContentPageRepository } = require('./contentPage.repository')
 
-async function findOne(options = {}) {
-  let cursor = AboutContent.findOne({})
-
-  if (options.lean) {
-    cursor = cursor.lean()
+module.exports = createFlatContentPageRepository('about', {
+  legacy: {
+    collectionName: 'about_contents',
+    query: {}
   }
-
-  return cursor
-}
-
-async function create(payload) {
-  return AboutContent.create(payload)
-}
-
-async function updateById(id, payload) {
-  return AboutContent.findByIdAndUpdate(id, payload, {
-    new: true,
-    runValidators: true
-  })
-}
-
-module.exports = {
-  findOne,
-  create,
-  updateById
-}
+})

@@ -1,28 +1,8 @@
-const TermsContent = require('../models/termsContent.model')
+const { createFlatContentPageRepository } = require('./contentPage.repository')
 
-async function findOne(options = {}) {
-  let cursor = TermsContent.findOne({})
-
-  if (options.lean) {
-    cursor = cursor.lean()
+module.exports = createFlatContentPageRepository('terms', {
+  legacy: {
+    collectionName: 'terms_contents',
+    query: {}
   }
-
-  return cursor
-}
-
-async function create(payload) {
-  return TermsContent.create(payload)
-}
-
-async function updateById(id, payload) {
-  return TermsContent.findByIdAndUpdate(id, payload, {
-    new: true,
-    runValidators: true
-  })
-}
-
-module.exports = {
-  findOne,
-  create,
-  updateById
-}
+})

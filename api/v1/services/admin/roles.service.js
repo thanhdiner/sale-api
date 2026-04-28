@@ -121,6 +121,23 @@ async function editRole(id, payload = {}) {
   }
 }
 
+async function editRolePermissions(id, payload = {}) {
+  ensureValidObjectId(id)
+
+  const permissions = Array.isArray(payload.permissions) ? payload.permissions : []
+
+  try {
+    const updated = await roleRepository.updateById(id, { permissions })
+    if (!updated) {
+      throw new AppError('Role group not found', 404)
+    }
+
+    return { message: 'Updated', data: updated }
+  } catch (error) {
+    throw normalizeWriteError(error, 'Updated unsuccessful')
+  }
+}
+
 async function deleteRole(id) {
   ensureValidObjectId(id)
 
@@ -150,6 +167,7 @@ module.exports = {
   listRoles,
   createRole,
   editRole,
+  editRolePermissions,
   deleteRole,
   toggleRoleActive
 }

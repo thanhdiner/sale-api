@@ -3,8 +3,9 @@ const router = express.Router()
 
 const controller = require('../../controllers/admin/termsContent.controller')
 const { invalidateTermsContent } = require('../../middlewares/cacheInvalidation.middleware')
+const checkPermission = require('../../middlewares/admin/checkPermission.middleware')
 
-router.get('/', controller.index)
-router.patch('/', invalidateTermsContent, controller.edit)
+router.get('/', checkPermission.checkPermission('view_terms_content'), controller.index)
+router.patch('/', checkPermission.checkPermission('edit_terms_content'), invalidateTermsContent, controller.edit)
 
 module.exports = router

@@ -1,28 +1,9 @@
-const ComingSoonContent = require('../models/comingSoonContent.model')
+const { createFlatContentPageRepository } = require('./contentPage.repository')
 
-async function findByKey(key, options = {}) {
-  let cursor = ComingSoonContent.findOne({ key })
-
-  if (options.lean) {
-    cursor = cursor.lean()
+module.exports = createFlatContentPageRepository(null, {
+  exposeKey: true,
+  legacy: {
+    collectionName: 'coming_soon_contents',
+    query: key => ({ key })
   }
-
-  return cursor
-}
-
-async function create(payload) {
-  return ComingSoonContent.create(payload)
-}
-
-async function updateById(id, payload) {
-  return ComingSoonContent.findByIdAndUpdate(id, payload, {
-    new: true,
-    runValidators: true
-  })
-}
-
-module.exports = {
-  findByKey,
-  create,
-  updateById
-}
+})

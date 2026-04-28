@@ -2,8 +2,9 @@ const express = require('express')
 const router = express.Router()
 
 const controller = require('../../controllers/admin/vipContent.controller')
+const checkPermission = require('../../middlewares/admin/checkPermission.middleware')
 
-router.get('/', controller.index)
-router.patch('/', controller.edit)
+router.get('/', checkPermission.checkPermission('view_vip_content'), controller.index)
+router.patch('/', checkPermission.checkPermission('edit_vip_content'), controller.edit)
 
 module.exports = router

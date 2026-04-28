@@ -1,20 +1,7 @@
-const PrivacyPolicyPage = require('../models/privacyPolicyPage.model')
+const { createContentPageRepository } = require('./contentPage.repository')
 
-async function findOne(query = {}, options = {}) {
-  let cursor = PrivacyPolicyPage.findOne(query)
-
-  if (options.lean) {
-    cursor = cursor.lean()
+module.exports = createContentPageRepository({
+  legacy: {
+    collectionName: 'privacyPolicyPages'
   }
-
-  return cursor
-}
-
-async function create(payload = {}) {
-  return PrivacyPolicyPage.create(payload)
-}
-
-module.exports = {
-  create,
-  findOne
-}
+})

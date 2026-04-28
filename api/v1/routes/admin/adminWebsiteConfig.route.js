@@ -7,6 +7,7 @@ const fileUpload = multer()
 
 const uploadCloud = require('../../middlewares/admin/uploadCloud.middleware')
 const authenticateTokenModule = require('../../middlewares/admin/authenticateToken.middleware')
+const checkPermission = require('../../middlewares/admin/checkPermission.middleware')
 
 const getMiddleware = (moduleValue, name) => {
   if (typeof moduleValue === 'function') {
@@ -38,6 +39,7 @@ router.get('/', controller.index)
 router.patch(
   '/edit',
   authMiddleware,
+  checkPermission.checkPermission('edit_website_config'),
   websiteConfigImageUpload,
   deleteImageManyMiddleware,
   uploadManyMiddleware,

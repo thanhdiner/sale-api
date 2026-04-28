@@ -1,5 +1,5 @@
-const cache = require('../../../../config/redis')
 const vipContentRepository = require('../../repositories/vipContent.repository')
+const { createSingletonContentModule } = require('../../factories/singletonContent.factory')
 
 const cleanString = value => (typeof value === 'string' ? value.trim() : '')
 const cleanText = value => (typeof value === 'string' ? value : '')
@@ -133,41 +133,18 @@ function normalizeTranslations(translations = {}) {
   }
 }
 
-async function getVipContent() {
-  return {
-    message: 'VIP content fetched successfully',
-    data: await vipContentRepository.findOne({ lean: true })
-  }
-}
-
-async function updateVipContent(payload = {}, user = null) {
-  const existingContent = await vipContentRepository.findOne()
-  const data = {
-    ...normalizeVipContent(payload),
-    translations: normalizeTranslations(payload.translations),
-    updatedBy: user?.userId || user?.id || null
-  }
-
-  let savedContent
-
-  if (existingContent) {
-    savedContent = await vipContentRepository.updateById(existingContent._id, data)
-  } else {
-    savedContent = await vipContentRepository.create({
-      ...data,
-      createdBy: user?.userId || user?.id || null
-    })
-  }
-
-  await cache.del('vip:content:*')
-
-  return {
-    message: 'VIP content saved successfully',
-    data: savedContent
-  }
-}
+const { service } = createSingletonContentModule({
+  repository: vipContentRepository,
+  normalizeContent: normalizeVipContent,
+  normalizeTranslations,
+  messages: {
+    fetched: 'VIP content fetched successfully',
+    saved: 'VIP content saved successfully'
+  },
+  cachePattern: 'vip:content:*'
+})
 
 module.exports = {
-  getVipContent,
-  updateVipContent
+  getVipContent: service.getAdminContent,
+  updateVipContent: service.updateContent
 }

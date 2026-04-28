@@ -1,20 +1,7 @@
-const FooterContent = require('../models/footerContent.model')
+const { createContentPageRepository } = require('./contentPage.repository')
 
-async function findOne(query = {}, options = {}) {
-  let cursor = FooterContent.findOne(query)
-
-  if (options.lean) {
-    cursor = cursor.lean()
+module.exports = createContentPageRepository({
+  legacy: {
+    collectionName: 'footerContents'
   }
-
-  return cursor
-}
-
-async function create(payload) {
-  return FooterContent.create(payload)
-}
-
-module.exports = {
-  findOne,
-  create
-}
+})

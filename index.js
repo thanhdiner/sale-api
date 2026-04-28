@@ -24,6 +24,7 @@ const adminRoutes = require('./api/v1/routes/admin/index.route')
 const clientRoutes = require('./api/v1/routes/client/index.route')
 const recalcRecommendScoreJob = require('./api/v1/jobs/recalcRecommendScore')
 const releaseExpiredOrderReservationsJob = require('./api/v1/jobs/releaseExpiredOrderReservations')
+const blogJobs = require('./api/v1/jobs/blogJobs')
 
 const app = express()
 const server = http.createServer(app)
@@ -101,6 +102,7 @@ app.use(errorHandler)
 
 recalcRecommendScoreJob.start()
 releaseExpiredOrderReservationsJob.start()
+blogJobs.start()
 
 server.listen(port, () => {
   logger.info(`🚀 Server started on PORT: ${port}`)

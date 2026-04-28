@@ -7,6 +7,7 @@
     "start": "node index.js",
     "dev": "npx nodemon --inspect index.js",
     "seed:chat": "node scripts/seedChatConversations.js",
+    "migrate:content-pages": "node scripts/migrateContentPages.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",

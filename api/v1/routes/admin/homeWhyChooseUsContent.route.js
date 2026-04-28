@@ -3,8 +3,9 @@ const router = express.Router()
 
 const controller = require('../../controllers/admin/homeWhyChooseUsContent.controller')
 const { invalidateHomeWhyChooseUsContent } = require('../../middlewares/cacheInvalidation.middleware')
+const checkPermission = require('../../middlewares/admin/checkPermission.middleware')
 
-router.get('/', controller.index)
-router.patch('/', invalidateHomeWhyChooseUsContent, controller.edit)
+router.get('/', checkPermission.checkPermission('view_home_why_choose_us_content'), controller.index)
+router.patch('/', checkPermission.checkPermission('edit_home_why_choose_us_content'), invalidateHomeWhyChooseUsContent, controller.edit)
 
 module.exports = router

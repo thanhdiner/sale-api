@@ -1,4 +1,5 @@
 const homeWhyChooseUsContentRepository = require('../../repositories/homeWhyChooseUsContent.repository')
+const { createSingletonContentModule } = require('../../factories/singletonContent.factory')
 
 const ITEM_KEYS = [
   'fastActivation',
@@ -45,39 +46,17 @@ function normalizeTranslations(translations = {}) {
   }
 }
 
-async function getHomeWhyChooseUsContent() {
-  return {
-    message: 'Home why choose us content fetched successfully',
-    data: await homeWhyChooseUsContentRepository.findOne({ lean: true })
+const { service } = createSingletonContentModule({
+  repository: homeWhyChooseUsContentRepository,
+  normalizeContent,
+  normalizeTranslations,
+  messages: {
+    fetched: 'Home why choose us content fetched successfully',
+    saved: 'Home why choose us content saved successfully'
   }
-}
-
-async function updateHomeWhyChooseUsContent(payload = {}, user = null) {
-  const existingContent = await homeWhyChooseUsContentRepository.findOne()
-  const data = {
-    ...normalizeContent(payload),
-    translations: normalizeTranslations(payload.translations),
-    updatedBy: user?.userId || null
-  }
-
-  let savedContent
-
-  if (existingContent) {
-    savedContent = await homeWhyChooseUsContentRepository.updateById(existingContent._id, data)
-  } else {
-    savedContent = await homeWhyChooseUsContentRepository.create({
-      ...data,
-      createdBy: user?.userId || null
-    })
-  }
-
-  return {
-    message: 'Home why choose us content saved successfully',
-    data: savedContent
-  }
-}
+})
 
 module.exports = {
-  getHomeWhyChooseUsContent,
-  updateHomeWhyChooseUsContent
+  getHomeWhyChooseUsContent: service.getAdminContent,
+  updateHomeWhyChooseUsContent: service.updateContent
 }

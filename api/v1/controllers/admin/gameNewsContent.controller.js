@@ -1,22 +1,14 @@
-const logger = require('../../../../config/logger')
 const gameNewsContentService = require('../../services/gameNewsContent.service')
+const { createControllerAction } = require('../../factories/singletonContent.factory')
 
-exports.show = async (_req, res) => {
-  try {
-    const result = await gameNewsContentService.getAdminGameNewsContent()
-    res.status(200).json(result)
-  } catch (error) {
-    logger.error('[Admin] Error retrieving game news content:', error)
-    res.status(500).json({ success: false, message: 'Failed to retrieve game news content' })
-  }
-}
+exports.show = createControllerAction({
+  handler: () => gameNewsContentService.getAdminGameNewsContent(),
+  logMessage: '[Admin] Error retrieving game news content:',
+  errorMessage: 'Failed to retrieve game news content'
+})
 
-exports.update = async (req, res) => {
-  try {
-    const result = await gameNewsContentService.updateGameNewsContent(req.body, req.user)
-    res.status(200).json(result)
-  } catch (error) {
-    logger.error('[Admin] Error updating game news content:', error)
-    res.status(500).json({ success: false, message: 'Failed to update game news content' })
-  }
-}
+exports.update = createControllerAction({
+  handler: req => gameNewsContentService.updateGameNewsContent(req.body, req.user),
+  logMessage: '[Admin] Error updating game news content:',
+  errorMessage: 'Failed to update game news content'
+})

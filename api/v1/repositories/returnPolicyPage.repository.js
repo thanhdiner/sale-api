@@ -1,20 +1,7 @@
-const ReturnPolicyPage = require('../models/returnPolicyPage.model')
+const { createContentPageRepository } = require('./contentPage.repository')
 
-async function findOne(query = {}, options = {}) {
-  let cursor = ReturnPolicyPage.findOne(query)
-
-  if (options.lean) {
-    cursor = cursor.lean()
+module.exports = createContentPageRepository({
+  legacy: {
+    collectionName: 'returnPolicyPages'
   }
-
-  return cursor
-}
-
-async function create(payload) {
-  return ReturnPolicyPage.create(payload)
-}
-
-module.exports = {
-  findOne,
-  create
-}
+})
