@@ -2,6 +2,7 @@ const slugify = require('slugify')
 const AppError = require('../../utils/AppError')
 const BlogTag = require('../../models/blogTag.model')
 const BlogPost = require('../../models/blogPost.model')
+const handleSlug = require('../../utils/handleSlug')
 
 const BLOG_TAG_STATUSES = new Set(['active', 'inactive'])
 
@@ -32,6 +33,17 @@ function normalizeTranslations(value = {}) {
       slug: buildSlug(en.slug, name).slice(0, 120)
     }
   }
+}
+
+async function resolveSlug({ name, slugInput, currentId = null }) {
+  const { slug, error, suggestedSlug } = await handleSlug({
+    Model: BlogTag,
+    slugInput,
+    title: name,
+    currentId
+  })
+  if (error) throw new AppError(error, 400, { suggestedSlug })
+  return slug
 }
 
 function normalizeWriteError(error) {
@@ -77,7 +89,7 @@ async function createTag(payload = {}, user = null) {
   try {
     const tag = await BlogTag.create({
       name,
-      slug: buildSlug(payload.slug, name),
+      slug: await resolveSlug({ name, slugInput: payload.slug }),
       translations: normalizeTranslations(payload.translations),
       status: normalizeStatus(payload.status),
       createdBy: getAdminId(user)
@@ -98,7 +110,11 @@ async function updateTag(id, payload = {}, user = null) {
       if (!name) throw new AppError('Tag name is required', 400)
       tag.name = name
     }
-    if (Object.prototype.hasOwnProperty.call(payload, 'slug')) tag.slug = buildSlug(payload.slug, tag.name)
+    if (Object.prototype.hasOwnProperty.call(payload, 'slug')) tag.slug = await resolveSlug({
+      name: tag.name,
+      slugInput: payload.slug,
+      currentId: id
+    })
     if (Object.prototype.hasOwnProperty.call(payload, 'translations')) tag.translations = normalizeTranslations(payload.translations)
     if (Object.prototype.hasOwnProperty.call(payload, 'status')) tag.status = normalizeStatus(payload.status, tag.status)
     tag.updatedBy = getAdminId(user)

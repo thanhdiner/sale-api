@@ -1,6 +1,6 @@
-const slugify = require('slugify')
 const AppError = require('../../utils/AppError')
 const BlogCategory = require('../../models/blogCategory.model')
+const handleSlug = require('../../utils/handleSlug')
 
 function getAdminId(user = null) {
   return user?.userId || user?.id || user?._id || null
@@ -11,6 +11,7 @@ function normalizeText(value) {
 }
 
 function normalizeNumber(value, fallback = 0) {
+  if (value === undefined || value === null || value === '') return fallback
   const number = Number(value)
   return Number.isFinite(number) ? number : fallback
 }
@@ -30,8 +31,30 @@ function normalizeSeo(value = {}) {
   }
 }
 
-function buildSlug(name, slugInput) {
-  return slugify(normalizeText(slugInput || name), { lower: true, strict: true, locale: 'vi' })
+function normalizeTranslations(value = {}) {
+  const en = value?.en || {}
+  return {
+    en: {
+      name: normalizeText(en.name).slice(0, 120),
+      description: normalizeText(en.description).slice(0, 500)
+    }
+  }
+}
+
+async function resolveSlug({ name, slugInput, currentId = null }) {
+  const { slug, error, suggestedSlug } = await handleSlug({
+    Model: BlogCategory,
+    slugInput,
+    title: name,
+    currentId
+  })
+  if (error) throw new AppError(error, 400, { suggestedSlug })
+  return slug
+}
+
+async function getNextSortOrder() {
+  const lastCategory = await BlogCategory.findOne({ sortOrder: { $type: 'number' } }).sort({ sortOrder: -1 }).select('sortOrder').lean()
+  return normalizeNumber(lastCategory?.sortOrder, 0) + 1
 }
 
 async function listCategories(params = {}) {
@@ -54,11 +77,12 @@ async function createCategory(payload = {}, user = null) {
 
   const category = await BlogCategory.create({
     name,
-    slug: buildSlug(name, payload.slug),
+    slug: await resolveSlug({ name, slugInput: payload.slug }),
     description: normalizeText(payload.description).slice(0, 500),
     thumbnail: normalizeText(payload.thumbnail).slice(0, 500),
     seo: normalizeSeo(payload.seo),
-    sortOrder: normalizeNumber(payload.sortOrder, 0),
+    translations: normalizeTranslations(payload.translations),
+    sortOrder: normalizeNumber(payload.sortOrder, await getNextSortOrder()),
     isActive: normalizeBoolean(payload.isActive, true),
     createdBy: getAdminId(user)
   })
@@ -75,10 +99,15 @@ async function updateCategory(id, payload = {}, user = null) {
     if (!name) throw new AppError('Category name is required', 400)
     category.name = name
   }
-  if (Object.prototype.hasOwnProperty.call(payload, 'slug')) category.slug = buildSlug(category.name, payload.slug)
+  if (Object.prototype.hasOwnProperty.call(payload, 'slug')) category.slug = await resolveSlug({
+    name: category.name,
+    slugInput: payload.slug,
+    currentId: id
+  })
   if (Object.prototype.hasOwnProperty.call(payload, 'description')) category.description = normalizeText(payload.description).slice(0, 500)
   if (Object.prototype.hasOwnProperty.call(payload, 'thumbnail')) category.thumbnail = normalizeText(payload.thumbnail).slice(0, 500)
   if (Object.prototype.hasOwnProperty.call(payload, 'seo')) category.seo = normalizeSeo(payload.seo)
+  if (Object.prototype.hasOwnProperty.call(payload, 'translations')) category.translations = normalizeTranslations(payload.translations)
   if (Object.prototype.hasOwnProperty.call(payload, 'sortOrder')) category.sortOrder = normalizeNumber(payload.sortOrder, category.sortOrder)
   if (Object.prototype.hasOwnProperty.call(payload, 'isActive')) category.isActive = normalizeBoolean(payload.isActive, category.isActive)
   category.updatedBy = getAdminId(user)
