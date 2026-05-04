@@ -63,11 +63,12 @@ async function updateWebsiteConfig(payload = {}) {
     config.specialPackage = parseJsonField(specialPackage, 'specialPackage')
   }
 
-  config.siteName = siteName
-  config.tagline = tagline
-  config.description = description
-  config.contactInfo = contactObj
-  config.seoSettings = seoObj
+
+  if (siteName !== undefined) config.siteName = siteName
+  if (tagline !== undefined) config.tagline = tagline
+  if (description !== undefined) config.description = description
+  if (contactObj !== undefined) config.contactInfo = contactObj
+  if (seoObj !== undefined) config.seoSettings = seoObj
 
   await config.save()
 

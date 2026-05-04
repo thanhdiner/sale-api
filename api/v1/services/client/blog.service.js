@@ -3,6 +3,7 @@ const logger = require('../../../../config/logger')
 const cache = require('../../../../config/redis')
 const BlogPost = require('../../models/blogPost.model')
 const BlogCategory = require('../../models/blogCategory.model')
+const BlogTag = require('../../models/blogTag.model')
 const blogPostRepository = require('../../repositories/blogPost.repository')
 const getRequestLanguage = require('../../utils/getRequestLanguage')
 
@@ -77,6 +78,33 @@ function applyBlogCategoryLanguage(category, lang = 'vi') {
   return obj
 }
 
+function applyBlogTagLanguage(tag, lang = 'vi') {
+  const obj = toPlainObject(tag)
+  if (!obj || lang !== 'en') return obj
+
+  const translated = obj.translations?.en
+  if (!translated) return obj
+
+  if (hasValue(translated.name)) obj.name = translated.name
+  if (hasValue(translated.slug)) obj.slug = translated.slug
+
+  return obj
+}
+
+function normalizePopulatedPost(post, lang = 'vi') {
+  const obj = applyBlogPostLanguage(post, lang)
+  if (!obj) return obj
+
+  if (obj.categoryRef) {
+    obj.category = applyBlogCategoryLanguage(obj.categoryRef, lang)
+  }
+  if (Array.isArray(obj.tagIds) && obj.tagIds.length > 0) {
+    obj.tags = obj.tagIds.map(tag => applyBlogTagLanguage(tag, lang)).filter(Boolean)
+  }
+
+  return obj
+}
+
 async function resolveCategoryFilter(category) {
   const value = normalizeText(category)
   if (!value) return null
@@ -112,8 +140,20 @@ async function buildPublicListQuery(params = {}) {
   if (categoryFilter) appendAndFilter(query, categoryFilter)
 
   if (tag) {
+    const tagDoc = await BlogTag.findOne({
+      deleted: false,
+      status: 'active',
+      $or: [
+        { slug: tag },
+        { name: buildTextSearch(tag) },
+        { 'translations.en.name': buildTextSearch(tag) },
+        { 'translations.en.slug': tag }
+      ]
+    }).select('_id').lean()
+
     appendAndFilter(query, {
       $or: [
+        ...(tagDoc?._id ? [{ tagIds: tagDoc._id }] : []),
         { tags: tag },
         { 'translations.en.tags': tag }
       ]
@@ -160,7 +200,11 @@ module.exports.index = async (req, res) => {
         sort: { isFeatured: -1, publishedAt: -1, updatedAt: -1 },
         skip: (page - 1) * limit,
         limit,
-        lean: true
+        lean: true,
+        populate: [
+          { path: 'categoryRef', select: 'name slug description translations thumbnail' },
+          { path: 'tagIds', select: 'name slug translations status' }
+        ]
       })
 
       return {
@@ -175,7 +219,7 @@ module.exports.index = async (req, res) => {
     res.status(200).json({
       ...result,
       data: Array.isArray(result.data)
-        ? result.data.map(post => applyBlogPostLanguage(post, language))
+        ? result.data.map(post => normalizePopulatedPost(post, language))
         : []
     })
   } catch (err) {
@@ -194,7 +238,13 @@ module.exports.show = async (req, res) => {
       const post = await blogPostRepository.findOne({
         slug,
         ...getPublishedBaseQuery()
-      }, { lean: true })
+      }, {
+        lean: true,
+        populate: [
+          { path: 'categoryRef', select: 'name slug description translations thumbnail' },
+          { path: 'tagIds', select: 'name slug translations status' }
+        ]
+      })
 
       if (!post) {
         return null
@@ -212,7 +262,7 @@ module.exports.show = async (req, res) => {
 
     res.status(200).json({
       ...result,
-      data: applyBlogPostLanguage(result.data, language)
+      data: normalizePopulatedPost(result.data, language)
     })
   } catch (err) {
     logger.error('[Client] Error fetching blog post:', err)
@@ -267,24 +317,31 @@ module.exports.categories = async (req, res) => {
 
 module.exports.tags = async (req, res) => {
   try {
+    const language = getRequestLanguage(req)
     const cacheKey = 'blog:tags'
     const result = await cache.getOrSet(cacheKey, async () => {
-      const [tags, enTags] = await Promise.all([
+      const [masterTags, legacyTags, legacyEnTags] = await Promise.all([
+        BlogTag.find({ deleted: false, status: 'active' }).sort({ name: 1 }).lean(),
         BlogPost.distinct('tags', getPublishedBaseQuery()),
         BlogPost.distinct('translations.en.tags', getPublishedBaseQuery())
       ])
-      const data = Array.from(new Set([...(tags || []), ...(enTags || [])]
+      const masterNames = new Set(masterTags.map(tag => tag.name))
+      const legacyItems = Array.from(new Set([...(legacyTags || []), ...(legacyEnTags || [])]
         .map(tag => normalizeText(tag))
         .filter(Boolean)))
-        .sort((a, b) => a.localeCompare(b))
+        .filter(name => !masterNames.has(name))
+        .map(name => ({ _id: null, name, slug: slugify(name, { lower: true, strict: true, locale: 'vi' }) || name, translations: { en: { name: '', slug: '' } }, isLegacy: true }))
 
       return {
         message: 'Blog tags fetched successfully',
-        data
+        data: [...masterTags, ...legacyItems]
       }
     }, 300)
 
-    res.status(200).json(result)
+    res.status(200).json({
+      ...result,
+      data: Array.isArray(result.data) ? result.data.map(tag => applyBlogTagLanguage(tag, language)) : []
+    })
   } catch (err) {
     logger.error('[Client] Error fetching blog tags:', err)
     res.status(500).json({ error: 'Failed to fetch blog tags' })

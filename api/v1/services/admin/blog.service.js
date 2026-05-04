@@ -3,13 +3,22 @@ const slugify = require('slugify')
 const AppError = require('../../utils/AppError')
 const BlogPost = require('../../models/blogPost.model')
 const BlogCategory = require('../../models/blogCategory.model')
+const BlogTag = require('../../models/blogTag.model')
 const blogPostRepository = require('../../repositories/blogPost.repository')
 const { deleteImageFromCloudinary } = require('../../utils/cloudinaryUtils')
+const { createRevision } = require('./cmsRevision.service')
 
 const BLOG_STATUSES = new Set(['draft', 'queued', 'published', 'archived'])
 const BLOG_REVIEW_STATUSES = new Set(['pending', 'approved', 'rejected', 'needs_edit'])
 const BLOG_SOURCES = new Set(['manual', 'ai'])
 const DUPLICATE_RISKS = new Set(['low', 'medium', 'high'])
+const BLOG_LIST_SORTS = {
+  newest: { createdAt: -1 },
+  updated: { updatedAt: -1 },
+  views: { viewsCount: -1 },
+  published: { publishedAt: -1 },
+  title: { title: 1 }
+}
 
 const isTruthy = value => value === true || value === 'true' || value === 1 || value === '1'
 const isFalsy = value => value === false || value === 'false' || value === 0 || value === '0'
@@ -81,6 +90,7 @@ function normalizeObjectIdArray(value, fieldName) {
 
   return Array.from(new Set(
     ids
+      .map(item => typeof item === 'object' && item ? item._id : item)
       .map(item => normalizeText(item))
       .filter(Boolean)
   )).map(id => {
@@ -154,7 +164,7 @@ function normalizePublishedAt(value, status, fallbackDate = null) {
   const parsedDate = normalizeDate(value, 'Published date')
 
   if (status === 'published') {
-    return typeof parsedDate === 'undefined' ? (fallbackDate || new Date()) : parsedDate
+    return parsedDate || fallbackDate || new Date()
   }
 
   return typeof parsedDate === 'undefined' ? null : parsedDate
@@ -292,6 +302,25 @@ async function buildUniqueSlug({ title, slugInput, currentId = null }) {
   return suggestedSlug
 }
 
+async function resolveTags({ tagIds, tags }) {
+  const ids = normalizeObjectIdArray(tagIds, 'tagIds')
+  if (ids.length > 0) return BlogTag.find({ _id: { $in: ids }, deleted: false, status: 'active' }).select('_id name slug translations').lean()
+
+  const tagNames = normalizeTags(tags)
+  if (tagNames.length === 0) return []
+
+  return BlogTag.find({
+    deleted: false,
+    status: 'active',
+    $or: [
+      { name: { $in: tagNames } },
+      { slug: { $in: tagNames } },
+      { 'translations.en.name': { $in: tagNames } },
+      { 'translations.en.slug': { $in: tagNames } }
+    ]
+  }).select('_id name slug translations').lean()
+}
+
 async function resolveCategory({ categorySlug, categoryRef, categoryName }) {
   const ref = normalizeText(categoryRef)
   if (ref) {
@@ -321,7 +350,7 @@ async function resolveCategory({ categorySlug, categoryRef, categoryName }) {
   return null
 }
 
-function buildListQuery(params = {}) {
+async function buildListQuery(params = {}) {
   const query = { isDeleted: false }
   const keyword = normalizeText(params.keyword || params.search)
   const status = normalizeText(params.status)
@@ -372,8 +401,21 @@ function buildListQuery(params = {}) {
   }
 
   if (tag) {
+    const tagDoc = mongoose.Types.ObjectId.isValid(tag)
+      ? await BlogTag.findOne({ _id: tag, deleted: false }).select('_id').lean()
+      : await BlogTag.findOne({
+        deleted: false,
+        $or: [
+          { slug: tag },
+          { name: buildTextSearch(tag) },
+          { 'translations.en.name': buildTextSearch(tag) },
+          { 'translations.en.slug': tag }
+        ]
+      }).select('_id').lean()
+
     appendAndFilter(query, {
       $or: [
+        ...(tagDoc?._id ? [{ tagIds: tagDoc._id }] : []),
         { tags: tag },
         { 'translations.en.tags': tag }
       ]
@@ -436,13 +478,18 @@ async function getBlogPostByIdOrThrow(id, options = {}) {
 async function listBlogPosts(params = {}) {
   const page = Math.max(parseInt(params.page, 10) || 1, 1)
   const limit = Math.min(Math.max(parseInt(params.limit, 10) || 20, 1), 100)
-  const query = buildListQuery(params)
+  const query = await buildListQuery(params)
+  const sort = BLOG_LIST_SORTS[normalizeText(params.sort)] || { isFeatured: -1, publishedAt: -1, scheduledAt: 1, updatedAt: -1 }
 
   const total = await blogPostRepository.countByQuery(query)
   const posts = await blogPostRepository.findByQuery(query, {
-    sort: { isFeatured: -1, publishedAt: -1, scheduledAt: 1, updatedAt: -1 },
+    sort,
     skip: (page - 1) * limit,
-    limit
+    limit,
+    populate: [
+      { path: 'categoryRef', select: 'name slug translations' },
+      { path: 'tagIds', select: 'name slug translations status' }
+    ]
   })
 
   return {
@@ -488,6 +535,18 @@ async function listPublishQueue(params = {}) {
 async function getBlogPost(id) {
   return {
     message: 'Blog post fetched successfully',
+    data: await getBlogPostByIdOrThrow(id, {
+      populate: [
+        { path: 'categoryRef', select: 'name slug translations' },
+        { path: 'tagIds', select: 'name slug translations status' }
+      ]
+    })
+  }
+}
+
+async function previewBlogPost(id) {
+  return {
+    message: 'Blog post preview fetched successfully',
     data: await getBlogPostByIdOrThrow(id)
   }
 }
@@ -511,6 +570,8 @@ async function createBlogPost(payload = {}, user = null) {
     categoryName: payload.category
   })
   const categoryName = normalizeText(payload.category) || category?.name || ''
+  const resolvedTags = await resolveTags({ tagIds: payload.tagIds, tags: payload.tags })
+  const tagNames = resolvedTags.length > 0 ? resolvedTags.map(tag => tag.name) : normalizeTags(payload.tags)
 
   try {
     const post = await blogPostRepository.create({
@@ -521,7 +582,8 @@ async function createBlogPost(payload = {}, user = null) {
       thumbnail: normalizeText(payload.thumbnail),
       category: categoryName,
       categoryRef: category?._id || null,
-      tags: normalizeTags(payload.tags),
+      tags: tagNames,
+      tagIds: resolvedTags.map(tag => tag._id),
       relatedProducts: normalizeObjectIdArray(payload.relatedProducts || payload.relatedProductIds, 'relatedProducts'),
       translations: normalizeTranslations(payload.translations),
       seo: normalizeSeo(payload, title, excerpt),
@@ -580,7 +642,11 @@ async function updateBlogPost(id, payload = {}, user = null) {
     updateData.categoryRef = category?._id || null
   }
 
-  if (hasOwn(payload, 'tags')) updateData.tags = normalizeTags(payload.tags)
+  if (hasOwn(payload, 'tagIds') || hasOwn(payload, 'tags')) {
+    const resolvedTags = await resolveTags({ tagIds: payload.tagIds, tags: payload.tags })
+    updateData.tags = resolvedTags.length > 0 ? resolvedTags.map(tag => tag.name) : normalizeTags(payload.tags)
+    updateData.tagIds = resolvedTags.map(tag => tag._id)
+  }
   if (hasOwn(payload, 'relatedProducts') || hasOwn(payload, 'relatedProductIds')) {
     updateData.relatedProducts = normalizeObjectIdArray(payload.relatedProducts || payload.relatedProductIds, 'relatedProducts')
   }
@@ -630,6 +696,7 @@ async function updateBlogPost(id, payload = {}, user = null) {
   updateData.updatedAt = new Date()
 
   try {
+    await createRevision({ entityType: 'blog_post', entityId: currentPost._id, snapshot: currentPost.toObject ? currentPost.toObject() : currentPost, message: 'Before update', user })
     const updatedPost = await blogPostRepository.updateById(id, updateData)
 
     if (!updatedPost) {
@@ -805,6 +872,7 @@ module.exports = {
   listBlogPosts,
   listPublishQueue,
   getBlogPost,
+  previewBlogPost,
   createBlogPost,
   updateBlogPost,
   deleteBlogPost,

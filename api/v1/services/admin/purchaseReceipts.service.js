@@ -1,7 +1,9 @@
 const mongoose = require('mongoose')
 const AppError = require('../../utils/AppError')
+const Product = require('../../models/products.model')
 const productRepository = require('../../repositories/product.repository')
 const purchaseReceiptRepository = require('../../repositories/purchaseReceipt.repository')
+const { hasPermission, isSuperAdmin } = require('../../middlewares/admin/checkPermission.middleware')
 const { invalidateProductCaches } = require('../digitalDelivery.service')
 const { notifyBackInStockForProduct } = require('../backInStock.service')
 
@@ -37,6 +39,8 @@ function buildTextSearch(value) {
   const escapedValue = String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   return { $regex: escapedValue, $options: 'i' }
 }
+
+const RECEIPT_STATUSES = ['active', 'cancelled', 'adjusted']
 
 function buildDateBoundary(value, boundary = 'start') {
   if (!value) return null
@@ -127,6 +131,7 @@ async function buildReceiptQuery(params = {}) {
   const keyword = normalizeText(params.keyword)
   const productId = normalizeText(params.productId)
   const supplierName = normalizeText(params.supplierName)
+  const status = normalizeText(params.status)
   const dateFrom = buildDateBoundary(params.dateFrom, 'start')
   const dateTo = buildDateBoundary(params.dateTo, 'end')
   const conditions = []
@@ -143,6 +148,13 @@ async function buildReceiptQuery(params = {}) {
 
   if (supplierName) {
     conditions.push({ supplierName: buildTextSearch(supplierName) })
+  }
+
+  if (status) {
+    if (!RECEIPT_STATUSES.includes(status)) {
+      throw new AppError('Trạng thái phiếu nhập không hợp lệ', 400)
+    }
+    conditions.push({ status })
   }
 
   if (dateFrom || dateTo) {
@@ -170,7 +182,9 @@ async function listPurchaseReceipts(params = {}, lang = 'vi') {
       limit: limitNum,
       populate: [
         { path: 'productId', select: 'title translations stock costPrice deliveryType' },
-        { path: 'createdBy.by', select: 'fullName email avatarUrl' }
+        { path: 'createdBy.by', select: 'fullName email avatarUrl' },
+        { path: 'cancelledBy.by', select: 'fullName email avatarUrl' },
+        { path: 'updatedBy.by', select: 'fullName email avatarUrl' }
       ],
       lean: true
     }),
@@ -184,11 +198,7 @@ async function listPurchaseReceipts(params = {}, lang = 'vi') {
   }
 }
 
-async function createPurchaseReceipt(payload = {}, adminId, lang = 'vi') {
-  const productId = normalizeText(payload.productId)
-  const quantity = Number(payload.quantity)
-  const unitCost = Number(payload.unitCost)
-
+function validateReceiptInput(productId, quantity, unitCost) {
   ensureValidObjectId(productId)
 
   if (!Number.isInteger(quantity) || quantity < 1) {
@@ -198,38 +208,78 @@ async function createPurchaseReceipt(payload = {}, adminId, lang = 'vi') {
   if (!Number.isFinite(unitCost) || unitCost < 0) {
     throw new AppError('Giá nhập không hợp lệ', 400)
   }
+}
 
-  const product = await productRepository.findById(productId)
-  if (!product || product.deleted === true) {
-    throw new AppError('Không tìm thấy sản phẩm', 404)
-  }
+async function createPurchaseReceipt(payload = {}, adminId, lang = 'vi') {
+  const productId = normalizeText(payload.productId)
+  const quantity = Number(payload.quantity)
+  const unitCost = Number(payload.unitCost)
+  const now = new Date()
+  const session = await mongoose.startSession()
+  let receipt
+  let product
+  let previousStock = 0
 
-  if (product.deliveryType === 'instant_account') {
-    throw new AppError('Sản phẩm giao tài khoản ngay cần nhập bằng credential, không nhập kho thủ công', 400)
-  }
+  validateReceiptInput(productId, quantity, unitCost)
 
-  const receipt = await purchaseReceiptRepository.create({
-    productId: product._id,
-    productName: product.title,
-    translations: {
-      en: {
-        productName: getEnglishProductTitle(product)
+  try {
+    await session.withTransaction(async () => {
+      product = await Product.findOne({ _id: productId, deleted: { $ne: true } }).session(session)
+      if (!product) {
+        throw new AppError('Không tìm thấy sản phẩm', 404)
       }
-    },
-    quantity,
-    unitCost,
-    totalCost: quantity * unitCost,
-    supplierName: normalizeText(payload.supplierName),
-    note: normalizeText(payload.note),
-    createdBy: { by: adminId, at: new Date() }
-  })
 
-  const previousStock = Number(product.stock || 0)
+      if (product.deliveryType !== 'manual') {
+        throw new AppError('Chỉ sản phẩm giao thủ công mới được nhập kho thủ công', 400)
+      }
 
-  product.stock = previousStock + quantity
-  product.costPrice = unitCost
-  product.updateBy.push({ by: adminId, at: new Date() })
-  await product.save()
+      previousStock = Number(product.stock || 0)
+      receipt = await purchaseReceiptRepository.create({
+        productId: product._id,
+        productName: product.title,
+        translations: {
+          en: {
+            productName: getEnglishProductTitle(product)
+          }
+        },
+        quantity,
+        unitCost,
+        totalCost: quantity * unitCost,
+        status: 'active',
+        supplierName: normalizeText(payload.supplierName),
+        note: normalizeText(payload.note),
+        createdBy: { by: adminId, at: now },
+        updatedBy: [
+          {
+            by: adminId,
+            at: now,
+            action: 'create',
+            before: { stock: previousStock },
+            after: { stock: previousStock + quantity }
+          }
+        ]
+      }, { session })
+
+      const updateResult = await Product.updateOne(
+        { _id: product._id, deleted: { $ne: true } },
+        {
+          $inc: { stock: quantity },
+          $set: { costPrice: unitCost },
+          $push: { updateBy: { by: adminId, at: now } }
+        },
+        { session }
+      )
+
+      if (updateResult.matchedCount !== 1) {
+        throw new AppError('Không thể cập nhật tồn kho sản phẩm', 400)
+      }
+
+      product = await Product.findById(product._id).session(session)
+    })
+  } finally {
+    await session.endSession()
+  }
+
   invalidateProductCaches()
 
   if (previousStock <= 0 && Number(product.stock || 0) > 0) {
@@ -243,7 +293,109 @@ async function createPurchaseReceipt(payload = {}, adminId, lang = 'vi') {
   }
 }
 
+function canOverrideNegativeStock(user) {
+  return isSuperAdmin(user) || hasPermission(user, 'manage_products')
+}
+
+async function cancelPurchaseReceipt(id, payload = {}, user = {}, lang = 'vi') {
+  ensureValidObjectId(id, 'ID phiếu nhập không hợp lệ')
+
+  const reason = normalizeText(payload.cancelReason || payload.reason)
+  const overrideNegativeStock = payload.overrideNegativeStock === true
+  const adminId = user?.userId
+  const now = new Date()
+  const session = await mongoose.startSession()
+  let receipt
+  let product
+  let previousStock = 0
+  let nextStock = 0
+
+  if (!reason) {
+    throw new AppError('Vui lòng nhập lý do hủy phiếu nhập', 400)
+  }
+
+  if (overrideNegativeStock && !canOverrideNegativeStock(user)) {
+    throw new AppError('Bạn không có quyền cho phép tồn kho âm', 403)
+  }
+
+  try {
+    await session.withTransaction(async () => {
+      receipt = await purchaseReceiptRepository.findById(id, { session })
+      if (!receipt) {
+        throw new AppError('Không tìm thấy phiếu nhập', 404)
+      }
+
+      if (receipt.status !== 'active') {
+        throw new AppError('Phiếu nhập đã bị hủy hoặc không còn hiệu lực', 400)
+      }
+
+      product = await Product.findOne({ _id: receipt.productId, deleted: { $ne: true } }).session(session)
+      if (!product) {
+        throw new AppError('Không tìm thấy sản phẩm', 404)
+      }
+
+      previousStock = Number(product.stock || 0)
+      nextStock = previousStock - Number(receipt.quantity || 0)
+
+      const productFilter = { _id: product._id, deleted: { $ne: true } }
+      if (!overrideNegativeStock) {
+        productFilter.stock = { $gte: receipt.quantity }
+      }
+
+      const productUpdateResult = await Product.updateOne(
+        productFilter,
+        {
+          $inc: { stock: -receipt.quantity },
+          $push: { updateBy: { by: adminId, at: now } }
+        },
+        { session }
+      )
+
+      if (productUpdateResult.matchedCount !== 1) {
+        throw new AppError('Không thể hủy vì tồn kho rollback sẽ bị âm', 400)
+      }
+
+      receipt = await purchaseReceiptRepository.findOneAndUpdate(
+        { _id: receipt._id, status: 'active' },
+        {
+          $set: {
+            status: 'cancelled',
+            cancelledBy: { by: adminId, at: now, reason }
+          },
+          $push: {
+            updatedBy: {
+              by: adminId,
+              at: now,
+              action: 'cancel',
+              before: { status: 'active', stock: previousStock },
+              after: { status: 'cancelled', stock: nextStock }
+            }
+          }
+        },
+        { session }
+      )
+
+      if (!receipt) {
+        throw new AppError('Phiếu nhập đã bị hủy hoặc không còn hiệu lực', 400)
+      }
+
+      product = await Product.findById(product._id).session(session)
+    })
+  } finally {
+    await session.endSession()
+  }
+
+  invalidateProductCaches()
+
+  return {
+    success: true,
+    receipt: localizePurchaseReceipt(receipt, lang),
+    product: localizeProduct(product, lang)
+  }
+}
+
 module.exports = {
   listPurchaseReceipts,
-  createPurchaseReceipt
+  createPurchaseReceipt,
+  cancelPurchaseReceipt
 }

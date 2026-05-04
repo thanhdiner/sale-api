@@ -23,6 +23,7 @@ const blogPostSchema = new mongoose.Schema(
     category: { type: String, trim: true, default: '', maxlength: 80 },
     categoryRef: { type: mongoose.Schema.Types.ObjectId, ref: 'BlogCategory', default: null },
     tags: { type: [String], default: [] },
+    tagIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'BlogTag' }],
     relatedProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
     translations: {
       en: { type: translationSchema, default: () => ({}) }
@@ -97,5 +98,6 @@ blogPostSchema.index({ isFeatured: 1, status: 1, isDeleted: 1 })
 blogPostSchema.index({ status: 1, reviewStatus: 1, scheduledAt: 1, publishedAt: 1 })
 blogPostSchema.index({ 'autoPublish.enabled': 1, 'autoPublish.priority': -1, 'autoPublish.approvedAt': 1 })
 blogPostSchema.index({ categoryRef: 1, status: 1, isDeleted: 1 })
+blogPostSchema.index({ tagIds: 1, status: 1, isDeleted: 1 })
 
 module.exports = mongoose.model('BlogPost', blogPostSchema, 'blog_posts')

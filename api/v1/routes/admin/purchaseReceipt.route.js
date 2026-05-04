@@ -7,5 +7,6 @@ const { invalidateProducts } = require('../../middlewares/cacheInvalidation.midd
 
 router.get('/', checkPermission.checkPermission('view_products'), controller.listPurchaseReceipts)
 router.post('/create', checkPermission.checkPermission('edit_product'), invalidateProducts, controller.createPurchaseReceipt)
+router.patch('/:id/cancel', checkPermission.checkPermission('edit_product'), invalidateProducts, controller.cancelPurchaseReceipt)
 
 module.exports = router

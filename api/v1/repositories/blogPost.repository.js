@@ -10,7 +10,8 @@ async function findByQuery(query = {}, options = {}) {
     sort = { publishedAt: -1, updatedAt: -1 },
     skip = 0,
     limit,
-    lean = false
+    lean = false,
+    populate
   } = options
 
   let cursor = BlogPost.find(query).sort(sort).skip(skip)
@@ -23,6 +24,10 @@ async function findByQuery(query = {}, options = {}) {
     cursor = cursor.limit(limit)
   }
 
+  if (populate) {
+    cursor = cursor.populate(populate)
+  }
+
   if (lean) {
     cursor = cursor.lean()
   }
@@ -31,11 +36,15 @@ async function findByQuery(query = {}, options = {}) {
 }
 
 async function findOne(query = {}, options = {}) {
-  const { select, sort = {}, lean = false } = options
+  const { select, sort = {}, lean = false, populate } = options
   let cursor = BlogPost.findOne(query).sort(sort)
 
   if (select) {
     cursor = cursor.select(select)
+  }
+
+  if (populate) {
+    cursor = cursor.populate(populate)
   }
 
   if (lean) {
@@ -46,11 +55,15 @@ async function findOne(query = {}, options = {}) {
 }
 
 async function findById(id, options = {}) {
-  const { select, lean = false } = options
+  const { select, lean = false, populate } = options
   let cursor = BlogPost.findById(id)
 
   if (select) {
     cursor = cursor.select(select)
+  }
+
+  if (populate) {
+    cursor = cursor.populate(populate)
   }
 
   if (lean) {

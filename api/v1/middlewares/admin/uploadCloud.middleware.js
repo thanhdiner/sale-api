@@ -13,9 +13,9 @@ cloudinary.config({
 })
 //# End Configure Cloudinary
 
-const uploadBufferToCloudinary = file => {
+const uploadBufferToCloudinary = (file, options = {}) => {
   return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream((error, result) => {
+    const stream = cloudinary.uploader.upload_stream(options, (error, result) => {
       if (result) resolve(result)
       else reject(error)
     })
@@ -150,6 +150,8 @@ module.exports.deleteImageMany = async (req, res, next) => {
 
   next()
 }
+
+module.exports.uploadBufferToCloudinary = uploadBufferToCloudinary
 
 module.exports.uploadImageFromUrl = async (url, publicId = undefined) => {
   const response = await axios.get(url, { responseType: 'arraybuffer' })

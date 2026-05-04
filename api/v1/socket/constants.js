@@ -19,6 +19,7 @@ const EVENTS = {
   // Customer → Server
   CHAT_JOIN: 'chat:join',
   CHAT_SEND: 'chat:send',
+  CHAT_PAGE_CONTEXT_UPDATE: 'chat:page_context_update',
   CHAT_REQUEST_AGENT: 'chat:request_agent',
   CHAT_SWITCH_TO_BOT: 'chat:switch_to_bot',
   CHAT_REACTION: 'chat:reaction',

@@ -14,12 +14,15 @@ const requireAnyPermission = permissions => checkPermission.checkAnyPermission
 
 const parseBlogJsonBodyFields = (req, res, next) => {
   parseJsonBodyField(req.body, 'tags')
+  parseJsonBodyField(req.body, 'tagIds')
   parseJsonBodyField(req.body, 'translations')
   next()
 }
 
 router.get('/', checkPermission.checkPermission('view_blog'), controller.index)
 router.get('/publish-queue', requireAnyPermission(['blog.publish', 'view_blog']), controller.publishQueue)
+router.post('/media', requireAnyPermission(['create_blog', 'edit_blog']), fileUpload.single('media'), controller.uploadMedia)
+router.get('/:id/preview', checkPermission.checkPermission('view_blog'), controller.preview)
 router.get('/:id', checkPermission.checkPermission('view_blog'), controller.show)
 router.post(
   '/',

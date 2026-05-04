@@ -4,6 +4,7 @@
 
 const logger = require('../../../config/logger')
 const chatService = require('../services/chat.service')
+const pageContextService = require('../services/ai/pageContext.service')
 const {
   markCustomerTyping,
   scheduleBotReply
@@ -157,6 +158,22 @@ function registerHandlers(io) {
       }
     })
 
+    socket.on(EVENTS.CHAT_PAGE_CONTEXT_UPDATE, (data, callback) => {
+      try {
+        const sessionId = validateSessionId(data?.sessionId)
+        const pageContext = pageContextService.updatePageContext(sessionId, data?.context)
+
+        if (typeof callback === 'function') {
+          callback({ success: true, pageContext })
+        }
+      } catch (err) {
+        logger.warn(`[Socket] page_context invalid: ${err.message}`)
+        if (typeof callback === 'function') {
+          callback({ success: false, message: err.message || 'Invalid page context' })
+        }
+      }
+    })
+
     // Customer sends message
     socket.on(EVENTS.CHAT_SEND, async (data, callback) => {
       try {
@@ -186,6 +203,7 @@ function registerHandlers(io) {
           avatar: senderAvatar,
           currentPage
         })
+        const pageContext = pageContextService.getPageContext(sessionId)
 
         if (!isNew && conv.status === 'resolved') {
           notifyResolvedConversation(io, socket, sessionId, conv, callback)
@@ -234,6 +252,7 @@ function registerHandlers(io) {
           customer: {
             name: senderName,
             currentPage,
+            pageContext,
             ip: getSocketClientIp(socket),
             userId: senderId
           }

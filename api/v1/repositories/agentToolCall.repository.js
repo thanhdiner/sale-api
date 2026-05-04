@@ -7,6 +7,10 @@ async function findByQuery(query = {}, options = {}) {
     cursor = cursor.sort(options.sort)
   }
 
+  if (typeof options.skip === 'number') {
+    cursor = cursor.skip(options.skip)
+  }
+
   if (typeof options.limit === 'number') {
     cursor = cursor.limit(options.limit)
   }

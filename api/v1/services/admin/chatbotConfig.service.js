@@ -170,7 +170,9 @@ async function updateConfig(payload = {}, user = null) {
 }
 
 async function getToolLogs(query = {}) {
+  const page = Math.max(parseInt(query.page, 10) || 1, 1)
   const limit = Math.min(Math.max(parseInt(query.limit, 10) || 20, 1), 100)
+  const skip = (page - 1) * limit
   const toolName = typeof query.toolName === 'string' ? query.toolName.trim() : ''
   const sessionId = typeof query.sessionId === 'string' ? query.sessionId.trim() : ''
 
@@ -179,7 +181,7 @@ async function getToolLogs(query = {}) {
   if (sessionId) filter.sessionId = sessionId
 
   const [logs, total, errorCount] = await Promise.all([
-    agentToolCallRepository.findByQuery(filter, { sort: { createdAt: -1 }, limit, lean: true }),
+    agentToolCallRepository.findByQuery(filter, { sort: { createdAt: -1 }, skip, limit, lean: true }),
     agentToolCallRepository.countByQuery(filter),
     agentToolCallRepository.countByQuery({ ...filter, outcome: 'error' })
   ])
@@ -188,7 +190,10 @@ async function getToolLogs(query = {}) {
     success: true,
     data: logs,
     meta: {
+      page,
+      limit,
       total,
+      totalPages: Math.ceil(total / limit),
       errorCount
     }
   }

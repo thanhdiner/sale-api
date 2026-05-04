@@ -26,6 +26,17 @@ const blogCategorySchema = new mongoose.Schema(
       trim: true,
       maxlength: 500
     },
+    thumbnail: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: 500
+    },
+    seo: {
+      title: { type: String, default: '', trim: true, maxlength: 180 },
+      description: { type: String, default: '', trim: true, maxlength: 300 },
+      thumbnail: { type: String, default: '', trim: true, maxlength: 500 }
+    },
     translations: {
       en: {
         name: { type: String, default: '', trim: true, maxlength: 120 },
@@ -40,7 +51,9 @@ const blogCategorySchema = new mongoose.Schema(
     sortOrder: {
       type: Number,
       default: 0
-    }
+    },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminAccount', default: null },
+    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'AdminAccount', default: null }
   },
   { timestamps: true }
 )

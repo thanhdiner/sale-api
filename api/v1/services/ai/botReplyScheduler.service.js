@@ -1,8 +1,9 @@
 const logger = require('../../../../config/logger')
 const chatService = require('../chat.service')
+const pageContextService = require('./pageContext.service')
 const { ROOMS, EVENTS } = require('../../socket/constants')
 
-const DEFAULT_REPLY_DELAY_MS = 3000
+const DEFAULT_REPLY_DELAY_MS = 1500
 const TYPING_HOLD_MS = 2500
 const MIN_REPLY_DELAY_MS = 500
 const MAX_REPLY_DELAY_MS = 10000
@@ -192,8 +193,11 @@ async function runBotReply(io, conversationId, messages) {
   if (!runtimeConfig.isEnabled) return
 
   const combinedMessage = combineBotInputs(messages)
+  const mergedCustomer = mergeCustomerInfo(messages)
+  const latestPageContext = pageContextService.getPageContext(sessionId)
   const customer = {
-    ...mergeCustomerInfo(messages),
+    ...mergedCustomer,
+    pageContext: latestPageContext || mergedCustomer.pageContext,
     conversationId
   }
 

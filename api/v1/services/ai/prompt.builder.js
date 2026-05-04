@@ -32,6 +32,34 @@ function formatSystemRules(systemRules = []) {
   return systemRules.map(rule => `- ${rule}`).join('\n')
 }
 
+function formatPageContext(pageContext) {
+  if (!pageContext || typeof pageContext !== 'object') {
+    return '- Khong co page context chi tiet.'
+  }
+
+  const lines = []
+  if (pageContext.route) lines.push(`- Route: ${pageContext.route}`)
+  if (pageContext.pageType) lines.push(`- Page type: ${pageContext.pageType}`)
+  if (pageContext.currentSection) lines.push(`- Current section: ${pageContext.currentSection}`)
+
+  const entity = pageContext.entity
+  if (entity && typeof entity === 'object') {
+    const entityParts = []
+    if (entity.type) entityParts.push(`type=${entity.type}`)
+    if (entity.title) entityParts.push(`title=${entity.title}`)
+    if (entity.id) entityParts.push(`id=${entity.id}`)
+    if (entity.slug) entityParts.push(`slug=${entity.slug}`)
+    if (entity.price !== undefined) entityParts.push(`price=${entity.price}`)
+    if (entity.stock !== undefined) entityParts.push(`stock=${entity.stock}`)
+    if (entity.category) entityParts.push(`category=${entity.category}`)
+    if (entityParts.length > 0) lines.push(`- Entity: ${entityParts.join(', ')}`)
+  }
+
+  if (lines.length === 0) return '- Khong co page context chi tiet.'
+
+  return `${lines.join('\n')}\n- Dung context nay de hieu cac cum nhu "cai nay", "san pham nay", "phan nay", "trang nay". Khong noi la ban nhin thay noi dung khong co trong context.`
+}
+
 /**
  * Build system prompt day du cho chatbot
  * @param {Object} options
@@ -54,7 +82,10 @@ function buildSystemPrompt(options = {}) {
   if (customPrompt && customPrompt.trim()) {
     return `${customPrompt.trim()}
 
-${ROLE_SCOPE_RULES}`
+${ROLE_SCOPE_RULES}
+
+## Page context hien tai
+${formatPageContext(customerInfo.pageContext)}`
   }
 
   const kb = knowledgeLoader.loadKnowledge()
@@ -66,6 +97,7 @@ ${ROLE_SCOPE_RULES}`
   const currentPage = customerInfo.currentPage
     ? `Khach dang xem trang: ${customerInfo.currentPage}`
     : 'Khong co thong tin trang hien tai.'
+  const pageContext = formatPageContext(customerInfo.pageContext)
 
   const communicationStyle = brandVoice || kb.brandVoice || `- Tra loi bang tieng Viet, than thien va ngan gon
 - Dung "minh" va "ban" khi giao tiep
@@ -88,6 +120,9 @@ ${ROLE_SCOPE_RULES}
 ## Thong tin phien
 ${customerContext}
 ${currentPage}
+
+## Page context hien tai
+${pageContext}
 
 ## Tool duoc phep su dung
 ${formatToolList(availableTools)}

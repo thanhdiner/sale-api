@@ -32,3 +32,14 @@ module.exports.createPurchaseReceipt = async (req, res) => {
     res.status(400).json({ error: err.message || 'Lỗi tạo phiếu nhập' })
   }
 }
+
+module.exports.cancelPurchaseReceipt = async (req, res) => {
+  try {
+    const result = await purchaseReceiptsService.cancelPurchaseReceipt(req.params.id, req.body, req.user, getRequestLanguage(req))
+    res.json(result)
+  } catch (err) {
+    if (handleKnownControllerError(res, err)) return
+    logger.error('[Admin] Error cancelling purchase receipt:', err)
+    res.status(400).json({ error: err.message || 'Lỗi hủy phiếu nhập' })
+  }
+}
