@@ -1,4 +1,4 @@
-const generateBackupCodes = async (count = 10) => {
+﻿const generateBackupCodes = async (count = 10) => {
   return Array.from({ length: count }, () => ({
     code: `${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
     used: false
@@ -6,3 +6,12 @@ const generateBackupCodes = async (count = 10) => {
 }
 
 module.exports = generateBackupCodes
+
+
+
+
+
+
+
+
+

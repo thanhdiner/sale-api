@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Shared helpers for support AI tool executors.
  */
 
@@ -2046,3 +2046,13 @@ module.exports = {
   buildHandoffReason,
   buildHandoffResponse
 }
+
+
+
+
+
+
+
+
+
+

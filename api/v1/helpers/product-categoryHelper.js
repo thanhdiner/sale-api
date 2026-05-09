@@ -1,4 +1,4 @@
-const productCategoryRepository = require('../repositories/productCategory.repository')
+﻿const productCategoryRepository = require('../repositories/product/productCategory.repository')
 
 const buildTree = (categories, parent = null) => {
   return categories
@@ -49,3 +49,12 @@ module.exports = {
   setDefaultPosition,
   findAllDescendantIds
 }
+
+
+
+
+
+
+
+
+

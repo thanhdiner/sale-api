@@ -1,7 +1,7 @@
-const { randomUUID } = require('crypto')
-const BlogAgentLog = require('../models/blogAgentLog.model')
+﻿const { randomUUID } = require('crypto')
+const BlogAgentLog = require('../models/blog/blogAgentLog.model')
 const logger = require('../../../config/logger')
-const { runBlogAgentGenerateDrafts } = require('../services/ai/blogAgent.service')
+const { runBlogAgentGenerateDrafts } = require('../services/ai/agents/blogAgent.service')
 
 let isGenerating = false
 
@@ -68,3 +68,12 @@ const runBlogAutoDraftJob = async (options = {}) => {
 module.exports = {
   runBlogAutoDraftJob
 }
+
+
+
+
+
+
+
+
+

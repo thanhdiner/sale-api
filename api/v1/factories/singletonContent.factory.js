@@ -1,4 +1,4 @@
-const cache = require('../../../config/redis')
+﻿const cache = require('../../../config/redis')
 const logger = require('../../../config/logger')
 const AppError = require('../utils/AppError')
 
@@ -422,3 +422,12 @@ module.exports = {
   removeSystemFields,
   toPlainObject
 }
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-const hasValue = value => {
+﻿const hasValue = value => {
   if (Array.isArray(value)) return value.length > 0
   return typeof value === 'string' && value.trim().length > 0
 }
@@ -26,3 +26,12 @@ const applyTranslation = (item, lang, fields = []) => {
 }
 
 module.exports = applyTranslation
+
+
+
+
+
+
+
+
+

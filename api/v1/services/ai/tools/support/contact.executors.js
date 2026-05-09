@@ -1,4 +1,4 @@
-const {
+﻿const {
   BUG_ISSUE_CATEGORY_MAP,
   BUG_ISSUE_TYPE_LABELS,
   cleanString,
@@ -20,7 +20,7 @@ const {
 
 async function submitContactRequest(args = {}, context = {}) {
   try {
-    const contactService = require('../../../client/contact.service')
+    const contactService = require('../../../client/cms/contact.service')
     const result = await contactService.submitContactRequest(args, {
       ...context,
       source: 'chatbot'
@@ -96,7 +96,7 @@ async function scheduleCallback(args = {}, context = {}) {
       })
     }
 
-    const contactService = require('../../../client/contact.service')
+    const contactService = require('../../../client/cms/contact.service')
     const priority = normalizeHandoffPriority(args.priority)
     const subject = truncateHandoffText(
       pickString(args.subject) || `Dat lich goi lai: ${callback.reason}`,
@@ -188,7 +188,7 @@ async function reportBugOrIssue(args = {}, context = {}) {
       context
     })
 
-    const contactService = require('../../../client/contact.service')
+    const contactService = require('../../../client/cms/contact.service')
     const result = await contactService.submitContactRequest({
       ...contact,
       subject,
@@ -243,3 +243,13 @@ module.exports = {
   scheduleCallback,
   reportBugOrIssue
 }
+
+
+
+
+
+
+
+
+
+

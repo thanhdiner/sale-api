@@ -1,8 +1,8 @@
-const mongoose = require('mongoose')
+﻿const mongoose = require('mongoose')
 
-const orderRepository = require('../repositories/order.repository')
-const productRepository = require('../repositories/product.repository')
-const reviewRepository = require('../repositories/review.repository')
+const orderRepository = require('../repositories/commerce/order.repository')
+const productRepository = require('../repositories/product/product.repository')
+const reviewRepository = require('../repositories/commerce/review.repository')
 
 const REVIEW_EDIT_LIMIT = 2
 const REVIEW_USER_POPULATE = 'fullName avatarUrl username'
@@ -144,3 +144,12 @@ module.exports = {
   recalcProductRating,
   getReviewEligibility
 }
+
+
+
+
+
+
+
+
+

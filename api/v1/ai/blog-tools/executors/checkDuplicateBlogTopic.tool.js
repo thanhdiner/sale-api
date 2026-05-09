@@ -1,4 +1,4 @@
-const BlogPost = require('../../../models/blogPost.model')
+﻿const BlogPost = require('../../../models/blog/blogPost.model')
 
 const normalizeText = (value = '') => String(value || '')
   .toLowerCase()
@@ -46,3 +46,12 @@ const checkDuplicateBlogTopic = async ({ topic }) => {
 module.exports = {
   checkDuplicateBlogTopic
 }
+
+
+
+
+
+
+
+
+

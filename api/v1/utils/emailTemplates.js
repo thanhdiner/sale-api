@@ -374,3 +374,12 @@ exports.orderStatusUpdatedTemplate = order => {
     html: baseLayout(content)
   }
 }
+
+
+
+
+
+
+
+
+

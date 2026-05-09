@@ -1,4 +1,4 @@
-const RefreshToken = require('../models/refreshToken.model')
+﻿const RefreshToken = require('../models/access/refreshToken.model')
 const jwt = require('jsonwebtoken')
 const ms = require('ms')
 
@@ -42,3 +42,12 @@ async function issueTokensAndRespond(res, admin) {
 }
 
 module.exports = { formatUser, issueTokensAndRespond }
+
+
+
+
+
+
+
+
+

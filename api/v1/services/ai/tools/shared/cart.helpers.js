@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Cart helpers for AI tool executors.
  */
 
@@ -235,3 +235,13 @@ module.exports = {
   removeOrderedItemsFromCart,
   getStoredCartUnitPrice
 }
+
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-const jwt = require('jsonwebtoken')
+﻿const jwt = require('jsonwebtoken')
 const AppError = require('../../utils/AppError')
 
 const ACCESS_SECRET = process.env.ACCESS_SECRET
@@ -17,3 +17,12 @@ module.exports.authenticateToken = (req, res, next) => {
     next(err)
   }
 }
+
+
+
+
+
+
+
+
+

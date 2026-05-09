@@ -1,5 +1,5 @@
-const BlogPost = require('../models/blogPost.model')
-const BlogAgentLog = require('../models/blogAgentLog.model')
+﻿const BlogPost = require('../models/blog/blogPost.model')
+const BlogAgentLog = require('../models/blog/blogAgentLog.model')
 const cache = require('../../../config/redis')
 const logger = require('../../../config/logger')
 
@@ -178,3 +178,12 @@ const runQueuedBlogPublishJob = async () => {
 module.exports = {
   runQueuedBlogPublishJob
 }
+
+
+
+
+
+
+
+
+

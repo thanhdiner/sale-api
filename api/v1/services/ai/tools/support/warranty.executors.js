@@ -1,4 +1,4 @@
-const {
+﻿const {
   cleanString,
   formatOrderCode,
   logger,
@@ -106,7 +106,7 @@ async function requestWarrantySupport(args = {}, context = {}) {
       context
     })
 
-    const contactService = require('../../../client/contact.service')
+    const contactService = require('../../../client/cms/contact.service')
     const result = await contactService.submitContactRequest({
       ...contact,
       subject,
@@ -177,3 +177,13 @@ module.exports = {
   getWarrantyStatus,
   requestWarrantySupport
 }
+
+
+
+
+
+
+
+
+
+

@@ -98,3 +98,12 @@ function verifyCallback({ data, mac }) {
 }
 
 module.exports = { createPaymentUrl, verifyCallback }
+
+
+
+
+
+
+
+
+

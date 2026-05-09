@@ -1,4 +1,4 @@
-const cloudinary = require('cloudinary').v2
+﻿const cloudinary = require('cloudinary').v2
 const logger = require('../../../config/logger')
 
 function extractPublicId(url) {
@@ -43,3 +43,12 @@ module.exports = {
   extractPublicId,
   deleteImageFromCloudinary
 }
+
+
+
+
+
+
+
+
+

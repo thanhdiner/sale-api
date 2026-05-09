@@ -1,4 +1,4 @@
-const normalizeText = value => (typeof value === 'string' ? value.trim() : '')
+﻿const normalizeText = value => (typeof value === 'string' ? value.trim() : '')
 
 const normalizeCode = value => {
   if (value === undefined || value === null) return ''
@@ -71,3 +71,12 @@ module.exports = {
   hasAnyStructuredAddressInput,
   hasCompleteStructuredAddress
 }
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-module.exports = (objectPagination, query, countRecords) => {
+﻿module.exports = (objectPagination, query, countRecords) => {
   if (query.page) objectPagination.currentPage = parseInt(query.page)
 
   if (query.limit) objectPagination.limitItems = parseInt(query.limit)
@@ -7,3 +7,12 @@ module.exports = (objectPagination, query, countRecords) => {
   objectPagination.totalPage = Math.ceil(countRecords / objectPagination.limitItems)
   return objectPagination
 }
+
+
+
+
+
+
+
+
+

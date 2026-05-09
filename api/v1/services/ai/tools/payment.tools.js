@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AI tool registry entries for payments.
  * Keep executor implementation wiring in ../toolExecutor.js.
  */
@@ -222,3 +222,15 @@ module.exports = [
       }
     }
 ]
+
+
+
+
+
+
+
+
+
+
+
+

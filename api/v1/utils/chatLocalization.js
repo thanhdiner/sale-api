@@ -1,4 +1,4 @@
-const SYSTEM_MESSAGE_ENGLISH_TEMPLATES = {
+﻿const SYSTEM_MESSAGE_ENGLISH_TEMPLATES = {
   'system.agentJoined': values => `${values?.agentName || 'Agent'} joined the conversation`,
   'system.agentResolved': values => `${values?.agentName || 'Agent'} marked the conversation as resolved`,
   'system.botReturned': () => 'AI assistant SmartMall Bot is back. How can I help you?',
@@ -43,3 +43,12 @@ module.exports = {
   getEnglishSystemMessage,
   getSystemMessageTranslations
 }
+
+
+
+
+
+
+
+
+

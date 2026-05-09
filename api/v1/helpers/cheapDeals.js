@@ -1,6 +1,6 @@
-const Product = require('../models/products.model')
-const Order = require('../models/order.model')
-const ProductView = require('../models/productView.model')
+const Product = require('../models/product/product.model')
+const Order = require('../models/commerce/order.model')
+const ProductView = require('../models/product/productView.model')
 
 // ──────────────────────────────────────────────────────────────
 // Scoring weights  (tổng = 1.0)
@@ -248,3 +248,12 @@ async function getCheapDeals(page, limit) {
 }
 
 module.exports = { getCheapDeals }
+
+
+
+
+
+
+
+
+

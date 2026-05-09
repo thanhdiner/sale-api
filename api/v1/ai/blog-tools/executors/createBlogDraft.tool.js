@@ -1,7 +1,7 @@
-const mongoose = require('mongoose')
+﻿const mongoose = require('mongoose')
 const slugify = require('slugify')
-const BlogPost = require('../../../models/blogPost.model')
-const BlogCategory = require('../../../models/blogCategory.model')
+const BlogPost = require('../../../models/blog/blogPost.model')
+const BlogCategory = require('../../../models/blog/blogCategory.model')
 
 const normalizeText = value => (typeof value === 'string' ? value.trim() : '')
 
@@ -122,3 +122,12 @@ const createBlogDraft = async ({
 module.exports = {
   createBlogDraft
 }
+
+
+
+
+
+
+
+
+

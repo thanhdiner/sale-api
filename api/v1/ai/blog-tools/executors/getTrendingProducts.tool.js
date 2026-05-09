@@ -1,4 +1,4 @@
-const Product = require('../../../models/products.model')
+﻿const Product = require('../../../models/product/product.model')
 
 const normalizeLimit = value => Math.min(Math.max(parseInt(value, 10) || 10, 1), 20)
 
@@ -23,3 +23,12 @@ const getTrendingProducts = async ({ limit = 10 } = {}) => {
 module.exports = {
   getTrendingProducts
 }
+
+
+
+
+
+
+
+
+

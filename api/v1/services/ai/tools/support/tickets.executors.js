@@ -1,4 +1,4 @@
-const {
+﻿const {
   agentToolCallRepository,
   cleanString,
   isMongoObjectId,
@@ -33,7 +33,7 @@ const {
 
 async function createSupportTicket(args = {}, context = {}) {
   try {
-    const contactService = require('../../../client/contact.service')
+    const contactService = require('../../../client/cms/contact.service')
     const result = await contactService.submitContactRequest(args, {
       ...context,
       source: 'chatbot_ticket'
@@ -391,7 +391,7 @@ async function addSupportTicketMessage(args = {}, context = {}) {
       type: 'support_ticket',
       label: 'Ticket ho tro'
     }
-    const contactService = require('../../../client/contact.service')
+    const contactService = require('../../../client/cms/contact.service')
     const result = await contactService.addSupportTicketMessage({
       ticketId: ticket.ticketId || ticketId,
       subject: `Bo sung thong tin ticket ${ticket.ticketId || ticketId}`,
@@ -464,3 +464,13 @@ module.exports = {
   getSupportTicketStatus,
   addSupportTicketMessage
 }
+
+
+
+
+
+
+
+
+
+

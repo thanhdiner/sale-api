@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Order lookup and payload helpers for AI tool executors.
  */
 
@@ -159,3 +159,13 @@ module.exports = {
   buildOrderItemPayload,
   buildOrderSummaryPayload
 }
+
+
+
+
+
+
+
+
+
+

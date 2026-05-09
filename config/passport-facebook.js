@@ -1,5 +1,5 @@
-const FacebookStrategy = require('passport-facebook').Strategy
-const User = require('../api/v1/models/user.model')
+﻿const FacebookStrategy = require('passport-facebook').Strategy
+const User = require('../api/v1/models/access/user.model')
 const passport = require('passport')
 
 passport.use(
@@ -31,3 +31,8 @@ passport.use(
     }
   )
 )
+
+
+
+
+

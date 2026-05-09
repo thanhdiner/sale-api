@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Policy and localized content helpers for AI tool executors.
  */
 
@@ -37,3 +37,13 @@ module.exports = {
   getGuideLocalizedRoot,
   getGuideText
 }
+
+
+
+
+
+
+
+
+
+

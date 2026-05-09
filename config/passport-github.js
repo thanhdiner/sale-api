@@ -1,6 +1,6 @@
-const passport = require('passport')
+﻿const passport = require('passport')
 const GitHubStrategy = require('passport-github2').Strategy
-const User = require('../api/v1/models/user.model')
+const User = require('../api/v1/models/access/user.model')
 
 passport.use(
   new GitHubStrategy(
@@ -36,3 +36,8 @@ passport.use(
     }
   )
 )
+
+
+
+
+

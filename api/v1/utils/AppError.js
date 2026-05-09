@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Custom Error class for operational errors.
  * Use this to throw known, expected errors (e.g. resource not found, unauthorized).
  *
@@ -26,3 +26,12 @@ class AppError extends Error {
 }
 
 module.exports = AppError
+
+
+
+
+
+
+
+
+

@@ -1,6 +1,6 @@
-const GoogleStrategy = require('passport-google-oauth20').Strategy
-const { uploadImageFromUrl } = require('../api/v1/middlewares/admin/uploadCloud.middleware')
-const User = require('../api/v1/models/user.model')
+﻿const GoogleStrategy = require('passport-google-oauth20').Strategy
+const { uploadImageFromUrl } = require('../api/v1/middlewares/upload/uploadCloud.middleware')
+const User = require('../api/v1/models/access/user.model')
 const passport = require('passport')
 
 passport.use(
@@ -37,3 +37,8 @@ passport.use(
     }
   )
 )
+
+
+
+
+

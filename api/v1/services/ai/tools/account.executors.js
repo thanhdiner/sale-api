@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AI tool executor implementations for the account domain.
  */
 
@@ -682,7 +682,7 @@ async function requestAccountDeletion(args = {}, context = {}) {
       })
     }
 
-    const contactService = require('../../client/contact.service')
+    const contactService = require('../../client/cms/contact.service')
     const contact = normalizeAccountDeletionContact(args, user, context)
     const reason = truncateHandoffText(
       pickString(args.reason, args.details, args.message, context.promptText) || 'Khach yeu cau xoa tai khoan qua chat.',
@@ -829,7 +829,7 @@ async function requestPersonalDataExport(args = {}, context = {}) {
     const scopes = normalizePersonalDataExportScopes(args.scopes || args.scope)
     const format = normalizePersonalDataExportFormat(args.format)
     const reason = truncateHandoffText(args.reason || args.notes || args.message, 500)
-    const contactService = require('../../client/contact.service')
+    const contactService = require('../../client/cms/contact.service')
     const result = await contactService.submitContactRequest({
       name: user.fullName || context.customerInfo?.name || user.username,
       email: deliveryEmail,
@@ -894,3 +894,15 @@ module.exports = {
   updateNotificationPreferences,
   requestPersonalDataExport
 }
+
+
+
+
+
+
+
+
+
+
+
+

@@ -3,12 +3,12 @@
  */
 
 const logger = require('../../../config/logger')
-const chatService = require('../services/chat.service')
-const pageContextService = require('../services/ai/pageContext.service')
+const chatService = require('../services/shared/chatbot/chat.service')
+const pageContextService = require('../services/ai/content/pageContext.service')
 const {
   markCustomerTyping,
   scheduleBotReply
-} = require('../services/ai/botReplyScheduler.service')
+} = require('../services/ai/agents/botReplyScheduler.service')
 const { ROOMS, EVENTS } = require('./constants')
 const { validateString, validateSessionId, validateObjectId, validateReactionEmoji } = require('./validators')
 
@@ -550,3 +550,12 @@ function registerHandlers(io) {
 }
 
 module.exports = { registerHandlers }
+
+
+
+
+
+
+
+
+

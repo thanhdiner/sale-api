@@ -1,4 +1,4 @@
-const Product = require('../../../models/products.model')
+﻿const Product = require('../../../models/product/product.model')
 
 const escapeRegex = value => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
@@ -43,3 +43,12 @@ const suggestRelatedProducts = async ({ topic, limit = 6 }) => {
 module.exports = {
   suggestRelatedProducts
 }
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-const getBlogToolDefinitions = () => [
+﻿const getBlogToolDefinitions = () => [
   {
     type: 'function',
     function: {
@@ -118,3 +118,12 @@ const getBlogToolDefinitions = () => [
 module.exports = {
   getBlogToolDefinitions
 }
+
+
+
+
+
+
+
+
+

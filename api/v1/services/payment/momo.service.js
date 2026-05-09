@@ -108,3 +108,12 @@ function verifyCallback(params) {
 }
 
 module.exports = { createPaymentUrl, verifyCallback }
+
+
+
+
+
+
+
+
+

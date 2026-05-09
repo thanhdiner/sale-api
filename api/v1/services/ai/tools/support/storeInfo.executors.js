@@ -1,4 +1,4 @@
-const {
+﻿const {
   CLIENT_URL,
   logger,
   normalizePolicyLanguage,
@@ -118,3 +118,13 @@ module.exports = {
   getSupportInfo,
   getStoreLocations
 }
+
+
+
+
+
+
+
+
+
+

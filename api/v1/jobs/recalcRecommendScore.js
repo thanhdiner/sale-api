@@ -1,8 +1,8 @@
 const cron = require('node-cron')
-const Product = require('../models/products.model')
-const ProductView = require('../models/productView.model')
-const Cart = require('../models/cart.model')
-const Wishlist = require('../models/wishlist.model')
+const Product = require('../models/product/product.model')
+const ProductView = require('../models/product/productView.model')
+const Cart = require('../models/commerce/cart.model')
+const Wishlist = require('../models/commerce/wishlist.model')
 const logger = require('../../../config/logger')
 
 /**
@@ -100,3 +100,12 @@ function start() {
 }
 
 module.exports = { start, recalculate }
+
+
+
+
+
+
+
+
+

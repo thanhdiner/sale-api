@@ -1,4 +1,4 @@
-const BlogPost = require('../../../models/blogPost.model')
+﻿const BlogPost = require('../../../models/blog/blogPost.model')
 
 const normalizeLimit = value => Math.min(Math.max(parseInt(value, 10) || 20, 1), 50)
 
@@ -16,3 +16,12 @@ const getRecentBlogPosts = async ({ limit = 20 } = {}) => {
 module.exports = {
   getRecentBlogPosts
 }
+
+
+
+
+
+
+
+
+

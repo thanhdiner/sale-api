@@ -1,4 +1,4 @@
-const { default: slugify } = require('slugify')
+﻿const { default: slugify } = require('slugify')
 const generateUniqueSlug = require('./generateUniqueSlug')
 
 const handleSlug = async ({ Model, source, slugInput, title, currentId = null }) => {
@@ -24,3 +24,12 @@ const handleSlug = async ({ Model, source, slugInput, title, currentId = null })
 }
 
 module.exports = handleSlug
+
+
+
+
+
+
+
+
+

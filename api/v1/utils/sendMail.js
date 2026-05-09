@@ -1,4 +1,4 @@
-const nodemailer = require('nodemailer')
+﻿const nodemailer = require('nodemailer')
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -17,3 +17,12 @@ module.exports = (to, subject, text, html) => {
     ...(html && { html })
   })
 }
+
+
+
+
+
+
+
+
+

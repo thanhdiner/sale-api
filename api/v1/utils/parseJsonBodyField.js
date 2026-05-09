@@ -1,4 +1,4 @@
-const parseJsonBodyField = (body, fieldName) => {
+﻿const parseJsonBodyField = (body, fieldName) => {
   if (!body || typeof body[fieldName] !== 'string') return
 
   try {
@@ -9,3 +9,12 @@ const parseJsonBodyField = (body, fieldName) => {
 }
 
 module.exports = parseJsonBodyField
+
+
+
+
+
+
+
+
+

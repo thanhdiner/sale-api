@@ -13,9 +13,9 @@ const logger = require('./config/logger')
 const redis = require('./config/redis')
 const swaggerSpec = require('./config/swagger')
 
-const morganMiddleware = require('./api/v1/middlewares/morgan.middleware')
-const notFound = require('./api/v1/middlewares/notFound.middleware')
-const errorHandler = require('./api/v1/middlewares/errorHandler.middleware')
+const morganMiddleware = require('./api/v1/middlewares/core/morgan.middleware')
+const notFound = require('./api/v1/middlewares/core/notFound.middleware')
+const errorHandler = require('./api/v1/middlewares/core/errorHandler.middleware')
 
 const { initIO } = require('./api/v1/helpers/socket')
 const { registerHandlers } = require('./api/v1/socket/handlers')
@@ -107,3 +107,4 @@ blogJobs.start()
 server.listen(port, () => {
   logger.info(`🚀 Server started on PORT: ${port}`)
 })
+

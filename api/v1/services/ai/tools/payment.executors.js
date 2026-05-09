@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AI tool executor implementations for the payment domain.
  */
 
@@ -805,7 +805,7 @@ async function submitPaymentProof(args = {}, context = {}) {
       })
     }
 
-    const contactService = require('../../client/contact.service')
+    const contactService = require('../../client/cms/contact.service')
     const contact = await getPaymentProofContact(args, order, context)
     const subject = truncateHandoffText(
       `[Chung tu thanh toan] ${formatOrderCode(order)} - ${getOrderPaymentReference(order)}`,
@@ -864,3 +864,15 @@ module.exports = {
   verifyBankTransfer,
   submitPaymentProof
 }
+
+
+
+
+
+
+
+
+
+
+
+

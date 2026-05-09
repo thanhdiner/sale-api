@@ -1,4 +1,4 @@
-module.exports.extractPublicId = url => {
+﻿module.exports.extractPublicId = url => {
   try {
     const parts = url.split('/upload/')[1]
     const withFolder = parts.split('.')[0]
@@ -8,3 +8,12 @@ module.exports.extractPublicId = url => {
     return ''
   }
 }
+
+
+
+
+
+
+
+
+

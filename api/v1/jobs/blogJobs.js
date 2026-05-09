@@ -1,4 +1,4 @@
-const cron = require('node-cron')
+﻿const cron = require('node-cron')
 const logger = require('../../../config/logger')
 const { runQueuedBlogPublishJob } = require('./blogAutoPublish.job')
 const { runBlogAutoDraftJob } = require('./blogAutoDraft.job')
@@ -29,3 +29,12 @@ module.exports = {
   runQueuedBlogPublishJob,
   runBlogAutoDraftJob
 }
+
+
+
+
+
+
+
+
+

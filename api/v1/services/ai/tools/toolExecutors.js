@@ -1,4 +1,4 @@
-const catalogExecutors = require('./catalog.executors')
+﻿const catalogExecutors = require('./catalog.executors')
 const cartExecutors = require('./cart.executors')
 const orderExecutors = require('./order.executors')
 const accountExecutors = require('./account.executors')
@@ -19,3 +19,15 @@ const toolExecutors = {
 module.exports = {
   toolExecutors
 }
+
+
+
+
+
+
+
+
+
+
+
+

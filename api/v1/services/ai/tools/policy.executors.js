@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AI tool executor implementations for the policy domain.
  */
 
@@ -352,3 +352,15 @@ module.exports = {
   getTermsOfService,
   getFAQ
 }
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Payment and bank-info helpers for AI tool executors.
  */
 
@@ -220,3 +220,13 @@ module.exports = {
   buildBankInfoPayload,
   getActiveBankInfoPayload
 }
+
+
+
+
+
+
+
+
+
+

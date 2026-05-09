@@ -1,37 +1,37 @@
-const productsRouter = require('./products.route')
-const productCategoriesRouter = require('./product-category.route')
-const userRouter = require('./user.route')
-const cartRouter = require('./cart.route')
-const promoRouter = require('./promo-codes.route')
-const ordersRouter = require('./order.route')
-const orderTrackingRouter = require('./order-tracking.route')
-const widgetsRouter = require('./widgets.route')
-const bannersRouter = require('./banners.route')
-const aboutContentRouter = require('./aboutContent.route')
-const termsContentRouter = require('./termsContent.route')
-const cooperationContactContentRouter = require('./cooperationContactContent.route')
-const homeWhyChooseUsContentRouter = require('./homeWhyChooseUsContent.route')
-const blogRouter = require('./blog.route')
-const blogCategoryRouter = require('./blog-category.route')
-const blogTagsRouter = require('./blog-tags.route')
-const cmsPageRouter = require('./cmsPage.route')
-const gameNewsContentRouter = require('./gameNewsContent.route')
-const vipContentRouter = require('./vipContent.route')
-const flashsalesRouter = require('./flashsales.route')
-const contactRouter = require('./contact.route')
-const bankInfoRouter = require('./bankInfo.route')
-const reviewsRouter = require('./reviews.route')
-const paymentRouter = require('./payment.route')
-const webhookRouter = require('./webhook.route')
-const wishlistRouter = require('./wishlist.route')
-const chatRouter = require('./chat.route')
-const privacyPolicyPageRouter = require('./privacyPolicyPage.route')
-const returnPolicyPageRouter = require('./returnPolicyPage.route')
-const faqPageRouter = require('./faqPage.route')
-const footerContentRouter = require('./footerContent.route')
-const gameAccountContentRouter = require('./gameAccountContent.route')
-const comingSoonContentRouter = require('./comingSoonContent.route')
-const devPaymentRouter = require('./devPayment.route')
+﻿const productsRouter = require('./product/products.route')
+const productCategoriesRouter = require('./product/productCategories.route')
+const userRouter = require('./access/user.route')
+const cartRouter = require('./commerce/carts.route')
+const promoRouter = require('./commerce/promoCodes.route')
+const ordersRouter = require('./commerce/orders.route')
+const orderTrackingRouter = require('./commerce/orderTracking.route')
+const widgetsRouter = require('./system/widgets.route')
+const bannersRouter = require('./system/banners.route')
+const aboutContentRouter = require('./cms/aboutContent.route')
+const termsContentRouter = require('./cms/termsContent.route')
+const cooperationContactContentRouter = require('./cms/cooperationContactContent.route')
+const homeWhyChooseUsContentRouter = require('./cms/homeWhyChooseUsContent.route')
+const blogRouter = require('./blog/blog.route')
+const blogCategoryRouter = require('./blog/blogCategory.route')
+const blogTagsRouter = require('./blog/blogTags.route')
+const cmsPageRouter = require('./cms/cmsPage.route')
+const gameNewsContentRouter = require('./cms/gameNewsContent.route')
+const vipContentRouter = require('./cms/vipContent.route')
+const flashsalesRouter = require('./commerce/flashSales.route')
+const contactRouter = require('./cms/contact.route')
+const bankInfoRouter = require('./commerce/bankInfo.route')
+const reviewsRouter = require('./commerce/reviews.route')
+const paymentRouter = require('./commerce/payment.route')
+const webhookRouter = require('./commerce/webhook.route')
+const wishlistRouter = require('./commerce/wishlist.route')
+const chatRouter = require('./chatbot/chat.route')
+const privacyPolicyPageRouter = require('./cms/privacyPolicyPage.route')
+const returnPolicyPageRouter = require('./cms/returnPolicyPage.route')
+const faqPageRouter = require('./cms/faqPage.route')
+const footerContentRouter = require('./cms/footerContent.route')
+const gameAccountContentRouter = require('./cms/gameAccountContent.route')
+const comingSoonContentRouter = require('./cms/comingSoonContent.route')
+const devPaymentRouter = require('./commerce/devPayment.route')
 
 const authenticateToken = require('../../middlewares/client/authenticateToken.middleware')
 
@@ -76,3 +76,14 @@ module.exports = app => {
     app.use(version + '/dev-payments', devPaymentRouter)
   }
 }
+
+
+
+
+
+
+
+
+
+
+

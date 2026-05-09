@@ -1,4 +1,4 @@
-const generateUniqueSlug = async (source, baseSlug) => {
+﻿const generateUniqueSlug = async (source, baseSlug) => {
   const regex = new RegExp(`^${baseSlug}(-\\d+)?$`, 'i')
   const existingSlugs = await source.find({ slug: regex }).select('slug')
 
@@ -14,3 +14,12 @@ const generateUniqueSlug = async (source, baseSlug) => {
 }
 
 module.exports = generateUniqueSlug
+
+
+
+
+
+
+
+
+
