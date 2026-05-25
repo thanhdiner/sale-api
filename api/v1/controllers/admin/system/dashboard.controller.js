@@ -24,6 +24,21 @@ module.exports.summary = createDashboardHandler('summary', () =>
   dashboardService.getDashboardSummary()
 )
 
+//# [GET] /api/v1/admin/dashboard/stats/users
+module.exports.userStats = createDashboardHandler('user stats', () =>
+  dashboardService.getDashboardUserStats()
+)
+
+//# [GET] /api/v1/admin/dashboard/stats/finance
+module.exports.financeStats = createDashboardHandler('finance stats', () =>
+  dashboardService.getDashboardFinanceStats()
+)
+
+//# [GET] /api/v1/admin/dashboard/stats/inventory
+module.exports.inventoryStats = createDashboardHandler('inventory stats', () =>
+  dashboardService.getDashboardInventoryStats()
+)
+
 //# [GET] /api/v1/admin/dashboard/charts
 module.exports.charts = createDashboardHandler('charts', req =>
   dashboardService.getDashboardCharts(req.query.range || '7days', getRequestLanguage(req))

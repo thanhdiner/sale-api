@@ -10,7 +10,6 @@ const checkPermission = require('../../../middlewares/admin/checkPermission.midd
 
 const validate = require('../../../middlewares/validation/validate.middleware')
 const productSchemas = require('../../../validations/product/adminProduct.validation')
-const { invalidateProducts } = require('../../../middlewares/cache/cacheInvalidation.middleware')
 const parseJsonBodyField = require('../../../utils/parseJsonBodyField')
 
 const productImageUpload = fileUpload.fields([
@@ -34,27 +33,24 @@ router.post(
   uploadCloud.uploadMany,
   parseProductJsonBodyFields,
   validate(productSchemas.createProduct),
-  invalidateProducts,
   controller.create
 )
 
-router.patch('/delete/:id', checkPermission.checkPermission('delete_product'), invalidateProducts, controller.delete)
+router.patch('/delete/:id', checkPermission.checkPermission('delete_product'), controller.delete)
 
 router.patch(
   '/delete-many',
   checkPermission.checkPermission('delete_product'),
   validate(productSchemas.deleteMany),
-  invalidateProducts,
   controller.deleteMany
 )
 
-router.patch('/changeStatus/:id', checkPermission.checkPermission('edit_product'), invalidateProducts, controller.changeStatus)
+router.patch('/changeStatus/:id', checkPermission.checkPermission('edit_product'), controller.changeStatus)
 
 router.patch(
   '/change-status-many',
   checkPermission.checkPermission('edit_product'),
   validate(productSchemas.changeStatusMany),
-  invalidateProducts,
   controller.changeStatusMany
 )
 
@@ -62,7 +58,6 @@ router.patch(
   '/change-position-many',
   checkPermission.checkPermission('edit_product'),
   validate(productSchemas.changePositionMany),
-  invalidateProducts,
   controller.changePositionMany
 )
 
@@ -75,19 +70,7 @@ router.patch(
   uploadCloud.uploadMany,
   parseProductJsonBodyFields,
   validate(productSchemas.editProduct),
-  invalidateProducts,
   controller.edit
 )
 
 module.exports = router
-
-
-
-
-
-
-
-
-
-
-

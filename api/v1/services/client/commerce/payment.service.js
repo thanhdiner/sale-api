@@ -11,6 +11,7 @@ const userRepository = require('../../../repositories/access/user.repository')
 const ordersService = require('./orders.service')
 const notificationsService = require('./notifications.service')
 const digitalDeliveryService = require('../../shared/commerce/digitalDelivery.service')
+const dashboardRealtime = require('../../../helpers/dashboardRealtime')
 
 const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:3000'
 
@@ -30,13 +31,6 @@ async function resolveOrderEmail(order) {
 function emitOrderConfirmed(order) {
   try {
     const io = getIO()
-    io.to('admin').emit('new_order', {
-      _id: order._id,
-      contact: order.contact,
-      total: order.total,
-      paymentMethod: order.paymentMethod,
-      createdAt: order.createdAt
-    })
     if (order.userId) {
       notificationsService.createOrderStatusNotification(order)
       io.to(`user_${order.userId}`).emit('order_status_updated', {
@@ -46,6 +40,8 @@ function emitOrderConfirmed(order) {
       })
     }
   } catch {}
+
+  dashboardRealtime.emitOrderCreated(order)
 
   resolveOrderEmail(order)
     .then(to => {

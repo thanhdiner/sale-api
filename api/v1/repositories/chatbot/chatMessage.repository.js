@@ -11,6 +11,10 @@ async function findByQuery(query = {}, options = {}) {
     cursor = cursor.sort(options.sort)
   }
 
+  if (typeof options.skip !== 'undefined') {
+    cursor = cursor.skip(options.skip)
+  }
+
   if (typeof options.limit !== 'undefined') {
     cursor = cursor.limit(options.limit)
   }

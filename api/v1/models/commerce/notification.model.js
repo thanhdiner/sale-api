@@ -5,7 +5,15 @@ const notificationSchema = new mongoose.Schema(
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      required() {
+        return this.audience !== 'admin'
+      },
+      index: true
+    },
+    audience: {
+      type: String,
+      enum: ['client', 'admin'],
+      default: 'client',
       index: true
     },
     type: {
@@ -27,6 +35,19 @@ const notificationSchema = new mongoose.Schema(
       type: String,
       trim: true,
       default: ''
+    },
+    priority: {
+      type: String,
+      enum: ['high', 'normal', 'low'],
+      default: 'normal'
+    },
+    actionRequired: {
+      type: Boolean,
+      default: false
+    },
+    translations: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {}
     },
     orderId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -50,6 +71,14 @@ const notificationSchema = new mongoose.Schema(
     readAt: {
       type: Date,
       default: null
+    },
+    archivedAt: {
+      type: Date,
+      default: null
+    },
+    deletedAt: {
+      type: Date,
+      default: null
     }
   },
   { timestamps: true }
@@ -58,6 +87,8 @@ const notificationSchema = new mongoose.Schema(
 notificationSchema.index({ userId: 1, readAt: 1, createdAt: -1 })
 notificationSchema.index({ userId: 1, category: 1, createdAt: -1 })
 notificationSchema.index({ userId: 1, orderId: 1, createdAt: -1 })
+notificationSchema.index({ audience: 1, deletedAt: 1, readAt: 1, createdAt: -1 })
+notificationSchema.index({ audience: 1, type: 1, createdAt: -1 })
 
 module.exports = mongoose.model('Notification', notificationSchema, 'notifications')
 

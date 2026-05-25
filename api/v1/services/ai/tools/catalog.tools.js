@@ -444,7 +444,7 @@ module.exports = [
   {
       name: 'searchBlogPosts',
       label: 'Bai viet blog',
-      description: 'Tim bai viet blog da publish theo tu khoa, danh muc hoac tag. Dung khi khach muon doc bai tu van, tin tuc, meo chon san pham hoac can nguon noi dung co san de tham khao.',
+      description: 'Tim bai viet blog da publish theo tu khoa, danh muc hoac tag. Khi khach noi "trang nay", "bai nay" hoac can tom tat trang blog hien tai, tool se uu tien bai viet trong page context hien tai.',
       group: 'content',
       riskLevel: 'safe',
       requiresConfirmation: false,

@@ -11,6 +11,26 @@ const { syncProductStock } = require('../../../services/shared/commerce/digitalD
 const { notifyBackInStockForProduct } = require('../../../services/shared/commerce/backInStock.service')
 const getRequestLanguage = require('../../../utils/getRequestLanguage')
 
+const ADMIN_PRODUCT_LIST_PROJECTION = {
+  title: 1,
+  'translations.en.title': 1,
+  productCategory: 1,
+  price: 1,
+  costPrice: 1,
+  discountPercentage: 1,
+  stock: 1,
+  thumbnail: 1,
+  images: { $slice: 1 },
+  status: 1,
+  position: 1,
+  slug: 1,
+  deliveryType: 1,
+  createdBy: 1,
+  createdAt: 1,
+  updatedAt: 1,
+  updateBy: { $slice: -1 }
+}
+
 const getUploadedFileUrl = file => {
   if (!file) return ''
 
@@ -150,8 +170,7 @@ module.exports.index = async (req, res) => {
       limitItems: 10
     }
 
-    const countProducts = await Product.countDocuments(find)
-    const objectPagination = paginationHelper(initPagination, req.query, countProducts)
+    const objectPagination = paginationHelper(initPagination, req.query, 0)
 
     let sort = {}
     if (sortField && sortOrder) {
@@ -161,13 +180,20 @@ module.exports.index = async (req, res) => {
       if (localizedSortField !== sortField) sort[sortField] = sortDirection
     } else sort.position = -1
 
-    const products = await Product.find(find)
-      .populate('productCategory', 'title translations')
-      .populate('createdBy.by', 'fullName avatarUrl')
-      .populate('updateBy.by', 'fullName avatarUrl')
-      .sort(sort)
-      .limit(objectPagination.limitItems)
-      .skip(objectPagination.skip)
+    const [countProducts, products] = await Promise.all([
+      Product.countDocuments(find),
+      Product.find(find)
+        .select(ADMIN_PRODUCT_LIST_PROJECTION)
+        .populate('productCategory', 'title translations')
+        .populate('createdBy.by', 'fullName avatarUrl')
+        .populate('updateBy.by', 'fullName avatarUrl')
+        .sort(sort)
+        .limit(objectPagination.limitItems)
+        .skip(objectPagination.skip)
+        .lean()
+    ])
+
+    objectPagination.totalPage = Math.ceil(countProducts / objectPagination.limitItems)
 
     res.json({
       products,

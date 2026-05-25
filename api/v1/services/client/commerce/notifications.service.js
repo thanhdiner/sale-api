@@ -1,18 +1,20 @@
-﻿const notificationRepository = require('../../../repositories/commerce/notification.repository')
+const notificationRepository = require('../../../repositories/commerce/notification.repository')
+const userRepository = require('../../../repositories/access/user.repository')
+const notificationRealtime = require('../../../helpers/notificationRealtime')
 const logger = require('../../../../../config/logger')
 
 const NOTIFICATION_CATEGORIES = ['orders', 'payments', 'promotions', 'system', 'support', 'account', 'wishlist', 'reviews', 'chat']
 const ORDER_STATUS_LABELS = {
-  pending: 'Cho xac nhan',
-  confirmed: 'Da xac nhan',
-  shipping: 'Dang giao hang',
-  completed: 'Hoan thanh',
-  cancelled: 'Da huy'
+  pending: 'Chờ xác nhận',
+  confirmed: 'Đã xác nhận',
+  shipping: 'Đang giao hàng',
+  completed: 'Hoàn thành',
+  cancelled: 'Đã hủy'
 }
 const PAYMENT_STATUS_LABELS = {
-  pending: 'Chua thanh toan',
-  paid: 'Da thanh toan',
-  failed: 'Thanh toan that bai'
+  pending: 'Chưa thanh toán',
+  paid: 'Đã thanh toán',
+  failed: 'Thanh toán thất bại'
 }
 const MAX_NOTIFICATION_LIMIT = 50
 
@@ -57,7 +59,7 @@ function buildOrderNotificationPayload(order = {}) {
   const orderId = serializeId(order._id || order.id)
   const status = cleanString(order.status)
   const paymentStatus = cleanString(order.paymentStatus)
-  const statusLabel = ORDER_STATUS_LABELS[status] || status || 'Cap nhat'
+  const statusLabel = ORDER_STATUS_LABELS[status] || status || 'Cập nhật'
   const paymentStatusLabel = PAYMENT_STATUS_LABELS[paymentStatus] || paymentStatus || ''
   const code = getOrderCode(order)
   const isPaymentUpdate = paymentStatus === 'paid' || paymentStatus === 'failed'
@@ -66,10 +68,10 @@ function buildOrderNotificationPayload(order = {}) {
     userId,
     type: isPaymentUpdate ? 'payment_status_updated' : 'order_status_updated',
     category: isPaymentUpdate ? 'payments' : 'orders',
-    title: `Cap nhat don hang ${code}`,
+    title: `Cập nhật đơn hàng ${code}`,
     body: paymentStatusLabel
-      ? `Trang thai don: ${statusLabel}. Thanh toan: ${paymentStatusLabel}.`
-      : `Trang thai don: ${statusLabel}.`,
+      ? `Trạng thái đơn: ${statusLabel}. Thanh toán: ${paymentStatusLabel}.`
+      : `Trạng thái đơn: ${statusLabel}.`,
     orderId: orderId || null,
     targetType: 'order',
     targetId: orderId,
@@ -85,10 +87,11 @@ function buildOrderNotificationPayload(order = {}) {
 
 function buildNotificationPayload(payload = {}) {
   return {
+    audience: 'client',
     userId: payload.userId,
     type: cleanString(payload.type, 80) || 'system',
     category: normalizeCategory(payload.category) || 'system',
-    title: cleanString(payload.title, 180) || 'Thong bao',
+    title: cleanString(payload.title, 180) || 'Thông báo',
     body: cleanString(payload.body, 1000),
     orderId: payload.orderId || null,
     targetType: cleanString(payload.targetType, 80),
@@ -97,24 +100,20 @@ function buildNotificationPayload(payload = {}) {
   }
 }
 
-async function createNotification(payload = {}) {
-  return notificationRepository.create(buildNotificationPayload(payload))
-}
+function preferenceEnabled(preferences = {}, payload = {}) {
+  if (preferences?.channels?.inApp === false) return false
 
-async function createOrderStatusNotification(order = {}) {
-  const payload = buildOrderNotificationPayload(order)
-  if (!payload) return null
-
-  try {
-    return await createNotification(payload)
-  } catch (error) {
-    logger.warn(`[Notifications] Failed to create order notification: ${error.message}`)
-    return null
-  }
+  const category = normalizeCategory(payload.category)
+  if (category === 'orders' && preferences.orderUpdates === false) return false
+  if (category === 'payments' && preferences.paymentUpdates === false) return false
+  if (category === 'promotions' && preferences.promotions === false) return false
+  if (category === 'wishlist' && preferences.wishlistUpdates === false) return false
+  if ((category === 'support' || category === 'chat') && preferences.supportMessages === false) return false
+  return true
 }
 
 function buildListQuery(userId, filters = {}) {
-  const query = { userId }
+  const query = { userId, audience: 'client', deletedAt: null, archivedAt: null }
   const status = normalizeStatusFilter(filters.status || (filters.unreadOnly ? 'unread' : 'all'))
   const category = normalizeCategory(filters.category)
 
@@ -146,6 +145,38 @@ function buildNotificationPayloadForClient(notification = {}) {
   }
 }
 
+async function getStats(userId) {
+  const query = { userId, audience: 'client', deletedAt: null, archivedAt: null }
+  const [total, unread] = await Promise.all([
+    notificationRepository.countByQuery(query),
+    notificationRepository.countByQuery({ ...query, readAt: null })
+  ])
+
+  return { total, unread }
+}
+
+async function createNotification(payload = {}) {
+  const builtPayload = buildNotificationPayload(payload)
+  const user = await userRepository.findById(builtPayload.userId, { select: 'notificationPreferences' })
+  if (user && !preferenceEnabled(user.notificationPreferences || {}, builtPayload)) return null
+
+  const notification = await notificationRepository.create(builtPayload)
+  notificationRealtime.emitCreated(buildNotificationPayloadForClient(notification), await getStats(builtPayload.userId))
+  return notification
+}
+
+async function createOrderStatusNotification(order = {}) {
+  const payload = buildOrderNotificationPayload(order)
+  if (!payload) return null
+
+  try {
+    return await createNotification(payload)
+  } catch (error) {
+    logger.warn(`[Notifications] Failed to create order notification: ${error.message}`)
+    return null
+  }
+}
+
 async function listNotifications(userId, filters = {}) {
   const limit = normalizeLimit(filters.limit)
   const query = buildListQuery(userId, filters)
@@ -156,7 +187,7 @@ async function listNotifications(userId, filters = {}) {
       lean: true
     }),
     notificationRepository.countByQuery(query),
-    notificationRepository.countByQuery({ userId, readAt: null })
+    notificationRepository.countByQuery({ userId, audience: 'client', deletedAt: null, archivedAt: null, readAt: null })
   ])
 
   return {
@@ -174,9 +205,10 @@ async function markNotificationRead(userId, { notificationId, notificationIds, a
 
   if (all === true) {
     const result = await notificationRepository.updateMany(
-      { userId, readAt: null },
+      { userId, audience: 'client', deletedAt: null, readAt: null },
       { $set: { readAt: now } }
     )
+    notificationRealtime.emitRead({ audience: 'client', userId, all: true, stats: await getStats(userId) })
 
     return {
       success: true,
@@ -197,7 +229,7 @@ async function markNotificationRead(userId, { notificationId, notificationIds, a
 
   if (ids.length === 1) {
     const notification = await notificationRepository.findOneAndUpdate(
-      { _id: ids[0], userId },
+      { _id: ids[0], userId, audience: 'client', deletedAt: null },
       { $set: { readAt: now } },
       { lean: true }
     )
@@ -208,6 +240,8 @@ async function markNotificationRead(userId, { notificationId, notificationIds, a
       throw error
     }
 
+    notificationRealtime.emitRead({ audience: 'client', userId, ids, stats: await getStats(userId) })
+
     return {
       success: true,
       modifiedCount: 1,
@@ -216,9 +250,10 @@ async function markNotificationRead(userId, { notificationId, notificationIds, a
   }
 
   const result = await notificationRepository.updateMany(
-    { _id: { $in: ids }, userId },
+    { _id: { $in: ids }, userId, audience: 'client', deletedAt: null },
     { $set: { readAt: now } }
   )
+  notificationRealtime.emitRead({ audience: 'client', userId, ids, stats: await getStats(userId) })
 
   return {
     success: true,
@@ -230,16 +265,6 @@ module.exports = {
   createNotification,
   createOrderStatusNotification,
   listNotifications,
+  getStats,
   markNotificationRead
 }
-
-
-
-
-
-
-
-
-
-
-

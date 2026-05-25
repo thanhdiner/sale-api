@@ -10,6 +10,7 @@ const logger = require('../../../../../config/logger')
 const { getIO } = require('../../../helpers/socket')
 const { sendMail } = require('../../../../../config/mailer')
 const { orderStatusUpdatedTemplate } = require('../../../utils/emailTemplates')
+const dashboardRealtime = require('../../../helpers/dashboardRealtime')
 
 const ADMIN_ORDER_LIST_FIELDS = [
   '_id',
@@ -343,6 +344,8 @@ function emitOrderStatusUpdate(order) {
   } catch (error) {
     logger.error('[Socket] Emit error:', error.message)
   }
+
+  dashboardRealtime.emitOrderUpdated(order)
 }
 
 function queueOrderStatusEmail(order) {

@@ -42,7 +42,20 @@ const EVENTS = {
   CHAT_CUSTOMER_TYPING: 'chat:customer_typing',
   CHAT_ESCALATION: 'chat:escalation',
   CHAT_BOT_TYPING: 'chat:bot_typing',
-  CHAT_BOT_ACTIVITY: 'chat:bot_activity'
+  CHAT_BOT_ACTIVITY: 'chat:bot_activity',
+
+  DASHBOARD_INVALIDATED: 'dashboard:invalidated',
+  DASHBOARD_ORDER_CREATED: 'dashboard:order_created',
+  DASHBOARD_ORDER_UPDATED: 'dashboard:order_updated',
+  DASHBOARD_REVIEW_CREATED: 'dashboard:review_created',
+  DASHBOARD_REVIEW_UPDATED: 'dashboard:review_updated',
+  DASHBOARD_STOCK_UPDATED: 'dashboard:stock_updated',
+
+  NOTIFICATION_CREATED: 'notification:created',
+  NOTIFICATION_UPDATED: 'notification:updated',
+  NOTIFICATION_READ: 'notification:read',
+  NOTIFICATION_DELETED: 'notification:deleted',
+  NOTIFICATION_STATS: 'notification:stats'
 }
 
 module.exports = { ROOMS, EVENTS }

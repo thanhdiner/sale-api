@@ -12,7 +12,9 @@ const websiteConfigSchema = new mongoose.Schema(
     faviconUrl: String,
     contactInfo: {
       phone: String,
+      hotline: String,
       email: String,
+      supportEmail: String,
       address: String,
       website: String,
       supportHours: String,

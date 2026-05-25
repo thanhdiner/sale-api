@@ -1,4 +1,5 @@
 const cloudinary = require('cloudinary').v2
+const mongoose = require('mongoose')
 const streamifier = require('streamifier')
 
 const chatMessageRepository = require('../../../repositories/chatbot/chatMessage.repository')
@@ -11,6 +12,8 @@ const {
 
 const DEFAULT_CONVERSATION_LIMIT = 50
 const MAX_CONVERSATION_LIMIT = 1000
+const DEFAULT_HISTORY_LIMIT = 30
+const MAX_HISTORY_LIMIT = 50
 
 cloudinary.config({
   cloud_name: process.env.CLOUD_NAME,
@@ -99,6 +102,21 @@ function normalizeConversationListQuery(query = {}) {
   }
 }
 
+function normalizeHistoryQuery(query = {}) {
+  return {
+    before: typeof query.before === 'string' ? query.before.trim() : '',
+    beforeId: typeof query.beforeId === 'string' ? query.beforeId.trim() : '',
+    limit: Math.min(parsePositiveInteger(query.limit, DEFAULT_HISTORY_LIMIT), MAX_HISTORY_LIMIT)
+  }
+}
+
+function getHistoryCursorDate(before) {
+  if (!before) return null
+
+  const date = new Date(before)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
 function buildConversationSearchFilter(search) {
   if (!search) return null
 
@@ -118,8 +136,9 @@ function buildConversationSearchFilter(search) {
 
 async function getAgentProfile(agent = {}) {
   let account = null
+  const hasValidAccountId = mongoose.Types.ObjectId.isValid(agent.agentId)
 
-  if (agent.agentId && (!agent.agentName || !agent.agentAvatar)) {
+  if (hasValidAccountId && (!agent.agentName || !agent.agentAvatar)) {
     account = await adminAccountRepository.findById(agent.agentId, {
       select: 'fullName avatarUrl',
       lean: true
@@ -167,19 +186,46 @@ async function hydrateConversationAgent(conversation, { persist = false } = {}) 
   return hydratedConversation
 }
 
-async function getHistory({ sessionId, showInternal }) {
+async function getHistory({ sessionId, showInternal, requestQuery = {} }) {
+  const { before, beforeId, limit } = normalizeHistoryQuery(requestQuery)
   const query = { sessionId }
+  const beforeDate = getHistoryCursorDate(before)
+  const beforeObjectId = mongoose.Types.ObjectId.isValid(beforeId)
+    ? new mongoose.Types.ObjectId(beforeId)
+    : null
+
   if (!showInternal) {
     query.isInternal = { $ne: true }
   }
 
+  if (beforeDate) {
+    query.$or = [
+      { createdAt: { $lt: beforeDate } },
+      ...(beforeObjectId ? [{ createdAt: beforeDate, _id: { $lt: beforeObjectId } }] : [])
+    ]
+  }
+
   const messages = await chatMessageRepository.findByQuery(query, {
-    sort: { createdAt: 1 },
-    limit: 200,
+    sort: { createdAt: -1, _id: -1 },
+    limit: limit + 1,
     lean: true
   })
+  const hasMore = messages.length > limit
+  const data = messages.slice(0, limit).reverse()
+  const oldestMessage = data[0]
 
-  return { success: true, data: messages }
+  return {
+    success: true,
+    data,
+    pagination: {
+      before: before || null,
+      beforeId: beforeId || null,
+      limit,
+      hasMore,
+      nextBefore: oldestMessage?.createdAt || before || null,
+      nextBeforeId: oldestMessage?._id || beforeId || null
+    }
+  }
 }
 
 async function getConversation(sessionId) {

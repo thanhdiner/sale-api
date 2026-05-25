@@ -10,6 +10,7 @@ const resetCodeRepository = require('../../../repositories/access/resetCode.repo
 const emailUpdateCodeRepository = require('../../../repositories/access/emailUpdateCode.repository')
 const clientRefreshTokenRepository = require('../../../repositories/access/clientRefreshToken.repository')
 const oauthCodeRepository = require('../../../repositories/access/oauthCode.repository')
+const adminNotificationsService = require('../../admin/commerce/notifications.service')
 
 const ACCESS_SECRET = process.env.ACCESS_SECRET
 const REFRESH_SECRET = process.env.REFRESH_SECRET
@@ -146,13 +147,23 @@ async function register(payload) {
     return { statusCode: 400, body: { error: 'Username hoặc email đã được sử dụng!' } }
   }
 
-  await userRepository.create({
+  const user = await userRepository.create({
     username,
     email,
     phone,
     passwordHash: password,
     fullName
   })
+
+  adminNotificationsService.createAdminNotification({
+    type: 'user_registered',
+    priority: 'low',
+    title: 'Khach hang moi dang ky',
+    message: `${fullName || username} da tao tai khoan.`,
+    targetType: 'user',
+    targetId: user._id,
+    data: { username, email }
+  }).catch(() => {})
 
   return {
     statusCode: 201,
@@ -404,6 +415,48 @@ async function updateCheckoutProfile(userId, payload) {
   }
 }
 
+async function getNotificationPreferences(userId) {
+  const user = await userRepository.findById(userId, { select: 'notificationPreferences' })
+  if (!user) {
+    return { statusCode: 404, body: { message: 'Khong tim thay tai khoan!' } }
+  }
+
+  return {
+    statusCode: 200,
+    body: {
+      success: true,
+      notificationPreferences: normalizeNotificationPreferences(user.notificationPreferences || {})
+    }
+  }
+}
+
+async function updateNotificationPreferences(userId, payload = {}) {
+  const currentUser = await userRepository.findById(userId, { select: 'notificationPreferences' })
+  if (!currentUser) {
+    return { statusCode: 404, body: { message: 'Khong tim thay tai khoan!' } }
+  }
+
+  const current = normalizeNotificationPreferences(currentUser.notificationPreferences || {})
+  const notificationPreferences = normalizeNotificationPreferences({
+    ...current,
+    ...payload,
+    channels: {
+      ...current.channels,
+      ...(payload.channels || {})
+    }
+  })
+
+  const updatedUser = await userRepository.updateById(userId, { notificationPreferences }, { new: true })
+
+  return {
+    statusCode: 200,
+    body: {
+      success: true,
+      notificationPreferences: normalizeNotificationPreferences(updatedUser.notificationPreferences || {})
+    }
+  }
+}
+
 async function requestEmailUpdate(userId, email) {
   if (!email) {
     return { statusCode: 400, body: { message: 'Thiếu email!' } }
@@ -512,6 +565,8 @@ module.exports = {
   resetPassword,
   updateProfile,
   updateCheckoutProfile,
+  getNotificationPreferences,
+  updateNotificationPreferences,
   requestEmailUpdate,
   confirmEmailUpdate,
   changePassword

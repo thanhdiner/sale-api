@@ -80,6 +80,7 @@ async function generateReplyWithTools({
   model,
   maxTokens,
   temperature,
+  topP,
   sessionId,
   customerInfo,
   promptText,
@@ -105,6 +106,10 @@ async function generateReplyWithTools({
       messages,
       max_tokens: maxTokens,
       temperature
+    }
+
+    if (Number.isFinite(Number(topP))) {
+      requestParams.top_p = Number(topP)
     }
 
     if (!handoffRequest && round < MAX_TOOL_ROUNDS - 1 && toolDefinitions.length > 0) {
@@ -170,7 +175,8 @@ async function generateReplyWithTools({
             model,
             messages,
             max_tokens: maxTokens,
-            temperature
+            temperature,
+            ...(Number.isFinite(Number(topP)) ? { top_p: Number(topP) } : {})
           })
 
           totalTokens += followUp.usage?.total_tokens || 0

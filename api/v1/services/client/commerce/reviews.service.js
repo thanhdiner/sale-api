@@ -11,6 +11,8 @@ const {
   recalcProductRating,
   serializeReview
 } = require('../../../utils/reviewUtils')
+const dashboardRealtime = require('../../../helpers/dashboardRealtime')
+const adminNotificationsService = require('../../admin/commerce/notifications.service')
 
 cloudinary.config({
   cloud_name: process.env.CLOUD_NAME,
@@ -174,6 +176,17 @@ async function createReview({ productId, body = {}, files = [], user }) {
 
   await review.populate('userId', REVIEW_USER_POPULATE)
   await recalcProductRating(productObjectId)
+  dashboardRealtime.emitReviewCreated(review)
+  adminNotificationsService.createAdminNotification({
+    type: 'review_created',
+    priority: Number(rating) <= 2 ? 'high' : 'normal',
+    title: 'Danh gia moi can kiem tra',
+    message: `${review.userId?.fullName || review.userId?.username || 'Khach hang'} vua danh gia ${rating} sao.`,
+    targetType: 'review',
+    targetId: review._id,
+    actionRequired: Number(rating) <= 2,
+    data: { productId: productObjectId, rating: Number(rating) }
+  }).catch(() => {})
 
   const serializedReview = serializeReview(review, { currentUserId })
 
@@ -225,6 +238,7 @@ async function updateReview({ reviewId, body = {}, files = [], user }) {
 
   await review.populate('userId', REVIEW_USER_POPULATE)
   await recalcProductRating(review.productId)
+  dashboardRealtime.emitReviewUpdated(review)
 
   return {
     review: serializeReview(review, { currentUserId })
@@ -244,6 +258,7 @@ async function deleteReview({ reviewId, user }) {
   await review.save()
   await reviewVoteRepository.deleteMany({ reviewId })
   await recalcProductRating(productId)
+  dashboardRealtime.emitReviewUpdated(review)
 
   return { message: 'Deleted' }
 }

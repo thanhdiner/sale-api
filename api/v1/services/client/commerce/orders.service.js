@@ -1,6 +1,5 @@
 const removeAccents = require('remove-accents')
 const logger = require('../../../../../config/logger')
-const { getIO } = require('../../../helpers/socket')
 const { sendMail } = require('../../../../../config/mailer')
 const { orderConfirmedTemplate } = require('../../../utils/emailTemplates')
 const {
@@ -15,7 +14,9 @@ const flashSaleRepository = require('../../../repositories/commerce/flashSale.re
 const userRepository = require('../../../repositories/access/user.repository')
 const digitalDeliveryService = require('../../shared/commerce/digitalDelivery.service')
 const notificationsService = require('./notifications.service')
+const adminNotificationsService = require('../../admin/commerce/notifications.service')
 const { notifyBackInStockForProduct } = require('../../shared/commerce/backInStock.service')
+const dashboardRealtime = require('../../../helpers/dashboardRealtime')
 
 const ONLINE_PAYMENT_METHODS = ['vnpay', 'momo', 'zalopay', 'sepay']
 const DEFAULT_PENDING_ONLINE_ORDER_TTL_MINUTES = 60
@@ -124,11 +125,19 @@ async function populateOrderItems(orderItems = []) {
       throw new Error(`Không tìm thấy sản phẩm ${item.productId}`)
     }
 
-    const finalPrice = item.salePrice !== undefined ? item.salePrice : product.price
+    const productPrice = Number(product.price || 0)
+    const discountPercentage = Number(product.discountPercentage || 0)
+    const discountedPrice = discountPercentage > 0
+      ? Math.round(productPrice * (1 - discountPercentage / 100))
+      : productPrice
+    const finalPrice = item.salePrice !== undefined ? Number(item.salePrice) : discountedPrice
+
     return {
       ...item,
       price: finalPrice,
       costPrice: product.costPrice,
+      originalPrice: productPrice,
+      discountPercentage,
       name: item.name || product.title,
       image: item.image || product.thumbnail,
       deliveryType: product.deliveryType || 'manual',
@@ -230,6 +239,7 @@ async function restoreOrderStock(order) {
   if (stockBulkOps.length) {
     await productRepository.bulkWrite(stockBulkOps)
     digitalDeliveryService.invalidateProductCaches()
+    dashboardRealtime.emitProductStockUpdated([...restoredQuantityByProductId.keys()])
 
     const backInStockProductIds = [...restoredQuantityByProductId.entries()]
       .filter(([productId, restoredQuantity]) => {
@@ -350,15 +360,10 @@ async function markOrderPromoUsed(order) {
 }
 
 function emitNewOrder(order) {
-  try {
-    getIO().to('admin').emit('new_order', {
-      _id: order._id,
-      contact: order.contact,
-      total: order.total,
-      paymentMethod: order.paymentMethod,
-      createdAt: order.createdAt
-    })
-  } catch {}
+  adminNotificationsService.createOrderCreatedNotification(order).catch(err => {
+    logger.warn(`[AdminNotifications] Failed to create order notification: ${err.message}`)
+  })
+  dashboardRealtime.emitOrderCreated(order)
 }
 
 function queueOrderEmail(order) {
@@ -480,6 +485,8 @@ async function createPendingOrder(userId, payload = {}) {
 
   await order.save()
 
+  emitNewOrder(order)
+
   return {
     success: true,
     orderId: order._id,
@@ -521,6 +528,7 @@ async function cancelOrder(userId, orderId) {
   order.cancelledAt = new Date()
   await order.save()
   notificationsService.createOrderStatusNotification(order)
+  dashboardRealtime.emitOrderUpdated(order)
 
   return { success: true, order }
 }
@@ -1073,6 +1081,7 @@ async function expirePendingOnlineOrders({ now = new Date(), batchSize = 100 } =
     order.cancelledAt = now
     await order.save()
     notificationsService.createOrderStatusNotification(order)
+    dashboardRealtime.emitOrderUpdated(order)
     expiredCount += 1
   }
 

@@ -26,6 +26,7 @@ function sanitizeEntity(entity) {
     id: sanitizeString(entity.id, 120),
     slug: sanitizeString(entity.slug, 200),
     title: sanitizeString(entity.title, 300),
+    description: sanitizeString(entity.description, 1000),
     price: sanitizeNumber(entity.price),
     stock: sanitizeNumber(entity.stock),
     category: sanitizeString(entity.category, 160)
@@ -70,10 +71,11 @@ function updatePageContext(sessionId, context) {
   pruneExpiredContexts(now)
 
   const previous = pageContexts.get(sessionId) || {}
+  const routeChanged = Boolean(sanitized.route && previous.route && sanitized.route !== previous.route)
   const next = {
     ...previous,
     ...sanitized,
-    entity: sanitized.entity || previous.entity,
+    entity: sanitized.entity || (routeChanged ? null : previous.entity),
     updatedAt: new Date(now).toISOString(),
     updatedAtMs: now
   }

@@ -19,6 +19,7 @@ const bannersRoutes = require('./system/banners.route')
 const aboutContentRoutes = require('./cms/aboutContent.route')
 const termsContentRoutes = require('./cms/termsContent.route')
 const cooperationContactContentRoutes = require('./cms/cooperationContactContent.route')
+const homeBuildYourKitContentRoutes = require('./cms/homeBuildYourKitContent.route')
 const homeWhyChooseUsContentRoutes = require('./cms/homeWhyChooseUsContent.route')
 const blogRoutes = require('./blog/blog.route')
 const blogCategoryRoutes = require('./blog/blogCategory.route')
@@ -34,7 +35,12 @@ const vipContentRoutes = require('./cms/vipContent.route')
 const flashSaleRoutes = require('./commerce/flashSales.route')
 const bankInfoRoutes = require('./commerce/bankInfo.route')
 const reviewsRoutes = require('./commerce/reviews.route')
+const notificationsRoutes = require('./commerce/notifications.route')
 const chatbotConfigRoutes = require('./chatbot/chatbotConfig.route')
+const aiProvidersRoutes = require('./chatbot/aiProviders.route')
+const aiProviderKeysRoutes = require('./chatbot/aiProviderKeys.route')
+const aiAgentsRoutes = require('./chatbot/aiAgents.route')
+const aiRuntimeSettingsRoutes = require('./chatbot/aiRuntimeSettings.route')
 const contactPageRoutes = require('./cms/contactPage.route')
 const privacyPolicyPageRoutes = require('./cms/privacyPolicyPage.route')
 const returnPolicyPageRoutes = require('./cms/returnPolicyPage.route')
@@ -70,6 +76,7 @@ module.exports = app => {
   app.use(PATH_ADMIN + '/about', authenticateToken.authenticateToken, aboutContentRoutes)
   app.use(PATH_ADMIN + '/terms', authenticateToken.authenticateToken, termsContentRoutes)
   app.use(PATH_ADMIN + '/cooperation-contact', authenticateToken.authenticateToken, cooperationContactContentRoutes)
+  app.use(PATH_ADMIN + '/home-build-your-kit', authenticateToken.authenticateToken, homeBuildYourKitContentRoutes)
   app.use(PATH_ADMIN + '/home-why-choose-us', authenticateToken.authenticateToken, homeWhyChooseUsContentRoutes)
   app.use(PATH_ADMIN + '/blog', authenticateToken.authenticateToken, blogRoutes)
   app.use(PATH_ADMIN + '/blog-posts', authenticateToken.authenticateToken, blogRoutes)
@@ -86,7 +93,12 @@ module.exports = app => {
   app.use(PATH_ADMIN + '/flash-sales', authenticateToken.authenticateToken, flashSaleRoutes)
   app.use(PATH_ADMIN + '/bank-infos', authenticateToken.authenticateToken, bankInfoRoutes)
   app.use(PATH_ADMIN + '/reviews', authenticateToken.authenticateToken, reviewsRoutes)
+  app.use(PATH_ADMIN + '/notifications', authenticateToken.authenticateToken, notificationsRoutes)
   app.use(PATH_ADMIN + '/chatbot-config', authenticateToken.authenticateToken, chatbotConfigRoutes)
+  app.use(PATH_ADMIN + '/ai-providers', authenticateToken.authenticateToken, aiProvidersRoutes)
+  app.use(PATH_ADMIN + '/ai-provider-keys', authenticateToken.authenticateToken, aiProviderKeysRoutes)
+  app.use(PATH_ADMIN + '/ai-agents', authenticateToken.authenticateToken, aiAgentsRoutes)
+  app.use(PATH_ADMIN + '/ai-runtime-settings', authenticateToken.authenticateToken, aiRuntimeSettingsRoutes)
   app.use(PATH_ADMIN + '/contact-page', authenticateToken.authenticateToken, contactPageRoutes)
   app.use(PATH_ADMIN + '/privacy-policy', authenticateToken.authenticateToken, privacyPolicyPageRoutes)
   app.use(PATH_ADMIN + '/return-policy', authenticateToken.authenticateToken, returnPolicyPageRoutes)
@@ -97,14 +109,3 @@ module.exports = app => {
   app.use(PATH_ADMIN + '/quick-replies', authenticateToken.authenticateToken, quickRepliesRoutes)
   app.use(PATH_ADMIN + '/quick-reply-categories', authenticateToken.authenticateToken, quickReplyCategoriesRoutes)
 }
-
-
-
-
-
-
-
-
-
-
-

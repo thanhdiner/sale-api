@@ -90,7 +90,7 @@ function localizePermission(permission, languageInput) {
 
 async function listPermissions(params = {}) {
   const { group, search, language } = params
-  const query = { deleted: false }
+  const query = { deleted: { $ne: true } }
 
   if (group) {
     query.group = group
@@ -126,7 +126,7 @@ async function createPermission(payload = {}) {
     throw new AppError('Only a-z, 0-9, and _', 400)
   }
 
-  const existingPermission = await permissionRepository.findOne({ name, deleted: false })
+  const existingPermission = await permissionRepository.findOne({ name, deleted: { $ne: true } })
   if (existingPermission) {
     throw new AppError('Permission with this name already exists', 400)
   }

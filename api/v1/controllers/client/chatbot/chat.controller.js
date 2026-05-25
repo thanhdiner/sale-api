@@ -50,7 +50,8 @@ const getHistory = async (req, res) => {
   try {
     const result = await chatService.getHistory({
       sessionId: req.params.sessionId,
-      showInternal: req.query.internal === 'true'
+      showInternal: req.query.internal === 'true',
+      requestQuery: req.query
     })
     return sendServiceResult(res, result)
   } catch (err) {

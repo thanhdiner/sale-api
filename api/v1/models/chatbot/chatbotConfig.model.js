@@ -12,8 +12,10 @@ const chatbotConfigSchema = new mongoose.Schema(
 
     // Cau hinh chung
     isEnabled: { type: Boolean, default: true },
-    aiProvider: { type: String, enum: ['openai', 'deepseek', 'groq', '9router'], default: 'openai' },
+    aiProvider: { type: String, default: 'openai', trim: true, lowercase: true },
     model: { type: String, default: 'gpt-4o-mini' },
+    fallbackProvider: { type: String, default: '', trim: true, lowercase: true },
+    fallbackModel: { type: String, default: '', trim: true },
     maxTokens: { type: Number, default: 1000 },
     temperature: { type: Number, default: 0.7 },
 
@@ -62,7 +64,6 @@ const chatbotConfigSchema = new mongoose.Schema(
 )
 
 module.exports = mongoose.model('ChatbotConfig', chatbotConfigSchema, 'chatbotConfigs')
-
 
 
 

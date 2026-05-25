@@ -159,6 +159,24 @@ exports.updateCheckoutProfile = async (req, res) => {
   }
 }
 
+exports.getNotificationPreferences = async (req, res) => {
+  try {
+    const result = await userService.getNotificationPreferences(req.user.userId)
+    return sendServiceResult(res, result)
+  } catch (err) {
+    return handleUnexpectedError(res, '[Client][User] getNotificationPreferences error:', err)
+  }
+}
+
+exports.updateNotificationPreferences = async (req, res) => {
+  try {
+    const result = await userService.updateNotificationPreferences(req.user.userId, req.body)
+    return sendServiceResult(res, result)
+  } catch (err) {
+    return handleUnexpectedError(res, '[Client][User] updateNotificationPreferences error:', err)
+  }
+}
+
 exports.requestEmailUpdate = async (req, res) => {
   try {
     const result = await userService.requestEmailUpdate(req.user.userId, req.body.email)

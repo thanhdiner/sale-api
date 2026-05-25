@@ -13,6 +13,46 @@ function parseJsonField(value, fieldName) {
   }
 }
 
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+function toPlainObject(value) {
+  if (!isPlainObject(value)) {
+    return {}
+  }
+
+  if (typeof value.toObject === 'function') {
+    return value.toObject({ depopulate: true, versionKey: false })
+  }
+
+  return { ...value }
+}
+
+function mergeDefinedDeep(currentValue, patchValue) {
+  if (patchValue === undefined) {
+    return currentValue
+  }
+
+  if (!isPlainObject(patchValue)) {
+    return patchValue
+  }
+
+  const merged = toPlainObject(currentValue)
+
+  Object.entries(patchValue).forEach(([key, value]) => {
+    if (value === undefined) {
+      return
+    }
+
+    merged[key] = isPlainObject(value)
+      ? mergeDefinedDeep(merged[key], value)
+      : value
+  })
+
+  return merged
+}
+
 async function getWebsiteConfig() {
   return websiteConfigRepository.findOne()
 }
@@ -45,7 +85,7 @@ async function updateWebsiteConfig(payload = {}) {
 
   if (dailySuggestionBanner) {
     const bannerObj = parseJsonField(dailySuggestionBanner, 'dailySuggestionBanner')
-    config.dailySuggestionBanner = { ...config.dailySuggestionBanner, ...bannerObj }
+    config.dailySuggestionBanner = mergeDefinedDeep(config.dailySuggestionBanner, bannerObj)
   }
 
   if (typeof dailySuggestionBannerImg === 'string' && dailySuggestionBannerImg.trim() !== '') {
@@ -55,20 +95,20 @@ async function updateWebsiteConfig(payload = {}) {
     }
   }
 
-  if (shoppingGuide) {
-    config.shoppingGuide = parseJsonField(shoppingGuide, 'shoppingGuide')
+  if (shoppingGuide !== undefined) {
+    config.shoppingGuide = mergeDefinedDeep(config.shoppingGuide, parseJsonField(shoppingGuide, 'shoppingGuide'))
   }
 
-  if (specialPackage) {
-    config.specialPackage = parseJsonField(specialPackage, 'specialPackage')
+  if (specialPackage !== undefined) {
+    config.specialPackage = mergeDefinedDeep(config.specialPackage, parseJsonField(specialPackage, 'specialPackage'))
   }
 
 
   if (siteName !== undefined) config.siteName = siteName
   if (tagline !== undefined) config.tagline = tagline
   if (description !== undefined) config.description = description
-  if (contactObj !== undefined) config.contactInfo = contactObj
-  if (seoObj !== undefined) config.seoSettings = seoObj
+  if (contactObj !== undefined) config.contactInfo = mergeDefinedDeep(config.contactInfo, contactObj)
+  if (seoObj !== undefined) config.seoSettings = mergeDefinedDeep(config.seoSettings, seoObj)
 
   await config.save()
 

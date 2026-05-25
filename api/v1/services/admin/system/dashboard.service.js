@@ -19,6 +19,11 @@ const RANGE_ALIASES = {
   '90d': '90days'
 }
 const ALLOWED_RANGES = new Set(['7days', '30days', '90days'])
+const REVENUE_ORDER_MATCH = {
+  isDeleted: false,
+  status: { $ne: 'cancelled' },
+  $or: [{ status: 'completed' }, { paymentStatus: 'paid' }]
+}
 
 const normalizeLanguage = language => (String(language || '').toLowerCase().startsWith('en') ? 'en' : 'vi')
 
@@ -100,6 +105,94 @@ function wrapDashboardResponse(data, message) {
     success: true,
     message,
     data
+  }
+}
+
+async function buildEntityCountMetric(repository, ranges) {
+  const { thisWeek, lastWeek } = ranges
+  const [total, active, inactive, current, previous] = await Promise.all([
+    repository.countByQuery({ deleted: false }),
+    repository.countByQuery({ status: 'active', deleted: false }),
+    repository.countByQuery({ status: 'inactive', deleted: false }),
+    repository.countByQuery({ deleted: false, createdAt: { $gte: thisWeek.from, $lt: thisWeek.to } }),
+    repository.countByQuery({ deleted: false, createdAt: { $gte: lastWeek.from, $lt: thisWeek.from } })
+  ])
+
+  return {
+    total,
+    active,
+    inactive,
+    new: { current, previous, ...calcChange(current, previous) }
+  }
+}
+
+async function buildDashboardUserStats(ranges = getDateRanges()) {
+  const [adminAccount, user] = await Promise.all([
+    buildEntityCountMetric(adminAccountRepository, ranges),
+    buildEntityCountMetric(userRepository, ranges)
+  ])
+
+  return { adminAccount, user }
+}
+
+async function buildDashboardInventoryStats(ranges = getDateRanges()) {
+  const [product, category] = await Promise.all([
+    buildEntityCountMetric(productRepository, ranges),
+    buildEntityCountMetric(productCategoryRepository, ranges)
+  ])
+
+  return { product, category }
+}
+
+async function buildDashboardFinanceStats(ranges = getDateRanges()) {
+  const { thisWeek, lastWeek } = ranges
+  const [revenueThisWeek, revenueLastWeek, profitThisWeek, profitLastWeek] = await Promise.all([
+    orderRepository.aggregate([
+      { $match: { ...REVENUE_ORDER_MATCH, createdAt: { $gte: thisWeek.from, $lt: thisWeek.to } } },
+      { $group: { _id: null, total: { $sum: '$total' } } }
+    ]),
+    orderRepository.aggregate([
+      { $match: { ...REVENUE_ORDER_MATCH, createdAt: { $gte: lastWeek.from, $lt: thisWeek.from } } },
+      { $group: { _id: null, total: { $sum: '$total' } } }
+    ]),
+    orderRepository.aggregate([
+      { $match: { ...REVENUE_ORDER_MATCH, createdAt: { $gte: thisWeek.from, $lt: thisWeek.to } } },
+      { $unwind: '$orderItems' },
+      {
+        $group: {
+          _id: null,
+          profit: {
+            $sum: {
+              $multiply: [{ $subtract: ['$orderItems.price', { $ifNull: ['$orderItems.costPrice', 0] }] }, '$orderItems.quantity']
+            }
+          }
+        }
+      }
+    ]),
+    orderRepository.aggregate([
+      { $match: { ...REVENUE_ORDER_MATCH, createdAt: { $gte: lastWeek.from, $lt: thisWeek.from } } },
+      { $unwind: '$orderItems' },
+      {
+        $group: {
+          _id: null,
+          profit: {
+            $sum: {
+              $multiply: [{ $subtract: ['$orderItems.price', { $ifNull: ['$orderItems.costPrice', 0] }] }, '$orderItems.quantity']
+            }
+          }
+        }
+      }
+    ])
+  ])
+
+  const revenueCurrent = revenueThisWeek[0]?.total || 0
+  const revenuePrevious = revenueLastWeek[0]?.total || 0
+  const profitCurrent = profitThisWeek[0]?.profit || 0
+  const profitPrevious = profitLastWeek[0]?.profit || 0
+
+  return {
+    totalRevenue: { value: revenueCurrent, ...calcChange(revenueCurrent, revenuePrevious) },
+    profit: { value: profitCurrent, ...calcChange(profitCurrent, profitPrevious) }
   }
 }
 
@@ -228,36 +321,36 @@ async function buildDashboardSummary() {
 
   const [revenueThisWeek, revenueLastWeek, profitThisWeek, profitLastWeek] = await Promise.all([
     orderRepository.aggregate([
-      { $match: { isDeleted: false, status: 'completed', createdAt: { $gte: thisWeek.from, $lt: thisWeek.to } } },
+      { $match: { ...REVENUE_ORDER_MATCH, createdAt: { $gte: thisWeek.from, $lt: thisWeek.to } } },
       { $group: { _id: null, total: { $sum: '$total' } } }
     ]),
     orderRepository.aggregate([
-      { $match: { isDeleted: false, status: 'completed', createdAt: { $gte: lastWeek.from, $lt: thisWeek.from } } },
+      { $match: { ...REVENUE_ORDER_MATCH, createdAt: { $gte: lastWeek.from, $lt: thisWeek.from } } },
       { $group: { _id: null, total: { $sum: '$total' } } }
     ]),
     orderRepository.aggregate([
-      { $match: { isDeleted: false, status: 'completed', createdAt: { $gte: thisWeek.from, $lt: thisWeek.to } } },
+      { $match: { ...REVENUE_ORDER_MATCH, createdAt: { $gte: thisWeek.from, $lt: thisWeek.to } } },
       { $unwind: '$orderItems' },
       {
         $group: {
           _id: null,
           profit: {
             $sum: {
-              $multiply: [{ $subtract: ['$orderItems.price', '$orderItems.costPrice'] }, '$orderItems.quantity']
+              $multiply: [{ $subtract: ['$orderItems.price', { $ifNull: ['$orderItems.costPrice', 0] }] }, '$orderItems.quantity']
             }
           }
         }
       }
     ]),
     orderRepository.aggregate([
-      { $match: { isDeleted: false, status: 'completed', createdAt: { $gte: lastWeek.from, $lt: thisWeek.from } } },
+      { $match: { ...REVENUE_ORDER_MATCH, createdAt: { $gte: lastWeek.from, $lt: thisWeek.from } } },
       { $unwind: '$orderItems' },
       {
         $group: {
           _id: null,
           profit: {
             $sum: {
-              $multiply: [{ $subtract: ['$orderItems.price', '$orderItems.costPrice'] }, '$orderItems.quantity']
+              $multiply: [{ $subtract: ['$orderItems.price', { $ifNull: ['$orderItems.costPrice', 0] }] }, '$orderItems.quantity']
             }
           }
         }
@@ -310,7 +403,7 @@ async function buildDashboardCharts(range, languageInput = 'vi') {
 
   const [salesAgg, categoryStats, paymentMethodStats] = await Promise.all([
     orderRepository.aggregate([
-      { $match: { isDeleted: false, status: 'completed', createdAt: { $gte: lastNDays[0], $lt: new Date() } } },
+      { $match: { ...REVENUE_ORDER_MATCH, createdAt: { $gte: lastNDays[0], $lt: new Date() } } },
       { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, total: { $sum: '$total' } } },
       { $sort: { _id: 1 } }
     ]),
@@ -333,8 +426,7 @@ async function buildDashboardCharts(range, languageInput = 'vi') {
     orderRepository.aggregate([
       {
         $match: {
-          isDeleted: false,
-          status: { $ne: 'cancelled' },
+          ...REVENUE_ORDER_MATCH,
           paymentMethod: { $exists: true, $ne: null },
           createdAt: { $gte: lastNDays[0], $lt: new Date() }
         }
@@ -371,7 +463,7 @@ async function buildDashboardCharts(range, languageInput = 'vi') {
 
 async function buildDashboardTopCustomers(limit) {
   const topCustomers = await orderRepository.aggregate([
-    { $match: { isDeleted: false, status: 'completed', userId: { $ne: null } } },
+    { $match: { ...REVENUE_ORDER_MATCH, userId: { $ne: null } } },
     { $group: { _id: '$userId', totalSpent: { $sum: '$total' }, totalOrders: { $sum: 1 } } },
     { $sort: { totalSpent: -1 } },
     { $limit: limit },
@@ -427,7 +519,7 @@ async function buildDashboardBestSellingProducts(limit, languageInput = 'vi', ra
 
   const [productsThisWeek, productsPrevWeek] = await Promise.all([
     orderRepository.aggregate([
-      { $match: { isDeleted: false, status: 'completed', createdAt: { $gte: weekStart, $lt: now } } },
+      { $match: { ...REVENUE_ORDER_MATCH, createdAt: { $gte: weekStart, $lt: now } } },
       { $unwind: '$orderItems' },
       {
         $group: {
@@ -456,7 +548,7 @@ async function buildDashboardBestSellingProducts(limit, languageInput = 'vi', ra
       }
     ]),
     orderRepository.aggregate([
-      { $match: { isDeleted: false, status: 'completed', createdAt: { $gte: prevWeekStart, $lt: weekStart } } },
+      { $match: { ...REVENUE_ORDER_MATCH, createdAt: { $gte: prevWeekStart, $lt: weekStart } } },
       { $unwind: '$orderItems' },
       { $group: { _id: '$orderItems.productId', sales: { $sum: '$orderItems.quantity' } } }
     ])
@@ -480,6 +572,18 @@ async function buildDashboardBestSellingProducts(limit, languageInput = 'vi', ra
 
 async function getCachedSummaryData() {
   return cache.getOrSet('dashboard:summary', buildDashboardSummary, SUMMARY_TTL)
+}
+
+async function getCachedUserStatsData() {
+  return cache.getOrSet('dashboard:stats:users', buildDashboardUserStats, SUMMARY_TTL)
+}
+
+async function getCachedFinanceStatsData() {
+  return cache.getOrSet('dashboard:stats:finance', buildDashboardFinanceStats, SUMMARY_TTL)
+}
+
+async function getCachedInventoryStatsData() {
+  return cache.getOrSet('dashboard:stats:inventory', buildDashboardInventoryStats, SUMMARY_TTL)
 }
 
 async function getCachedChartsData(range = '7days', language = 'vi') {
@@ -529,6 +633,21 @@ async function getDashboardSummary() {
   return wrapDashboardResponse(data, 'Dashboard summary retrieved successfully')
 }
 
+async function getDashboardUserStats() {
+  const data = await getCachedUserStatsData()
+  return wrapDashboardResponse(data, 'Dashboard user stats retrieved successfully')
+}
+
+async function getDashboardFinanceStats() {
+  const data = await getCachedFinanceStatsData()
+  return wrapDashboardResponse(data, 'Dashboard finance stats retrieved successfully')
+}
+
+async function getDashboardInventoryStats() {
+  const data = await getCachedInventoryStatsData()
+  return wrapDashboardResponse(data, 'Dashboard inventory stats retrieved successfully')
+}
+
 async function getDashboardCharts(range = '7days', language = 'vi') {
   const data = await getCachedChartsData(range, language)
   return wrapDashboardResponse(data, 'Dashboard charts retrieved successfully')
@@ -547,6 +666,24 @@ async function getDashboardRecentOrders(limit) {
 async function getDashboardBestSellingProducts(limit, language = 'vi', range = '7days') {
   const data = await getCachedBestSellingProductsData(limit, language, range)
   return wrapDashboardResponse(data, 'Dashboard best selling products retrieved successfully')
+}
+
+async function warmDashboardCache({ languages = ['vi', 'en'], ranges = ['7days', '30days', '90days'] } = {}) {
+  const uniqueLanguages = [...new Set(languages.map(normalizeLanguage))]
+  const uniqueRanges = [...new Set(ranges.map(normalizeRange))]
+
+  await Promise.all([
+    getCachedSummaryData(),
+    getCachedUserStatsData(),
+    getCachedFinanceStatsData(),
+    getCachedInventoryStatsData(),
+    getCachedTopCustomersData(),
+    getCachedRecentOrdersData(),
+    ...uniqueRanges.flatMap(range => [
+      ...uniqueLanguages.map(language => getCachedChartsData(range, language)),
+      ...uniqueLanguages.map(language => getCachedBestSellingProductsData(5, language, range))
+    ])
+  ])
 }
 
 async function getDashboard(range = '7days', language = 'vi') {
@@ -574,10 +711,14 @@ async function getDashboard(range = '7days', language = 'vi') {
 module.exports = {
   getDashboard,
   getDashboardSummary,
+  getDashboardUserStats,
+  getDashboardFinanceStats,
+  getDashboardInventoryStats,
   getDashboardCharts,
   getDashboardTopCustomers,
   getDashboardRecentOrders,
-  getDashboardBestSellingProducts
+  getDashboardBestSellingProducts,
+  warmDashboardCache
 }
 
 

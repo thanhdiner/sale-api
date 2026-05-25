@@ -300,7 +300,7 @@ async function saveBotMessage(conversationId, sessionId, botReply) {
     sessionId,
     sender: 'bot',
     type: 'text',
-    senderName: 'SmartMall Bot',
+    senderName: botReply.metadata?.agentName || 'SmartMall Bot',
     message: botReply.text,
     metadata: {
       suggestions: botReply.suggestions || [],

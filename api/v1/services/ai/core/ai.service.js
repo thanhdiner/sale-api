@@ -19,15 +19,17 @@ const { generateReplyWithTools } = require('./ai.completion')
 
 async function processMessage(sessionId, userMessage, customerInfo = {}, overrides = {}) {
   let fallbackMessage = PROCESS_FALLBACK_MESSAGE
+  let runtimeConfig = null
 
   try {
     const { promptInput, promptText, memoryInput, imageUrls } = normalizeUserMessage(userMessage)
-    const runtimeConfig = await getRuntimeConfig(overrides)
+    runtimeConfig = await getRuntimeConfig(overrides)
     const {
       provider,
       model,
       maxTokens,
       temperature,
+      topP,
       autoEscalateKeywords,
       systemPromptOverride,
       brandVoice,
@@ -37,9 +39,13 @@ async function processMessage(sessionId, userMessage, customerInfo = {}, overrid
       systemRules,
       toolSettings,
       availableTools,
+      modelCapabilities,
+      activeAgent,
       onActivity
     } = runtimeConfig
-    const toolDefinitions = getToolDefinitions(toolSettings)
+    const toolDefinitions = modelCapabilities?.supportsTools === false
+      ? []
+      : getToolDefinitions(toolSettings)
 
     fallbackMessage = runtimeConfig.fallbackMessage || PROCESS_FALLBACK_MESSAGE
 
@@ -101,6 +107,7 @@ async function processMessage(sessionId, userMessage, customerInfo = {}, overrid
       model,
       maxTokens,
       temperature,
+      topP,
       sessionId,
       customerInfo,
       promptText,
@@ -138,6 +145,11 @@ async function processMessage(sessionId, userMessage, customerInfo = {}, overrid
         ...(handoffRequest ? { intent: 'escalate', escalationReason: handoffRequest.reason } : {}),
         provider,
         model,
+        ...(activeAgent ? {
+          agentId: activeAgent.id,
+          agentCode: activeAgent.code,
+          agentName: activeAgent.name
+        } : {}),
         tokensUsed: totalTokens,
         responseTime: elapsed,
         toolsUsed: toolsUsed.length > 0 ? toolsUsed : undefined,
@@ -152,6 +164,22 @@ async function processMessage(sessionId, userMessage, customerInfo = {}, overrid
     logger.error(`[AI] processMessage error (session: ${sessionId}): ${err.message || err}`)
     if (err.stack) logger.error(`[AI] Stack: ${err.stack}`)
     if (err.error) logger.error(`[AI] API Error body: ${JSON.stringify(err.error)}`)
+
+    if (!overrides.skipFallback && Array.isArray(runtimeConfig?.fallbackProviderModels)) {
+      const fallbackProviders = runtimeConfig.fallbackProviderModels.filter(item => item?.provider && item.provider !== runtimeConfig.provider)
+
+      for (const fallbackProvider of fallbackProviders) {
+        logger.warn(`[AI] Trying fallback provider ${fallbackProvider.provider} after ${runtimeConfig.provider} failed`)
+        const fallbackResult = await processMessage(sessionId, userMessage, customerInfo, {
+          ...overrides,
+          provider: fallbackProvider.provider,
+          model: fallbackProvider.model || undefined,
+          skipFallback: true
+        })
+
+        if (!fallbackResult?.metadata?.error) return fallbackResult
+      }
+    }
 
     if (err.status === 429) {
       return {
@@ -177,9 +205,6 @@ module.exports = {
   getActiveConfig,
   getRuntimeConfig
 }
-
-
-
 
 
 

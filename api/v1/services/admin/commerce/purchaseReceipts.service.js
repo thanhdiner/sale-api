@@ -6,6 +6,7 @@ const purchaseReceiptRepository = require('../../../repositories/commerce/purcha
 const { hasPermission, isSuperAdmin } = require('../../../middlewares/admin/checkPermission.middleware')
 const { invalidateProductCaches } = require('../../shared/commerce/digitalDelivery.service')
 const { notifyBackInStockForProduct } = require('../../shared/commerce/backInStock.service')
+const dashboardRealtime = require('../../../helpers/dashboardRealtime')
 
 function ensureValidObjectId(id, message = 'ID sản phẩm không hợp lệ') {
   if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -281,6 +282,7 @@ async function createPurchaseReceipt(payload = {}, adminId, lang = 'vi') {
   }
 
   invalidateProductCaches()
+  dashboardRealtime.emitProductStockUpdated(product._id)
 
   if (previousStock <= 0 && Number(product.stock || 0) > 0) {
     await notifyBackInStockForProduct(product._id)
@@ -386,6 +388,7 @@ async function cancelPurchaseReceipt(id, payload = {}, user = {}, lang = 'vi') {
   }
 
   invalidateProductCaches()
+  dashboardRealtime.emitProductStockUpdated(product._id)
 
   return {
     success: true,

@@ -61,6 +61,8 @@ const checkoutProfileHandlers = [
 
 router.patch('/checkout-profile', ...checkoutProfileHandlers)
 router.patch('/update-checkout-profile', ...checkoutProfileHandlers)
+router.get('/notification-preferences', authenticateToken.authenticateToken, controller.getNotificationPreferences)
+router.patch('/notification-preferences', authenticateToken.authenticateToken, controller.updateNotificationPreferences)
 router.post(
   '/request-email-update',
   authenticateToken.authenticateToken,

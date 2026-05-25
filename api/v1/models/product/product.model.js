@@ -127,6 +127,7 @@ productSchema.index({ isTopDeal: 1, status: 1, deleted: 1 })
 productSchema.index({ deleted: 1, isTopDeal: 1, soldQuantity: -1 })
 productSchema.index({ deleted: 1, productCategory: 1 })
 productSchema.index({ status: 1, deleted: 1, recommendScore: -1 })
+productSchema.index({ deleted: 1, position: -1 })
 
 const Product = mongoose.model('Product', productSchema, 'products')
 

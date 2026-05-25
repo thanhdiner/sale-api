@@ -866,7 +866,7 @@ function buildBlogTextFilter(value, fields = []) {
   }
 }
 
-function buildBlogPostQuery({ query, category, tag } = {}) {
+function buildBlogPostQuery({ query, category, tag, slug } = {}) {
   const now = new Date()
   const filters = [
     {
@@ -904,11 +904,17 @@ function buildBlogPostQuery({ query, category, tag } = {}) {
   if (categoryFilter) filters.push(categoryFilter)
   if (tagFilter) filters.push(tagFilter)
 
-  return {
+  const mongoQuery = {
     isDeleted: false,
     status: 'published',
     $and: filters
   }
+
+  if (cleanString(slug)) {
+    mongoQuery.slug = cleanString(slug)
+  }
+
+  return mongoQuery
 }
 
 function normalizeBlogSort(sort, query) {
@@ -973,7 +979,7 @@ function buildBlogPostPayload(rawPost = {}, language = 'vi', query = '') {
     thumbnail: cleanString(post.thumbnail) || null,
     isFeatured: post.isFeatured === true,
     publishedAt: post.publishedAt || null,
-    url: `${CLIENT_URL}/blog`,
+    url: slug ? `${CLIENT_URL}/blog/${slug}` : `${CLIENT_URL}/blog`,
     score: scoreBlogPost(post, query)
   }
 }
@@ -2315,6 +2321,28 @@ function extractProductSlugFromPage(value = '') {
   }
 }
 
+function extractBlogSlugFromPage(value = '') {
+  const raw = cleanString(value)
+  if (!raw) return ''
+
+  let pathname = raw
+  try {
+    const parsed = new URL(raw, CLIENT_URL)
+    pathname = parsed.pathname || raw
+  } catch {
+    pathname = raw.split(/[?#]/)[0]
+  }
+
+  const match = pathname.match(/\/blog\/([^/?#]+)/i)
+  if (!match?.[1]) return ''
+
+  try {
+    return decodeURIComponent(match[1])
+  } catch {
+    return match[1]
+  }
+}
+
 async function resolveCurrentPageProduct(context = {}) {
   const slug = extractProductSlugFromPage(context.customerInfo?.currentPage || context.currentPage)
   if (!slug) return null
@@ -2325,6 +2353,35 @@ async function resolveCurrentPageProduct(context = {}) {
   })
 
   return product || null
+}
+
+async function resolveCurrentPageBlogPost(context = {}) {
+  const pageContext = context.customerInfo?.pageContext || context.pageContext || {}
+  const entity = pageContext.entity || {}
+  const entitySlug = entity.type === 'blog_post' ? cleanString(entity.slug) : ''
+  const routeSlug = extractBlogSlugFromPage(pageContext.route)
+  const currentPageSlug = extractBlogSlugFromPage(context.customerInfo?.currentPage || context.currentPage)
+  const slug = entitySlug || routeSlug || currentPageSlug
+
+  if (!slug) return null
+
+  return blogPostRepository.findOne(buildBlogPostQuery({ query: null, category: null, tag: null, slug }), {
+    lean: true
+  })
+}
+
+function shouldPreferCurrentPageBlog(args = {}, context = {}) {
+  if (!cleanString(args.query) && !cleanString(args.category) && !cleanString(args.tag)) return true
+
+  const prompt = normalizeSearchText(`${context.promptText || ''} ${context.customerInfo?.promptText || ''} ${args.query || ''}`)
+  return [
+    'trang nay',
+    'bai nay',
+    'bai viet nay',
+    'noi dung nay',
+    'tom tat trang',
+    'tom tat bai'
+  ].some(phrase => prompt.includes(phrase))
 }
 
 function buildRecentViewedProductPayload(view = {}) {
@@ -3205,6 +3262,24 @@ async function searchBlogPosts({ query, category, tag, language, sort, limit } =
     const normalizedLanguage = normalizePolicyLanguage(language, context)
     const normalizedLimit = normalizeToolLimit(limit, DEFAULT_BLOG_POST_LIMIT, MAX_BLOG_POST_LIMIT)
     const normalizedSort = normalizeBlogSort(sort, query)
+    const currentPagePost = await resolveCurrentPageBlogPost(context)
+
+    if (currentPagePost && shouldPreferCurrentPageBlog({ query, category, tag }, context)) {
+      const currentPost = buildBlogPostPayload(currentPagePost, normalizedLanguage, query)
+
+      return JSON.stringify({
+        found: true,
+        query: cleanString(query),
+        category: cleanString(category) || null,
+        tag: cleanString(tag) || null,
+        language: normalizedLanguage,
+        count: 1,
+        source: 'current_page',
+        posts: [currentPost],
+        message: null
+      })
+    }
+
     const findLimit = cleanString(query) || cleanString(category) || cleanString(tag)
       ? Math.min(normalizedLimit * 3, 30)
       : normalizedLimit

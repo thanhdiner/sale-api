@@ -189,12 +189,15 @@ async function runBotReply(io, conversationId, messages) {
   if (shouldSkipBotReply(conversation)) return
 
   const aiService = require('../core/ai.service')
-  const runtimeConfig = await aiService.getRuntimeConfig()
+  const latestPageContext = pageContextService.getPageContext(sessionId)
+  const runtimeConfig = await aiService.getRuntimeConfig({
+    useDefaultAgent: true,
+    pageContext: latestPageContext
+  })
   if (!runtimeConfig.isEnabled) return
 
   const combinedMessage = combineBotInputs(messages)
   const mergedCustomer = mergeCustomerInfo(messages)
-  const latestPageContext = pageContextService.getPageContext(sessionId)
   const customer = {
     ...mergedCustomer,
     pageContext: latestPageContext || mergedCustomer.pageContext,
@@ -320,7 +323,6 @@ module.exports = {
   flushBotReply,
   markCustomerTyping
 }
-
 
 
 

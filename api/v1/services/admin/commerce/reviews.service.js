@@ -3,6 +3,7 @@ const reviewRepository = require('../../../repositories/commerce/review.reposito
 const reviewVoteRepository = require('../../../repositories/commerce/reviewVote.repository')
 const AppError = require('../../../utils/AppError')
 const { getRequesterUserId, recalcProductRating } = require('../../../utils/reviewUtils')
+const dashboardRealtime = require('../../../helpers/dashboardRealtime')
 
 function ensureValidObjectId(id, message = 'Invalid review ID') {
   if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -123,6 +124,7 @@ async function replyReview(reviewId, payload = {}) {
     repliedAt: new Date()
   }
   await review.save()
+  dashboardRealtime.emitReviewUpdated(review)
 
   return { sellerReply: review.sellerReply }
 }
@@ -139,6 +141,7 @@ async function deleteReply(reviewId) {
     repliedAt: null
   }
   await review.save()
+  dashboardRealtime.emitReviewUpdated(review)
 
   return { message: 'Reply deleted' }
 }
@@ -154,6 +157,7 @@ async function hideReview(reviewId, payload = {}, user = null) {
   await review.save()
 
   await recalcProductRating(review.productId)
+  dashboardRealtime.emitReviewUpdated(review)
 
   return { message: 'Review hidden', review }
 }
@@ -166,6 +170,7 @@ async function deleteReview(reviewId) {
   await review.save()
   await reviewVoteRepository.deleteMany({ reviewId })
   await recalcProductRating(review.productId)
+  dashboardRealtime.emitReviewUpdated(review)
 
   return { message: 'Deleted' }
 }

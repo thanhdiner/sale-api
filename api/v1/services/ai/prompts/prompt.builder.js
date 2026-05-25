@@ -47,6 +47,7 @@ function formatPageContext(pageContext) {
     const entityParts = []
     if (entity.type) entityParts.push(`type=${entity.type}`)
     if (entity.title) entityParts.push(`title=${entity.title}`)
+    if (entity.description) entityParts.push(`description=${entity.description}`)
     if (entity.id) entityParts.push(`id=${entity.id}`)
     if (entity.slug) entityParts.push(`slug=${entity.slug}`)
     if (entity.price !== undefined) entityParts.push(`price=${entity.price}`)
@@ -57,7 +58,7 @@ function formatPageContext(pageContext) {
 
   if (lines.length === 0) return '- Khong co page context chi tiet.'
 
-  return `${lines.join('\n')}\n- Dung context nay de hieu cac cum nhu "cai nay", "san pham nay", "phan nay", "trang nay". Khong noi la ban nhin thay noi dung khong co trong context.`
+  return `${lines.join('\n')}\n- Dung context nay de hieu cac cum nhu "cai nay", "san pham nay", "phan nay", "trang nay". Neu entity co title/description thi co the tra loi ngan dua tren title/description do; khong can bao la khong lay duoc noi dung chi tiet. Khong noi la ban nhin thay noi dung khong co trong context.`
 }
 
 /**
@@ -267,7 +268,6 @@ module.exports = {
   buildSystemPrompt,
   buildMessages
 }
-
 
 
 
