@@ -163,6 +163,9 @@ async function schedulePage(key, payload = {}, user = null) {
   if (Number.isNaN(scheduledAt.getTime())) throw new AppError('Scheduled date is invalid', 400)
 
   if (Object.prototype.hasOwnProperty.call(payload, 'sections')) page.draftSections = normalizeSections(payload.sections, page.key)
+  if (Object.prototype.hasOwnProperty.call(payload, 'title')) page.title = normalizeText(payload.title).slice(0, 180)
+  if (Object.prototype.hasOwnProperty.call(payload, 'slug')) page.slug = normalizeText(payload.slug).toLowerCase().slice(0, 220)
+  if (Object.prototype.hasOwnProperty.call(payload, 'seo')) page.seo = normalizeSeo(payload.seo)
   await createRevision({ entityType: 'cms_page', entityId: page._id, key: page.key, snapshot: page.toObject(), message: 'Before schedule', user })
   page.scheduledAt = scheduledAt
   page.scheduleStatus = 'scheduled'

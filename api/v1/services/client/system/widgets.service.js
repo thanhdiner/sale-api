@@ -1,5 +1,4 @@
-﻿const logger = require('../../../../../config/logger')
-const cache = require('../../../../../config/redis')
+﻿const cache = require('../../../../../config/redis')
 const widgetRepository = require('../../../repositories/system/widget.repository')
 const applyTranslation = require('../../../utils/applyTranslation')
 const getRequestLanguage = require('../../../utils/getRequestLanguage')
@@ -7,7 +6,7 @@ const getRequestLanguage = require('../../../utils/getRequestLanguage')
 const WIDGET_TRANSLATION_FIELDS = ['title']
 
 //# GET /api/v1/widgets
-module.exports.index = async (req, res) => {
+module.exports.index = async (req, res, next) => {
   try {
     const language = getRequestLanguage(req)
     const result = await cache.getOrSet('widgets:active', async () => {
@@ -22,8 +21,7 @@ module.exports.index = async (req, res) => {
         : []
     })
   } catch (err) {
-    logger.error('[Client] Error fetching widgets:', err)
-    res.status(500).json({ error: 'Internal server error' })
+    return next(err)
   }
 }
 

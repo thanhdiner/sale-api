@@ -1,5 +1,4 @@
-﻿const logger = require('../../../../../config/logger')
-const userService = require('../../../services/client/access/user.service')
+﻿const userService = require('../../../services/client/access/user.service')
 
 function applyCookies(res, cookies = []) {
   cookies.forEach(({ name, value, options }) => {
@@ -24,120 +23,116 @@ function sendServiceResult(res, result) {
   return res.status(result.statusCode).json(result.body)
 }
 
-function handleUnexpectedError(res, message, err) {
-  logger.error(message, err)
-  return res.status(500).json({ error: err.message })
-}
 
-exports.login = async (req, res) => {
+exports.login = async (req, res, next) => {
   try {
     const result = await userService.login(req.body)
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][User] login error:', err)
+    return next(err)
   }
 }
 
-exports.register = async (req, res) => {
+exports.register = async (req, res, next) => {
   try {
     const result = await userService.register(req.body)
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][User] register error:', err)
+    return next(err)
   }
 }
 
-exports.refreshToken = async (req, res) => {
+exports.refreshToken = async (req, res, next) => {
   try {
     const result = await userService.refreshToken(req.cookies.clientRefreshToken)
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][User] refreshToken error:', err)
+    return next(err)
   }
 }
 
-exports.logout = async (req, res) => {
+exports.logout = async (req, res, next) => {
   try {
     const result = await userService.logout(req.cookies.clientRefreshToken)
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][User] logout error:', err)
+    return next(err)
   }
 }
 
-exports.googleLoginCallback = async (req, res) => {
+exports.googleLoginCallback = async (req, res, next) => {
   try {
     const { redirectUrl } = await userService.createOauthCallback(req.user, 'Google')
     return res.redirect(redirectUrl)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][User] googleLoginCallback error:', err)
+    return next(err)
   }
 }
 
-exports.facebookLoginCallback = async (req, res) => {
+exports.facebookLoginCallback = async (req, res, next) => {
   try {
     const { redirectUrl } = await userService.createOauthCallback(req.user, 'Facebook')
     return res.redirect(redirectUrl)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][User] facebookLoginCallback error:', err)
+    return next(err)
   }
 }
 
-exports.githubLoginCallback = async (req, res) => {
+exports.githubLoginCallback = async (req, res, next) => {
   try {
     const { redirectUrl } = await userService.createOauthCallback(req.user, 'GitHub')
     return res.redirect(redirectUrl)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][User] githubLoginCallback error:', err)
+    return next(err)
   }
 }
 
-exports.oauthCodeLogin = async (req, res) => {
+exports.oauthCodeLogin = async (req, res, next) => {
   try {
     const result = await userService.oauthCodeLogin(req.body.code)
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][User] oauthCodeLogin error:', err)
+    return next(err)
   }
 }
 
-exports.getMe = async (req, res) => {
+exports.getMe = async (req, res, next) => {
   try {
     const result = await userService.getMe(req.user.userId)
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][User] getMe error:', err)
+    return next(err)
   }
 }
 
-exports.forgotPassword = async (req, res) => {
+exports.forgotPassword = async (req, res, next) => {
   try {
     const result = await userService.forgotPassword(req.body.email)
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][User] forgotPassword error:', err)
+    return next(err)
   }
 }
 
-exports.verifyResetCode = async (req, res) => {
+exports.verifyResetCode = async (req, res, next) => {
   try {
     const result = await userService.verifyResetCode(req.body)
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][User] verifyResetCode error:', err)
+    return next(err)
   }
 }
 
-exports.resetPassword = async (req, res) => {
+exports.resetPassword = async (req, res, next) => {
   try {
     const result = await userService.resetPassword(req.body)
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][User] resetPassword error:', err)
+    return next(err)
   }
 }
 
-exports.updateProfile = async (req, res) => {
+exports.updateProfile = async (req, res, next) => {
   try {
     const avatarUrl = req.body.avatarUrl || req.file?.path || ''
     const result = await userService.updateProfile(req.user.userId, {
@@ -146,61 +141,61 @@ exports.updateProfile = async (req, res) => {
     })
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][User] updateProfile error:', err)
+    return next(err)
   }
 }
 
-exports.updateCheckoutProfile = async (req, res) => {
+exports.updateCheckoutProfile = async (req, res, next) => {
   try {
     const result = await userService.updateCheckoutProfile(req.user.userId, req.body)
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][User] updateCheckoutProfile error:', err)
+    return next(err)
   }
 }
 
-exports.getNotificationPreferences = async (req, res) => {
+exports.getNotificationPreferences = async (req, res, next) => {
   try {
     const result = await userService.getNotificationPreferences(req.user.userId)
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][User] getNotificationPreferences error:', err)
+    return next(err)
   }
 }
 
-exports.updateNotificationPreferences = async (req, res) => {
+exports.updateNotificationPreferences = async (req, res, next) => {
   try {
     const result = await userService.updateNotificationPreferences(req.user.userId, req.body)
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][User] updateNotificationPreferences error:', err)
+    return next(err)
   }
 }
 
-exports.requestEmailUpdate = async (req, res) => {
+exports.requestEmailUpdate = async (req, res, next) => {
   try {
     const result = await userService.requestEmailUpdate(req.user.userId, req.body.email)
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][User] requestEmailUpdate error:', err)
+    return next(err)
   }
 }
 
-exports.confirmEmailUpdate = async (req, res) => {
+exports.confirmEmailUpdate = async (req, res, next) => {
   try {
     const result = await userService.confirmEmailUpdate(req.user.userId, req.body)
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][User] confirmEmailUpdate error:', err)
+    return next(err)
   }
 }
 
-exports.changePassword = async (req, res) => {
+exports.changePassword = async (req, res, next) => {
   try {
     const result = await userService.changePassword(req.user.userId, req.body)
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][User] changePassword error:', err)
+    return next(err)
   }
 }
 

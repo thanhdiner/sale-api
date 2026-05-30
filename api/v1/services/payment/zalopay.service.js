@@ -1,6 +1,7 @@
 const crypto = require('crypto')
 const axios = require('axios')
 const moment = require('moment')
+const AppError = require('../../utils/AppError')
 
 const ZALOPAY_CONFIG = {
   appId: process.env.ZALOPAY_APP_ID || '2553',
@@ -57,7 +58,7 @@ async function createPaymentUrl({ orderId, amount, items = [], description = 'Th
   const response = await axios.post(ZALOPAY_CONFIG.endpoint, null, { params: body })
 
   if (response.data.return_code !== 1) {
-    throw new Error(response.data.return_message || 'ZaloPay tạo order thất bại')
+    throw new AppError(response.data.return_message || 'ZaloPay order creation failed', 400)
   }
 
   return {

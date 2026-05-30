@@ -1,17 +1,8 @@
 ﻿const logger = require('../../../../../config/logger')
 const wishlistService = require('../../../services/client/commerce/wishlist.service')
 
-const handleKnownControllerError = (res, error) => {
-  if (!error?.statusCode) {
-    return false
-  }
-
-  res.status(error.statusCode).json({ error: error.message })
-  return true
-}
-
 //# GET /api/v1/wishlist?page=1&limit=12
-module.exports.index = async (req, res) => {
+module.exports.index = async (req, res, next) => {
   try {
     const result = await wishlistService.getWishlist({
       userId: req.user?.userId,
@@ -21,14 +12,12 @@ module.exports.index = async (req, res) => {
 
     res.json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Wishlist] index error:', err)
-    res.status(500).json({ error: 'Internal server error' })
+    return next(err)
   }
 }
 
 //# POST /api/v1/wishlist/add
-module.exports.add = async (req, res) => {
+module.exports.add = async (req, res, next) => {
   try {
     const result = await wishlistService.addWishlistItem({
       userId: req.user?.userId,
@@ -37,14 +26,12 @@ module.exports.add = async (req, res) => {
 
     res.json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Wishlist] add error:', err)
-    res.status(500).json({ error: 'Internal server error' })
+    return next(err)
   }
 }
 
 //# POST /api/v1/wishlist/remove
-module.exports.remove = async (req, res) => {
+module.exports.remove = async (req, res, next) => {
   try {
     const result = await wishlistService.removeWishlistItem({
       userId: req.user?.userId,
@@ -53,14 +40,12 @@ module.exports.remove = async (req, res) => {
 
     res.json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Wishlist] remove error:', err)
-    res.status(500).json({ error: 'Internal server error' })
+    return next(err)
   }
 }
 
 //# POST /api/v1/wishlist/toggle
-module.exports.toggle = async (req, res) => {
+module.exports.toggle = async (req, res, next) => {
   try {
     const result = await wishlistService.toggleWishlistItem({
       userId: req.user?.userId,
@@ -69,14 +54,12 @@ module.exports.toggle = async (req, res) => {
 
     res.json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Wishlist] toggle error:', err)
-    res.status(500).json({ error: 'Internal server error' })
+    return next(err)
   }
 }
 
 //# POST /api/v1/wishlist/clear
-module.exports.clear = async (req, res) => {
+module.exports.clear = async (req, res, next) => {
   try {
     const result = await wishlistService.clearWishlist({
       userId: req.user?.userId
@@ -84,14 +67,12 @@ module.exports.clear = async (req, res) => {
 
     res.json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Wishlist] clear error:', err)
-    res.status(500).json({ error: 'Internal server error' })
+    return next(err)
   }
 }
 
 //# GET /api/v1/wishlist/check/:productId
-module.exports.check = async (req, res) => {
+module.exports.check = async (req, res, next) => {
   try {
     const result = await wishlistService.checkWishlistItem({
       userId: req.user?.userId,
@@ -100,9 +81,7 @@ module.exports.check = async (req, res) => {
 
     res.json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Wishlist] check error:', err)
-    res.status(500).json({ error: 'Internal server error' })
+    return next(err)
   }
 }
 

@@ -1,117 +1,86 @@
-﻿const logger = require('../../../../../config/logger')
+﻿const AppError = require('../../../utils/AppError')
 const chatbotConfigService = require('../../../services/admin/chatbot/chatbotConfig.service')
 
-const handleKnownControllerError = (res, error) => {
-  if (!error?.statusCode) {
-    return false
-  }
-
-  res.status(error.statusCode).json({
-    success: false,
-    message: error.message
-  })
-  return true
-}
-
-// GET /api/v1/admin/chatbot-config
-exports.getConfig = async (_req, res) => {
+exports.getConfig = async (_req, res, next) => {
   try {
     const result = await chatbotConfigService.getConfig()
     res.json(result)
   } catch (err) {
-    logger.error(`[Admin] Get chatbot config error: ${err.stack || err.message || err}`)
-    res.status(500).json({ success: false, message: 'Loi server' })
+    return next(err)
   }
 }
 
-// PATCH /api/v1/admin/chatbot-config
-exports.updateConfig = async (req, res) => {
+exports.updateConfig = async (req, res, next) => {
   try {
     const result = await chatbotConfigService.updateConfig(req.body, req.user)
     res.json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error(`[Admin] Update chatbot config error: ${err.stack || err.message || err}`)
-    res.status(500).json({ success: false, message: err.message || 'Cap nhat cau hinh chatbot that bai!' })
+    return next(err)
   }
 }
 
-// GET /api/v1/admin/chatbot-config/tool-logs
-exports.getToolLogs = async (req, res) => {
+exports.getToolLogs = async (req, res, next) => {
   try {
     const result = await chatbotConfigService.getToolLogs(req.query)
     res.json(result)
   } catch (err) {
-    logger.error(`[Admin] Get tool logs error: ${err.stack || err.message || err}`)
-    res.status(500).json({ success: false, message: 'Khong the tai tool logs' })
+    return next(err)
   }
 }
 
-exports.getRulesDefaults = async (_req, res) => {
+exports.getRulesDefaults = async (_req, res, next) => {
   try {
     const result = await chatbotConfigService.getRulesDefaults()
     res.json(result)
   } catch (err) {
-    logger.error(`[Admin] Get rules defaults error: ${err.stack || err.message || err}`)
-    res.status(500).json({ success: false, message: 'Khong the tai defaults' })
+    return next(err)
   }
 }
 
-exports.previewPrompt = async (req, res) => {
+exports.previewPrompt = async (req, res, next) => {
   try {
     const result = await chatbotConfigService.previewPrompt(req.body)
     res.json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error(`[Admin] Preview prompt error: ${err.stack || err.message || err}`)
-    res.status(400).json({ success: false, message: err.message || 'Khong the preview prompt' })
+    return next(err)
   }
 }
 
-exports.getRulesHistory = async (_req, res) => {
+exports.getRulesHistory = async (_req, res, next) => {
   try {
     const result = await chatbotConfigService.getRulesHistory()
     res.json(result)
   } catch (err) {
-    logger.error(`[Admin] Get rules history error: ${err.stack || err.message || err}`)
-    res.status(500).json({ success: false, message: 'Khong the tai rules history' })
+    return next(err)
   }
 }
 
-exports.rollbackRulesHistory = async (req, res) => {
+exports.rollbackRulesHistory = async (req, res, next) => {
   try {
     const result = await chatbotConfigService.rollbackRulesHistory(req.params.id, req.user)
     res.json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error(`[Admin] Rollback rules error: ${err.stack || err.message || err}`)
-    res.status(400).json({ success: false, message: err.message || 'Rollback rules that bai' })
+    return next(err)
   }
 }
 
-exports.testRules = async (req, res) => {
+exports.testRules = async (req, res, next) => {
   try {
     const result = await chatbotConfigService.testRules(req.body)
-    res.status(result.success ? 200 : 400).json(result)
+    if (!result.success) throw new AppError(result.message || 'Rules test failed', 400, result.data)
+    res.json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error(`[Admin] Test rules error: ${err.stack || err.message || err}`)
-    res.status(500).json({ success: false, message: err.message || 'Test chatbot that bai' })
+    return next(err)
   }
 }
 
 // POST /api/v1/admin/chatbot-config/test
-exports.testConnection = async (req, res) => {
+exports.testConnection = async (req, res, next) => {
   try {
     const result = await chatbotConfigService.testConnection(req.body)
     res.json(result)
   } catch (err) {
-    logger.error(`[Admin] Test chatbot connection error: ${err.stack || err.message || err}`)
-    res.status(500).json({
-      success: false,
-      message: `Loi ket noi: ${err.message}`,
-      data: { error: err.message }
-    })
+    return next(err)
   }
 }
 

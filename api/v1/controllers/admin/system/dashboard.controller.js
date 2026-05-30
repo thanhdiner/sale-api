@@ -3,13 +3,12 @@ const dashboardService = require('../../../services/admin/system/dashboard.servi
 const getRequestLanguage = require('../../../utils/getRequestLanguage')
 
 function createDashboardHandler(label, fetcher) {
-  return async (req, res) => {
+  return async (req, res, next) => {
     try {
       const result = await fetcher(req)
       return res.status(200).json(result)
     } catch (err) {
-      logger.error(`[Admin] Error fetching dashboard ${label}:`, err)
-      return res.status(500).json({ error: `Failed to fetch dashboard ${label}`, status: 500 })
+      return next(err)
     }
   }
 }

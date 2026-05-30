@@ -1,0 +1,29 @@
+
+> sales-api@1.0.0 dev
+> npx nodemon --inspect index.js
+
+[33m[nodemon] 3.1.9[39m
+[33m[nodemon] to restart at any time, enter `rs`[39m
+[33m[nodemon] watching path(s): *.*[39m
+[33m[nodemon] watching extensions: js,mjs,cjs,json[39m
+[32m[nodemon] starting `node --inspect index.js`[39m
+Debugger listening on ws://127.0.0.1:9229/6dadc774-2453-413c-b495-86a7336a8fb6
+For help, see: https://nodejs.org/en/docs/inspector
+iconv-lite warning: javascript files use encoding different from utf-8. See https://github.com/ashtuchkin/iconv-lite/wiki/Javascript-source-file-encodings for more info.
+21:23:42 [32minfo[39m: [32m[Swagger] Disabled by ENABLE_SWAGGER=false[39m
+21:23:43 [32minfo[39m: [32m[Mailer] SMTP ready ✓[39m
+21:23:44 [32minfo[39m: [32mConnected to MongoDB successfully![39m
+21:23:44 [32minfo[39m: [32m[Jobs] Disabled by ENABLE_JOBS=false[39m
+21:23:44 [32minfo[39m: [32mServer started on PORT: 3001[39m
+21:23:44 [32minfo[39m: [32m[Redis] Đã kết nối Redis[39m
+21:23:53 [32minfo[39m: [32mGET /api/v1/admin/notifications?page=1&limit=40&tab=all&type=all&priority=all&status=all 200 249.417ms[39m
+21:24:49 [32minfo[39m: [32mGET /api/v1/admin/notifications?page=1&limit=40&tab=all&type=all&priority=all&status=all 200 238.629ms[39m
+21:25:05 [32minfo[39m: [32m[Socket] Client connected: yIKcVZLSL5NcBVNzAAAB[39m
+21:25:05 [32minfo[39m: [32m[Socket] Agent/Admin joined: yIKcVZLSL5NcBVNzAAAB[39m
+21:25:05 [32minfo[39m: [32mGET /api/v1/admin/website-config 200 242.230ms[39m
+21:25:05 [32minfo[39m: [32mGET /api/v1/admin/notifications?page=1&limit=40&tab=all&type=all&priority=all&status=all 200 259.171ms[39m
+21:25:06 [32minfo[39m: [32mGET /api/v1/admin/me 200 483.101ms[39m
+21:25:06 [32minfo[39m: [32m[Socket] Agent/Admin joined: yIKcVZLSL5NcBVNzAAAB[39m
+21:25:06 [32minfo[39m: [32mGET /api/v1/admin/ai-provider-keys?providerCode=9router 200 251.044ms[39m
+21:25:07 [32minfo[39m: [32mGET /api/v1/admin/ai-providers 200 698.123ms[39m
+[31m[nodemon] app crashed - waiting for file changes before starting...[39m

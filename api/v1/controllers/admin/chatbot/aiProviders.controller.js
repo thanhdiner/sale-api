@@ -1,74 +1,58 @@
-const logger = require('../../../../../config/logger')
+const AppError = require('../../../utils/AppError')
 const aiProvidersService = require('../../../services/admin/chatbot/aiProviders.service')
 
-const handleKnownControllerError = (res, error) => {
-  if (!error?.statusCode) return false
 
-  res.status(error.statusCode).json({ success: false, message: error.message })
-  return true
-}
-
-exports.listProviders = async (_req, res) => {
+exports.listProviders = async (_req, res, next) => {
   try {
     const result = await aiProvidersService.listProviders()
     res.json(result)
   } catch (err) {
-    logger.error(`[Admin] List AI providers error: ${err.stack || err.message || err}`)
-    res.status(500).json({ success: false, message: 'Khong the tai AI providers' })
+    return next(err)
   }
 }
 
-exports.createProvider = async (req, res) => {
+exports.createProvider = async (req, res, next) => {
   try {
     const result = await aiProvidersService.createProvider(req.body, req.user)
     res.json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error(`[Admin] Create AI provider error: ${err.stack || err.message || err}`)
-    res.status(400).json({ success: false, message: err.message || 'Tao AI provider that bai' })
+    return next(err)
   }
 }
 
-exports.updateProvider = async (req, res) => {
+exports.updateProvider = async (req, res, next) => {
   try {
     const result = await aiProvidersService.updateProvider(req.params.id, req.body, req.user)
     res.json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error(`[Admin] Update AI provider error: ${err.stack || err.message || err}`)
-    res.status(400).json({ success: false, message: err.message || 'Cap nhat AI provider that bai' })
+    return next(err)
   }
 }
 
-exports.toggleProvider = async (req, res) => {
+exports.toggleProvider = async (req, res, next) => {
   try {
     const result = await aiProvidersService.toggleProvider(req.params.id, req.user)
     res.json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error(`[Admin] Toggle AI provider error: ${err.stack || err.message || err}`)
-    res.status(400).json({ success: false, message: err.message || 'Cap nhat trang thai provider that bai' })
+    return next(err)
   }
 }
 
-exports.deleteProvider = async (req, res) => {
+exports.deleteProvider = async (req, res, next) => {
   try {
     const result = await aiProvidersService.deleteProvider(req.params.id)
     res.json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error(`[Admin] Delete AI provider error: ${err.stack || err.message || err}`)
-    res.status(400).json({ success: false, message: err.message || 'Xoa AI provider that bai' })
+    return next(err)
   }
 }
 
-exports.testProvider = async (req, res) => {
+exports.testProvider = async (req, res, next) => {
   try {
     const result = await aiProvidersService.testProvider(req.params.id, req.body)
-    res.status(result.success ? 200 : 400).json(result)
+    if (!result.success) throw new AppError(result.message || 'Test failed', 400, result.data)
+    res.json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error(`[Admin] Test AI provider error: ${err.stack || err.message || err}`)
-    res.status(500).json({ success: false, message: err.message || 'Test provider that bai' })
+    return next(err)
   }
 }

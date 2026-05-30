@@ -122,7 +122,7 @@ async function populateOrderItems(orderItems = []) {
   return orderItems.map(item => {
     const product = productsMap[item.productId?.toString()]
     if (!product) {
-      throw new Error(`Không tìm thấy sản phẩm ${item.productId}`)
+      throw new AppError(`Product not found: ${item.productId}`, 404)
     }
 
     const productPrice = Number(product.price || 0)

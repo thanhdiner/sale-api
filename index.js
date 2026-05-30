@@ -17,6 +17,7 @@ const redis = require('./config/redis')
 const morganMiddleware = require('./api/v1/middlewares/core/morgan.middleware')
 const notFound = require('./api/v1/middlewares/core/notFound.middleware')
 const errorHandler = require('./api/v1/middlewares/core/errorHandler.middleware')
+const wrapAsyncRoutes = require('./api/v1/utils/wrapAsyncRoutes')
 
 // Socket
 const { initIO } = require('./api/v1/helpers/socket')
@@ -110,6 +111,7 @@ function setupSwaggerDocs() {
 setupSwaggerDocs()
 
 // Error handlers
+wrapAsyncRoutes(app)
 app.use(notFound)
 app.use(errorHandler)
 

@@ -17,6 +17,7 @@ class AppError extends Error {
     super(message)
     this.name = 'AppError'
     this.statusCode = statusCode
+    this.status = `${statusCode}`.startsWith('4') ? 'fail' : 'error'
     this.details = details
     this.isOperational = true          // mark as safe-to-expose to client
 

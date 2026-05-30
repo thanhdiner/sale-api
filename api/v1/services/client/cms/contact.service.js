@@ -298,14 +298,12 @@ async function submitContactRequest(payload = {}, context = {}) {
 }
 
 // # POST /api/v1/contact
-async function sendContactEmail(req, res) {
+async function sendContactEmail(req, res, next) {
   try {
     const result = await submitContactRequest(req.body, { source: 'contact_form' })
     res.json({ message: 'Gui thanh cong!', data: result.request })
   } catch (err) {
-    const statusCode = err.statusCode || 500
-    const message = statusCode === 400 ? err.message : 'Loi gui mail!'
-    res.status(statusCode).json({ message, error: err.message })
+    return next(err)
   }
 }
 

@@ -1,5 +1,5 @@
 ﻿const slugify = require('slugify')
-const logger = require('../../../../../config/logger')
+const AppError = require('../../../utils/AppError')
 const cache = require('../../../../../config/redis')
 const BlogPost = require('../../../models/blog/blogPost.model')
 const BlogCategory = require('../../../models/blog/blogCategory.model')
@@ -183,7 +183,7 @@ async function buildPublicListQuery(params = {}) {
   return query
 }
 
-module.exports.index = async (req, res) => {
+module.exports.index = async (req, res, next) => {
   try {
     const language = getRequestLanguage(req)
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1)
@@ -223,12 +223,11 @@ module.exports.index = async (req, res) => {
         : []
     })
   } catch (err) {
-    logger.error('[Client] Error fetching blog posts:', err)
-    res.status(500).json({ error: 'Failed to fetch blog posts' })
+    return next(err)
   }
 }
 
-module.exports.show = async (req, res) => {
+module.exports.show = async (req, res, next) => {
   try {
     const language = getRequestLanguage(req)
     const slug = normalizeText(req.params.slug)
@@ -257,7 +256,7 @@ module.exports.show = async (req, res) => {
     }, 300)
 
     if (!result) {
-      return res.status(404).json({ error: 'Blog post not found' })
+      throw new AppError('Blog post not found', 404)
     }
 
     res.status(200).json({
@@ -265,12 +264,11 @@ module.exports.show = async (req, res) => {
       data: normalizePopulatedPost(result.data, language)
     })
   } catch (err) {
-    logger.error('[Client] Error fetching blog post:', err)
-    res.status(500).json({ error: 'Failed to fetch blog post' })
+    return next(err)
   }
 }
 
-module.exports.categories = async (req, res) => {
+module.exports.categories = async (req, res, next) => {
   try {
     const language = getRequestLanguage(req)
     const cacheKey = 'blog:categories'
@@ -310,12 +308,11 @@ module.exports.categories = async (req, res) => {
         : []
     })
   } catch (err) {
-    logger.error('[Client] Error fetching blog categories:', err)
-    res.status(500).json({ error: 'Failed to fetch blog categories' })
+    return next(err)
   }
 }
 
-module.exports.tags = async (req, res) => {
+module.exports.tags = async (req, res, next) => {
   try {
     const language = getRequestLanguage(req)
     const cacheKey = 'blog:tags'
@@ -343,8 +340,7 @@ module.exports.tags = async (req, res) => {
       data: Array.isArray(result.data) ? result.data.map(tag => applyBlogTagLanguage(tag, language)) : []
     })
   } catch (err) {
-    logger.error('[Client] Error fetching blog tags:', err)
-    res.status(500).json({ error: 'Failed to fetch blog tags' })
+    return next(err)
   }
 }
 

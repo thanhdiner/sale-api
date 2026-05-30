@@ -2,77 +2,59 @@ const logger = require('../../../../../config/logger')
 const blogService = require('../../../services/admin/blog/blog.service')
 const mediaLibraryService = require('../../../services/admin/system/mediaLibrary.service')
 const { uploadBufferToCloudinary } = require('../../../middlewares/upload/uploadCloud.middleware')
+const AppError = require('../../../utils/AppError')
 
 const BLOG_MEDIA_IMAGE_MAX_SIZE = 5 * 1024 * 1024
 const BLOG_MEDIA_VIDEO_MAX_SIZE = 50 * 1024 * 1024
 const BLOG_MEDIA_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])
 const BLOG_MEDIA_VIDEO_TYPES = new Set(['video/mp4', 'video/webm', 'video/quicktime'])
 
-const handleKnownControllerError = (res, error) => {
-  if (!error?.statusCode) {
-    return false
-  }
 
-  const payload = { message: error.message }
-  if (error.details) {
-    payload.details = error.details
-  }
-
-  res.status(error.statusCode).json(payload)
-  return true
-}
-
-module.exports.index = async (req, res) => {
+module.exports.index = async (req, res, next) => {
   try {
     const result = await blogService.listBlogPosts(req.query)
     res.status(200).json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] Error fetching blog posts:', err)
-    res.status(500).json({ error: 'Failed to fetch blog posts' })
+    return next(err)
   }
 }
 
-module.exports.show = async (req, res) => {
+module.exports.show = async (req, res, next) => {
   try {
     const result = await blogService.getBlogPost(req.params.id)
     res.status(200).json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] Error fetching blog post:', err)
-    res.status(500).json({ error: 'Failed to fetch blog post' })
+    return next(err)
   }
 }
 
-module.exports.preview = async (req, res) => {
+module.exports.preview = async (req, res, next) => {
   try {
     const result = await blogService.previewBlogPost(req.params.id)
     res.status(200).json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] Error fetching blog post preview:', err)
-    res.status(500).json({ error: 'Failed to fetch blog post preview' })
+    return next(err)
   }
 }
 
-module.exports.uploadMedia = async (req, res) => {
+module.exports.uploadMedia = async (req, res, next) => {
   try {
     const file = req.file
 
     if (!file) {
-      return res.status(400).json({ message: 'No media file uploaded' })
+      throw new AppError('No media file uploaded', 400)
     }
 
     const isImage = BLOG_MEDIA_IMAGE_TYPES.has(file.mimetype)
     const isVideo = BLOG_MEDIA_VIDEO_TYPES.has(file.mimetype)
 
     if (!isImage && !isVideo) {
-      return res.status(400).json({ message: 'Unsupported media type' })
+      throw new AppError('Unsupported media type', 400)
     }
 
     const maxSize = isVideo ? BLOG_MEDIA_VIDEO_MAX_SIZE : BLOG_MEDIA_IMAGE_MAX_SIZE
     if (file.size > maxSize) {
-      return res.status(400).json({ message: `Media file must be smaller than ${Math.floor(maxSize / 1024 / 1024)}MB` })
+      throw new AppError(`Media file must be smaller than ${Math.floor(maxSize / 1024 / 1024)}MB`, 400)
     }
 
     const resourceType = isVideo ? 'video' : 'image'
@@ -89,45 +71,38 @@ module.exports.uploadMedia = async (req, res) => {
       asset
     })
   } catch (err) {
-    logger.error('[Admin] Error uploading blog media:', err)
-    res.status(500).json({ error: 'Failed to upload blog media' })
+    return next(err)
   }
 }
 
-module.exports.create = async (req, res) => {
+module.exports.create = async (req, res, next) => {
   try {
     const result = await blogService.createBlogPost(req.body, req.user)
     res.status(201).json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] Error creating blog post:', err)
-    res.status(500).json({ error: 'Failed to create blog post' })
+    return next(err)
   }
 }
 
-module.exports.edit = async (req, res) => {
+module.exports.edit = async (req, res, next) => {
   try {
     const result = await blogService.updateBlogPost(req.params.id, req.body, req.user)
     res.status(200).json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] Error updating blog post:', err)
-    res.status(500).json({ error: 'Failed to update blog post' })
+    return next(err)
   }
 }
 
-module.exports.delete = async (req, res) => {
+module.exports.delete = async (req, res, next) => {
   try {
     const result = await blogService.deleteBlogPost(req.params.id)
     res.status(200).json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] Error deleting blog post:', err)
-    res.status(500).json({ error: 'Failed to delete blog post' })
+    return next(err)
   }
 }
 
-module.exports.review = async (req, res) => {
+module.exports.review = async (req, res, next) => {
   try {
     const result = await blogService.reviewBlogPost({
       postId: req.params.id,
@@ -135,13 +110,11 @@ module.exports.review = async (req, res) => {
     })
     res.status(200).json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] Error reviewing blog post:', err)
-    res.status(500).json({ error: 'Failed to review blog post' })
+    return next(err)
   }
 }
 
-module.exports.approveAndQueue = async (req, res) => {
+module.exports.approveAndQueue = async (req, res, next) => {
   try {
     const result = await blogService.approveAndQueueBlogPost({
       postId: req.params.id,
@@ -150,13 +123,11 @@ module.exports.approveAndQueue = async (req, res) => {
     })
     res.status(200).json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] Error approving blog post queue:', err)
-    res.status(500).json({ error: 'Failed to approve and queue blog post' })
+    return next(err)
   }
 }
 
-module.exports.approveAndSchedule = async (req, res) => {
+module.exports.approveAndSchedule = async (req, res, next) => {
   try {
     const result = await blogService.approveAndScheduleBlogPost({
       postId: req.params.id,
@@ -166,13 +137,11 @@ module.exports.approveAndSchedule = async (req, res) => {
     })
     res.status(200).json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] Error scheduling blog post:', err)
-    res.status(500).json({ error: 'Failed to approve and schedule blog post' })
+    return next(err)
   }
 }
 
-module.exports.publishNow = async (req, res) => {
+module.exports.publishNow = async (req, res, next) => {
   try {
     const result = await blogService.publishBlogPostNow({
       postId: req.params.id,
@@ -180,53 +149,43 @@ module.exports.publishNow = async (req, res) => {
     })
     res.status(200).json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] Error publishing blog post:', err)
-    res.status(500).json({ error: 'Failed to publish blog post' })
+    return next(err)
   }
 }
 
-module.exports.rejectBlogPost = async (req, res) => {
+module.exports.rejectBlogPost = async (req, res, next) => {
   try {
     const result = await blogService.rejectBlogPost({ postId: req.params.id })
     res.status(200).json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] Error rejecting blog post:', err)
-    res.status(500).json({ error: 'Failed to reject blog post' })
+    return next(err)
   }
 }
 
-module.exports.markNeedsEdit = async (req, res) => {
+module.exports.markNeedsEdit = async (req, res, next) => {
   try {
     const result = await blogService.markNeedsEdit({ postId: req.params.id })
     res.status(200).json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] Error marking blog post needs edit:', err)
-    res.status(500).json({ error: 'Failed to mark blog post as needs edit' })
+    return next(err)
   }
 }
 
-module.exports.archive = async (req, res) => {
+module.exports.archive = async (req, res, next) => {
   try {
     const result = await blogService.archiveBlogPost({ postId: req.params.id })
     res.status(200).json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] Error archiving blog post:', err)
-    res.status(500).json({ error: 'Failed to archive blog post' })
+    return next(err)
   }
 }
 
-module.exports.publishQueue = async (req, res) => {
+module.exports.publishQueue = async (req, res, next) => {
   try {
     const result = await blogService.listPublishQueue(req.query)
     res.status(200).json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] Error fetching blog publish queue:', err)
-    res.status(500).json({ error: 'Failed to fetch blog publish queue' })
+    return next(err)
   }
 }
 

@@ -17,8 +17,7 @@ module.exports.sepayWebhook = async (req, res, next) => {
       transactionId: result.transactionId || null
     })
   } catch (err) {
-    logger.error('[Sepay] webhook error:', err)
-    next(err)
+    return next(err)
   }
 }
 

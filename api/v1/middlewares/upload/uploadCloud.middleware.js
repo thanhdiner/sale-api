@@ -3,6 +3,7 @@ const streamifier = require('streamifier')
 const { extractPublicId } = require('../../helpers/cloudinary')
 const axios = require('axios')
 const logger = require('../../../../config/logger')
+const AppError = require('../../utils/AppError')
 
 //# Configure Cloudinary
 cloudinary.config({
@@ -52,9 +53,7 @@ module.exports.upload = async (req, res, next) => {
   } catch (err) {
     logger.error('Failed to upload image:', err.message)
 
-    return res.status(500).json({
-      error: 'Failed to upload image to cloud'
-    })
+    return next(new AppError('Failed to upload image to cloud', 500))
   }
 }
 
@@ -92,9 +91,7 @@ module.exports.uploadMany = async (req, res, next) => {
   } catch (err) {
     logger.error('Failed to upload images:', err.message)
 
-    return res.status(500).json({
-      error: 'Failed to upload images to cloud'
-    })
+    return next(new AppError('Failed to upload images to cloud', 500))
   }
 }
 

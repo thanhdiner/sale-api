@@ -1,64 +1,43 @@
 ﻿const logger = require('../../../../../config/logger')
 const bannersService = require('../../../services/admin/system/banners.service')
 
-const handleKnownControllerError = (res, error) => {
-  if (!error?.statusCode) {
-    return false
-  }
-
-  const payload = { message: error.message }
-  if (error.details) {
-    payload.details = error.details
-  }
-
-  res.status(error.statusCode).json(payload)
-  return true
-}
-
 //# GET /api/v1/admin/banners
-module.exports.index = async (_req, res) => {
+module.exports.index = async (_req, res, next) => {
   try {
     const result = await bannersService.listBanners()
     res.status(200).json(result)
   } catch (err) {
-    logger.error('[Admin] Error fetching banners:', err)
-    res.status(500).json({ error: 'Internal server error' })
+    return next(err)
   }
 }
 
 //# POST /api/v1/admin/banners
-module.exports.create = async (req, res) => {
+module.exports.create = async (req, res, next) => {
   try {
     const result = await bannersService.createBanner(req.body, req.user)
     res.status(201).json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] Error creating banner:', err)
-    res.status(500).json({ error: 'Failed to create banner' })
+    return next(err)
   }
 }
 
 //# PATCH /api/v1/admin/banners/:id
-module.exports.edit = async (req, res) => {
+module.exports.edit = async (req, res, next) => {
   try {
     const result = await bannersService.updateBanner(req.params.id, req.body, req.user)
     res.status(200).json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] Error updating banner:', err)
-    res.status(500).json({ error: 'Failed to update banner' })
+    return next(err)
   }
 }
 
 //# DELETE /api/v1/admin/banners/:id
-module.exports.delete = async (req, res) => {
+module.exports.delete = async (req, res, next) => {
   try {
     const result = await bannersService.deleteBanner(req.params.id)
     res.status(200).json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] Error deleting banner:', err)
-    res.status(500).json({ error: 'Failed to delete banner' })
+    return next(err)
   }
 }
 

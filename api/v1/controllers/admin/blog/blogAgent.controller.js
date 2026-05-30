@@ -28,7 +28,7 @@ const buildLogQuery = (params = {}) => {
   return query
 }
 
-module.exports.generateDrafts = async (req, res) => {
+module.exports.generateDrafts = async (req, res, next) => {
   try {
     const result = await runBlogAutoDraftJob({
       batchId: normalizeText(req.body.batchId) || undefined,
@@ -44,12 +44,11 @@ module.exports.generateDrafts = async (req, res) => {
       data: result
     })
   } catch (error) {
-    logger.error('[Admin] Error generating blog drafts:', error)
-    res.status(500).json({ error: 'Failed to generate blog drafts', message: error.message })
+    return next(error)
   }
 }
 
-module.exports.logs = async (req, res) => {
+module.exports.logs = async (req, res, next) => {
   try {
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1)
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 100)
@@ -73,12 +72,11 @@ module.exports.logs = async (req, res) => {
       limit
     })
   } catch (error) {
-    logger.error('[Admin] Error fetching blog agent logs:', error)
-    res.status(500).json({ error: 'Failed to fetch blog agent logs' })
+    return next(error)
   }
 }
 
-module.exports.batches = async (req, res) => {
+module.exports.batches = async (req, res, next) => {
   try {
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 100)
     const data = await BlogAgentLog.aggregate([
@@ -116,8 +114,7 @@ module.exports.batches = async (req, res) => {
       }))
     })
   } catch (error) {
-    logger.error('[Admin] Error fetching blog agent batches:', error)
-    res.status(500).json({ error: 'Failed to fetch blog agent batches' })
+    return next(error)
   }
 }
 

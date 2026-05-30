@@ -12,7 +12,7 @@ const handleKnownAuthError = (res, error) => {
 }
 
 //# POST /api/v1/admin/auth/login
-module.exports.login = async (req, res) => {
+module.exports.login = async (req, res, next) => {
   try {
     const result = await adminAuthService.loginAdmin(req.body)
 
@@ -22,38 +22,32 @@ module.exports.login = async (req, res) => {
 
     await issueTokensAndRespond(res, result.admin)
   } catch (error) {
-    if (handleKnownAuthError(res, error)) return
-    logger.error('[Admin] Login error:', error)
-    res.status(500).json({ error: 'Đăng nhập thất bại, vui lòng thử lại sau!' })
+    return next(error)
   }
 }
 
 // # POST /api/v1/admin/auth/2fa-verify
-module.exports.verify2FA = async (req, res) => {
+module.exports.verify2FA = async (req, res, next) => {
   try {
     const result = await adminAuthService.verifyAdminLogin2FA(req.body)
     await issueTokensAndRespond(res, result.admin)
   } catch (err) {
-    if (handleKnownAuthError(res, err)) return
-    logger.error('[Admin] 2FA verify error:', err)
-    res.status(500).json({ error: 'Xác thực 2FA thất bại' })
+    return next(err)
   }
 }
 
 //# POST /api/v1/admin/auth/refresh-token
-module.exports.refreshToken = async (req, res) => {
+module.exports.refreshToken = async (req, res, next) => {
   try {
     const data = await adminAuthService.refreshAdminAccessToken(req.cookies.refreshToken)
     res.json(data)
   } catch (error) {
-    if (handleKnownAuthError(res, error)) return
-    logger.error('[Admin] Refresh token error:', error)
-    res.status(500).json({ error: 'Có lỗi xảy ra, vui lòng thử lại sau!' })
+    return next(error)
   }
 }
 
 //# POST /api/v1/admin/auth/logout
-module.exports.logout = async (req, res) => {
+module.exports.logout = async (req, res, next) => {
   try {
     const result = await adminAuthService.logoutAdmin(req.cookies.refreshToken)
 
@@ -66,9 +60,7 @@ module.exports.logout = async (req, res) => {
 
     res.sendStatus(204)
   } catch (error) {
-    if (handleKnownAuthError(res, error)) return
-    logger.error('[Admin] Logout error:', error)
-    res.status(500).json({ error: 'Đăng xuất thất bại, vui lòng thử lại sau!' })
+    return next(error)
   }
 }
 

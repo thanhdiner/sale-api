@@ -10,6 +10,7 @@ const logger = require('../../../../../config/logger')
 const { syncProductStock } = require('../../../services/shared/commerce/digitalDelivery.service')
 const { notifyBackInStockForProduct } = require('../../../services/shared/commerce/backInStock.service')
 const getRequestLanguage = require('../../../utils/getRequestLanguage')
+const AppError = require('../../../utils/AppError')
 
 const ADMIN_PRODUCT_LIST_PROJECTION = {
   title: 1,
@@ -56,8 +57,8 @@ const parseStringArray = value => {
       return Array.isArray(parsed)
         ? parsed.map(item => String(item).trim()).filter(Boolean)
         : []
-    } catch {
-      return value.trim() ? [value.trim()] : []
+    } catch (error) {
+      return []
     }
   }
 
@@ -139,7 +140,7 @@ const summarizeProductBody = body => ({
 })
 
 //# Get /api/v1/admin/products
-module.exports.index = async (req, res) => {
+module.exports.index = async (req, res, next) => {
   try {
     let find = {
       deleted: false
@@ -203,20 +204,19 @@ module.exports.index = async (req, res) => {
       limitItems: objectPagination.limitItems
     })
   } catch (err) {
-    logger.error('[Admin] Error fetching products:', err)
-    res.status(500).json({ error: 'Internal server error', status: 500 })
+    return next(err)
   }
 }
 
 //# Get /api/v1/products/:id
-module.exports.detail = async (req, res) => {
+module.exports.detail = async (req, res, next) => {
   try {
     const product = await Product.findById(req.params.id)
       .populate('productCategory', 'title translations')
       .populate('createdBy.by', 'fullName avatarUrl')
       .populate('updateBy.by', 'fullName avatarUrl')
 
-    if (!product) return res.status(404).json({ message: 'Product not found' })
+    if (!product) throw new AppError('Product not found', 404)
 
     res.json({
       code: 200,
@@ -224,13 +224,12 @@ module.exports.detail = async (req, res) => {
       product
     })
   } catch (err) {
-    logger.error('[Admin] Error fetching product:', err)
-    res.status(500).json({ message: 'Server error' })
+    return next(err)
   }
 }
 
 //# Post /api/v1/admin/products/create
-module.exports.create = async (req, res) => {
+module.exports.create = async (req, res, next) => {
   try {
     logger.debug('[Admin][CreateProduct] ── START ──')
     logger.debug('[Admin][CreateProduct] req.body', { body: summarizeProductBody(req.body) })
@@ -260,7 +259,7 @@ module.exports.create = async (req, res) => {
     })
 
     if (!category) {
-      return res.status(400).json({ error: 'Invalid or deleted product category!' })
+      throw new AppError('Invalid or deleted product category', 400)
     }
 
     const { slug, error, suggestedSlug } = await handleSlug({
@@ -272,7 +271,7 @@ module.exports.create = async (req, res) => {
     logger.debug('[Admin][CreateProduct] Slug result', { slug, error, suggestedSlug })
 
     if (error) {
-      return res.status(400).json({ error, suggestedSlug })
+      throw new AppError(error, 400, { suggestedSlug })
     }
 
     req.body.slug = slug
@@ -322,28 +321,12 @@ module.exports.create = async (req, res) => {
       data
     })
   } catch (err) {
-    logger.error('[Admin][CreateProduct] ❌ Error:', err.message)
-    logger.error('[Admin][CreateProduct] ❌ Stack:', err.stack)
-
-    logger.error('[Admin][CreateProduct] Error detail', {
-      name: err?.name,
-      message: err?.message,
-      code: err?.code,
-      errors: err?.errors
-        ? Object.fromEntries(Object.entries(err.errors).map(([field, value]) => [field, value.message]))
-        : undefined
-    })
-    logger.error(err?.stack || '[Admin][CreateProduct] Stack unavailable')
-
-    res.status(500).json({
-      error: 'Failed to create product',
-      status: 500
-    })
+    return next(err)
   }
 }
 
 //# Patch /api/v1/admin/products/delete/:id
-module.exports.delete = async (req, res) => {
+module.exports.delete = async (req, res, next) => {
   try {
     await Product.updateOne(
       { _id: req.params.id },
@@ -361,13 +344,12 @@ module.exports.delete = async (req, res) => {
       message: 'Product deleted successfully!'
     })
   } catch (err) {
-    logger.error('[Admin] Error deleting product:', err)
-    res.status(500).json({ error: 'Failed to delete product', status: 400 })
+    return next(err)
   }
 }
 
 //# Patch /api/v1/admin/products/changeStatus/:id
-module.exports.changeStatus = async (req, res) => {
+module.exports.changeStatus = async (req, res, next) => {
   try {
     const newStatus = req.body.status === 'active' ? 'inactive' : 'active'
 
@@ -393,18 +375,17 @@ module.exports.changeStatus = async (req, res) => {
       product: updatedProduct
     })
   } catch (err) {
-    logger.error('[Admin] Error changing product status:', err)
-    res.status(500).json({ error: 'Failed to change product status', status: 400 })
+    return next(err)
   }
 }
 
 //# Patch /api/v1/admin/products/deleteMany
-module.exports.deleteMany = async (req, res) => {
+module.exports.deleteMany = async (req, res, next) => {
   try {
     const ids = req.body.ids
 
     if (!Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).json({ error: 'Invalid request data', status: 400 })
+      throw new AppError('Invalid request data', 400)
     }
 
     await Product.updateMany(
@@ -425,18 +406,17 @@ module.exports.deleteMany = async (req, res) => {
       message: `Deleted ${ids.length} products successfully!`
     })
   } catch (err) {
-    logger.error('[Admin] Error deleting many products:', err)
-    res.status(500).json({ error: 'Failed to delete products', status: 400 })
+    return next(err)
   }
 }
 
 //# PATCH /api/v1/admin/products/changeStatusMany
-module.exports.changeStatusMany = async (req, res) => {
+module.exports.changeStatusMany = async (req, res, next) => {
   try {
     const { ids, status } = req.body
 
     if (!Array.isArray(ids) || ids.length === 0 || !['active', 'inactive'].includes(status)) {
-      return res.status(400).json({ error: 'Invalid request data', status: 400 })
+      throw new AppError('Invalid request data', 400)
     }
 
     const updateFields = {
@@ -462,18 +442,17 @@ module.exports.changeStatusMany = async (req, res) => {
       products: updatedProducts
     })
   } catch (err) {
-    logger.error('[Admin] Error changing product statuses:', err)
-    res.status(500).json({ error: 'Failed to change product statuses', status: 400 })
+    return next(err)
   }
 }
 
 //# PATCH /api/v1/admin/products/change-position-many
-module.exports.changePositionMany = async (req, res) => {
+module.exports.changePositionMany = async (req, res, next) => {
   try {
     const { data } = req.body
 
     if (!Array.isArray(data) || data.length === 0) {
-      return res.status(400).json({ error: 'Invalid data' })
+      throw new AppError('Invalid data', 400)
     }
 
     const bulkOps = data.map(({ _id, position }) => ({
@@ -504,13 +483,12 @@ module.exports.changePositionMany = async (req, res) => {
       products: updatedProducts
     })
   } catch (err) {
-    logger.error('[Admin] Error changing product positions:', err)
-    return res.status(500).json({ error: 'Failed to change product positions', status: 400 })
+    return next(err)
   }
 }
 
 //# PATCH /api/v1/admin/products/edit/:id
-module.exports.edit = async (req, res) => {
+module.exports.edit = async (req, res, next) => {
   try {
     const productId = req.params.id
 
@@ -540,7 +518,7 @@ module.exports.edit = async (req, res) => {
     })
 
     if (!category) {
-      return res.status(400).json({ error: 'Invalid or deleted product category!' })
+      throw new AppError('Invalid or deleted product category', 400)
     }
 
     const { slug, error, suggestedSlug } = await handleSlug({
@@ -576,7 +554,7 @@ module.exports.edit = async (req, res) => {
     }
 
     if (error) {
-      return res.status(400).json({ error, suggestedSlug })
+      throw new AppError(error, 400, { suggestedSlug })
     }
 
     req.body.slug = slug
@@ -650,17 +628,7 @@ module.exports.edit = async (req, res) => {
       product: updatedProduct
     })
   } catch (err) {
-    logger.error('[Admin] Error updating product:', err)
-    logger.error('[Admin][EditProduct] Error detail', {
-      name: err?.name,
-      message: err?.message,
-      code: err?.code,
-      errors: err?.errors
-        ? Object.fromEntries(Object.entries(err.errors).map(([field, value]) => [field, value.message]))
-        : undefined
-    })
-    logger.error(err?.stack || '[Admin][EditProduct] Stack unavailable')
-    return res.status(500).json({ error: 'Failed to update product', status: 400 })
+    return next(err)
   }
 }
 

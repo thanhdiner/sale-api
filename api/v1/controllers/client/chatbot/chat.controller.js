@@ -29,7 +29,7 @@ function emitConversationUpdate(sessionId, result, { emitResolved = false } = {}
     io.to(ROOMS.chat(sessionId)).emit(EVENTS.CHAT_CONVERSATION_UPDATED, conversation)
     io.to(ROOMS.AGENTS).emit(EVENTS.CHAT_CONVERSATION_UPDATED, conversation)
   } catch (error) {
-    logger.error('[Client][Chat] emitConversationUpdate error:', error)
+    logger.error('Failed to emit chat conversation update:', error)
   }
 }
 
@@ -41,12 +41,8 @@ function sendServiceResult(res, result) {
   return res.json(result)
 }
 
-function handleUnexpectedError(res, message, err, fallbackMessage = 'Lỗi server') {
-  logger.error(message, err)
-  return res.status(500).json({ success: false, message: fallbackMessage })
-}
 
-const getHistory = async (req, res) => {
+const getHistory = async (req, res, next) => {
   try {
     const result = await chatService.getHistory({
       sessionId: req.params.sessionId,
@@ -55,73 +51,73 @@ const getHistory = async (req, res) => {
     })
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][Chat] getHistory error:', err)
+    return next(err)
   }
 }
 
-const getConversation = async (req, res) => {
+const getConversation = async (req, res, next) => {
   try {
     const result = await chatService.getConversation(req.params.sessionId)
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][Chat] getConversation error:', err)
+    return next(err)
   }
 }
 
-const getConversations = async (req, res) => {
+const getConversations = async (req, res, next) => {
   try {
     const result = await chatService.getConversations(req.query)
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][Chat] getConversations error:', err)
+    return next(err)
   }
 }
 
-const uploadImage = async (req, res) => {
+const uploadImage = async (req, res, next) => {
   try {
     const result = await chatService.uploadImage(req.files)
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][Chat] uploadImage error:', err, 'Không thể upload ảnh chat')
+    return next(err)
   }
 }
 
-const assignConversation = async (req, res) => {
+const assignConversation = async (req, res, next) => {
   try {
     const result = await chatService.assignConversation(req.params.sessionId, req.body)
     emitConversationUpdate(req.params.sessionId, result)
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][Chat] assignConversation error:', err)
+    return next(err)
   }
 }
 
-const resolveConversation = async (req, res) => {
+const resolveConversation = async (req, res, next) => {
   try {
     const result = await chatService.resolveConversation(req.params.sessionId)
     emitConversationUpdate(req.params.sessionId, result, { emitResolved: true })
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][Chat] resolveConversation error:', err)
+    return next(err)
   }
 }
 
-const reopenConversation = async (req, res) => {
+const reopenConversation = async (req, res, next) => {
   try {
     const result = await chatService.reopenConversation(req.params.sessionId)
     emitConversationUpdate(req.params.sessionId, result)
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][Chat] reopenConversation error:', err)
+    return next(err)
   }
 }
 
-const markRead = async (req, res) => {
+const markRead = async (req, res, next) => {
   try {
     const result = await chatService.markRead(req.params.sessionId, req.body.reader)
     return sendServiceResult(res, result)
   } catch (err) {
-    return handleUnexpectedError(res, '[Client][Chat] markRead error:', err)
+    return next(err)
   }
 }
 

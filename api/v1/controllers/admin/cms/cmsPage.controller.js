@@ -1,63 +1,49 @@
 ﻿const logger = require('../../../../../config/logger')
 const cmsPageService = require('../../../services/admin/cms/cmsPage.service')
 
-const handleKnownControllerError = (res, error) => {
-  if (!error?.statusCode) return false
-  res.status(error.statusCode).json({ message: error.message, details: error.details })
-  return true
-}
 
-exports.show = async (req, res) => {
+exports.show = async (req, res, next) => {
   try {
     const result = await cmsPageService.getCmsPage(req.params.key)
     res.status(200).json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] Error fetching CMS page:', err)
-    res.status(500).json({ error: 'Failed to fetch CMS page' })
+    return next(err)
   }
 }
 
-exports.saveDraft = async (req, res) => {
+exports.saveDraft = async (req, res, next) => {
   try {
     const result = await cmsPageService.saveDraft(req.params.key, req.body, req.user)
     res.status(200).json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] Error saving CMS page draft:', err)
-    res.status(500).json({ error: 'Failed to save CMS page draft' })
+    return next(err)
   }
 }
 
-exports.schedule = async (req, res) => {
+exports.schedule = async (req, res, next) => {
   try {
     const result = await cmsPageService.schedulePage(req.params.key, req.body, req.user)
     res.status(200).json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] Error scheduling CMS page:', err)
-    res.status(500).json({ error: 'Failed to schedule CMS page' })
+    return next(err)
   }
 }
 
-exports.publishDue = async (req, res) => {
+exports.publishDue = async (req, res, next) => {
   try {
     const result = await cmsPageService.publishDuePages()
     res.status(200).json(result)
   } catch (err) {
-    logger.error('[Admin] Error publishing due CMS pages:', err)
-    res.status(500).json({ error: 'Failed to publish due CMS pages' })
+    return next(err)
   }
 }
 
-exports.publish = async (req, res) => {
+exports.publish = async (req, res, next) => {
   try {
     const result = await cmsPageService.publishPage(req.params.key, req.body, req.user)
     res.status(200).json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] Error publishing CMS page:', err)
-    res.status(500).json({ error: 'Failed to publish CMS page' })
+    return next(err)
   }
 }
 

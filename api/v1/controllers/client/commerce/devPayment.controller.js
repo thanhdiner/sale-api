@@ -39,7 +39,7 @@ module.exports.simulateSepayPayment = async (req, res, next) => {
       order: result.order
     })
   } catch (error) {
-    next(error)
+    return next(error)
   }
 }
 

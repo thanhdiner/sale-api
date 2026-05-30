@@ -1,17 +1,8 @@
 const logger = require('../../../../../config/logger')
 const ordersService = require('../../../services/admin/commerce/orders.service')
 
-const handleKnownControllerError = (res, error) => {
-  if (!error?.statusCode) {
-    return false
-  }
-
-  res.status(error.statusCode).json({ error: error.message })
-  return true
-}
-
 //# GET /api/v1/orders
-module.exports.getAllOrders = async (req, res) => {
+module.exports.getAllOrders = async (req, res, next) => {
   try {
     const result = await ordersService.listOrders({
       ...req.query,
@@ -19,45 +10,37 @@ module.exports.getAllOrders = async (req, res) => {
     })
     res.json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] getAllOrders error:', err)
-    res.status(500).json({ error: 'Lỗi lấy đơn hàng' })
+    return next(err)
   }
 }
 
 //# GET /api/v1/orders/:id
-module.exports.getOrderDetailAdmin = async (req, res) => {
+module.exports.getOrderDetailAdmin = async (req, res, next) => {
   try {
     const result = await ordersService.getOrderDetail(req.params.id, req.get('accept-language'))
     res.json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] getOrderDetailAdmin error:', err)
-    res.status(500).json({ error: 'Lỗi lấy đơn hàng' })
+    return next(err)
   }
 }
 
 //# POST /api/v1/orders/:id
-module.exports.updateOrderStatus = async (req, res) => {
+module.exports.updateOrderStatus = async (req, res, next) => {
   try {
     const result = await ordersService.updateOrderStatus(req.params.id, req.body, req.get('accept-language'))
     res.json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] updateOrderStatus error:', err)
-    res.status(500).json({ error: 'Lỗi cập nhật đơn hàng' })
+    return next(err)
   }
 }
 
 //# DELETE /api/v1/orders/:id
-module.exports.deleteOrder = async (req, res) => {
+module.exports.deleteOrder = async (req, res, next) => {
   try {
     const result = await ordersService.deleteOrder(req.params.id)
     res.json(result)
   } catch (err) {
-    if (handleKnownControllerError(res, err)) return
-    logger.error('[Admin] deleteOrder error:', err)
-    res.status(500).json({ error: 'Lỗi xóa đơn hàng' })
+    return next(err)
   }
 }
 

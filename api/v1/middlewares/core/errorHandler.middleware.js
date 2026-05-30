@@ -5,8 +5,11 @@ const buildResponse = (err, isDev) => {
   const body = {
     success: false,
     statusCode: err.statusCode || 500,
+    status: err.status || (`${err.statusCode || 500}`.startsWith('4') ? 'fail' : 'error'),
     error: err.message || 'Internal Server Error'
   }
+
+  body.message = body.error
 
   if (err.details) body.details = err.details
   if (isDev) Object.assign(body, { stack: err.stack, name: err.name })
@@ -82,7 +85,6 @@ const errorHandler = (err, req, res, next) => { // eslint-disable-line no-unused
 }
 
 module.exports = errorHandler
-
 
 
 

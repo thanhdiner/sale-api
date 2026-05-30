@@ -1,4 +1,6 @@
-const FORBIDDEN_MESSAGE = 'Bạn không có quyền thực hiện thao tác này'
+const AppError = require('../../utils/AppError')
+
+const FORBIDDEN_MESSAGE = 'You do not have permission to perform this action'
 
 const normalizePermissions = permissions => (Array.isArray(permissions) ? permissions : [])
 
@@ -19,10 +21,10 @@ const hasPermission = (user, permission) => {
   return getUserPermissions(user).includes(permission)
 }
 
-const deny = res => res.status(403).json({ error: FORBIDDEN_MESSAGE })
+const deny = next => next(new AppError(FORBIDDEN_MESSAGE, 403))
 
 const checkPermission = permission => (req, res, next) => {
-  if (!hasPermission(req.user, permission)) return deny(res)
+  if (!hasPermission(req.user, permission)) return deny(next)
   next()
 }
 
@@ -33,7 +35,7 @@ const checkAnyPermission = permissions => (req, res, next) => {
     return next()
   }
 
-  return deny(res)
+  return deny(next)
 }
 
 const checkSelfOrPermission = (permission, getTargetId = req => req.params.id) => (req, res, next) => {
@@ -47,7 +49,7 @@ const checkSelfOrPermission = (permission, getTargetId = req => req.params.id) =
     return next()
   }
 
-  return deny(res)
+  return deny(next)
 }
 
 module.exports = {
@@ -57,12 +59,3 @@ module.exports = {
   hasPermission,
   isSuperAdmin
 }
-
-
-
-
-
-
-
-
-

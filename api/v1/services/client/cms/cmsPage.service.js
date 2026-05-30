@@ -1,4 +1,5 @@
 ﻿const CmsPage = require('../../../models/cms/cmsPage.model')
+const AppError = require('../../../utils/AppError')
 
 const DEFAULT_BLOG_DETAIL_TEMPLATE = {
   key: 'blog-detail-template',
@@ -18,21 +19,21 @@ const DEFAULT_BLOG_DETAIL_TEMPLATE = {
   updatedAt: null
 }
 
-async function show(req, res) {
+async function show(req, res, next) {
   try {
     const key = String(req.params.key || '').trim().toLowerCase()
     const page = await CmsPage.findOne({ key, status: 'published' }).select('key title slug seo sections publishedAt updatedAt').lean()
 
     if (!page && key !== 'blog-detail-template') {
-      return res.status(404).json({ message: 'CMS page not found' })
+      throw new AppError('CMS page not found', 404)
     }
 
     res.status(200).json({
       message: 'CMS page fetched successfully',
       data: page || DEFAULT_BLOG_DETAIL_TEMPLATE
     })
-  } catch {
-    res.status(500).json({ error: 'Failed to fetch CMS page' })
+  } catch (err) {
+    return next(err)
   }
 }
 

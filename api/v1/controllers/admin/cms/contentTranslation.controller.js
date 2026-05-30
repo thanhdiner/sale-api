@@ -1,7 +1,7 @@
 ﻿const logger = require('../../../../../config/logger')
 const { translateContentToEnglish } = require('../../../services/ai/content/contentTranslation.service')
 
-exports.translateToEnglish = async (req, res) => {
+exports.translateToEnglish = async (req, res, next) => {
   try {
     const result = await translateContentToEnglish({
       target: req.body.target,
@@ -13,8 +13,7 @@ exports.translateToEnglish = async (req, res) => {
     })
     res.status(200).json({ message: 'Content translated successfully', data: result.result, provider: result.provider, model: result.model })
   } catch (err) {
-    logger.error('[Admin] Error translating content:', err)
-    res.status(500).json({ error: err.message || 'Failed to translate content' })
+    return next(err)
   }
 }
 

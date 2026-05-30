@@ -9,7 +9,7 @@ const handleKnownError = (res, error) => {
   return true
 }
 
-module.exports.getReviews = async (req, res) => {
+module.exports.getReviews = async (req, res, next) => {
   try {
     const result = await reviewsService.getReviews({
       productId: req.params.productId,
@@ -18,13 +18,11 @@ module.exports.getReviews = async (req, res) => {
     })
     res.json(result)
   } catch (err) {
-    if (handleKnownError(res, err)) return
-    console.error(err)
-    res.status(500).json({ error: 'Internal server error' })
+    return next(err)
   }
 }
 
-module.exports.createReview = async (req, res) => {
+module.exports.createReview = async (req, res, next) => {
   try {
     const result = await reviewsService.createReview({
       productId: req.params.productId,
@@ -34,13 +32,11 @@ module.exports.createReview = async (req, res) => {
     })
     res.status(201).json(result)
   } catch (err) {
-    if (handleKnownError(res, err)) return
-    console.error(err)
-    res.status(500).json({ error: 'Internal server error' })
+    return next(err)
   }
 }
 
-module.exports.updateReview = async (req, res) => {
+module.exports.updateReview = async (req, res, next) => {
   try {
     const result = await reviewsService.updateReview({
       reviewId: req.params.reviewId,
@@ -50,13 +46,11 @@ module.exports.updateReview = async (req, res) => {
     })
     res.json(result)
   } catch (err) {
-    if (handleKnownError(res, err)) return
-    console.error(err)
-    res.status(500).json({ error: 'Internal server error' })
+    return next(err)
   }
 }
 
-module.exports.deleteReview = async (req, res) => {
+module.exports.deleteReview = async (req, res, next) => {
   try {
     const result = await reviewsService.deleteReview({
       reviewId: req.params.reviewId,
@@ -64,13 +58,11 @@ module.exports.deleteReview = async (req, res) => {
     })
     res.json(result)
   } catch (err) {
-    if (handleKnownError(res, err)) return
-    console.error(err)
-    res.status(500).json({ error: 'Internal server error' })
+    return next(err)
   }
 }
 
-module.exports.voteReview = async (req, res) => {
+module.exports.voteReview = async (req, res, next) => {
   try {
     const result = await reviewsService.voteReview({
       reviewId: req.params.reviewId,
@@ -78,9 +70,7 @@ module.exports.voteReview = async (req, res) => {
     })
     res.json(result)
   } catch (err) {
-    if (handleKnownError(res, err)) return
-    console.error(err)
-    res.status(500).json({ error: 'Internal server error' })
+    return next(err)
   }
 }
 

@@ -3,7 +3,7 @@ const { generateProductContent } = require('../../../services/ai/content/product
 
 const normalizeText = value => (typeof value === 'string' ? value.trim() : '')
 
-module.exports.generate = async (req, res) => {
+module.exports.generate = async (req, res, next) => {
   try {
     const data = await generateProductContent({
       action: req.body.action,
@@ -19,11 +19,7 @@ module.exports.generate = async (req, res) => {
       data
     })
   } catch (error) {
-    logger.error('[Admin] Error generating product content:', error)
-    return res.status(500).json({
-      error: 'Failed to generate product content',
-      message: error.message
-    })
+    return next(error)
   }
 }
 

@@ -1,10 +1,10 @@
 ﻿const paymentService = require('../../../services/client/commerce/payment.service')
-const logger = require('../../../../../config/logger')
+const AppError = require('../../../utils/AppError')
 
-module.exports.createVNPayUrl = async (req, res) => {
+module.exports.createVNPayUrl = async (req, res, next) => {
   try {
     const { orderId } = req.body
-    if (!orderId) return res.status(400).json({ error: 'Thiáº¿u orderId' })
+    if (!orderId) throw new AppError('Missing orderId', 400)
 
     const result = await paymentService.createVNPayUrl({
       orderId,
@@ -14,25 +14,23 @@ module.exports.createVNPayUrl = async (req, res) => {
 
     res.status(result.statusCode).json(result.body)
   } catch (err) {
-    logger.error('[VNPay] createUrl error:', err)
-    res.status(500).json({ error: err.message || 'Lá»—i táº¡o VNPay URL' })
+    return next(err)
   }
 }
 
-module.exports.vnpayReturn = async (req, res) => {
+module.exports.vnpayReturn = async (req, res, next) => {
   try {
     const result = await paymentService.handleVNPayReturn(req.query)
     res.redirect(result.redirectUrl)
   } catch (err) {
-    logger.error('[VNPay] return error:', err)
-    res.redirect(`${process.env.CLIENT_URL || 'http://localhost:3000'}/order-success?status=failed&reason=server_error`)
+    return next(err)
   }
 }
 
-module.exports.createMoMoUrl = async (req, res) => {
+module.exports.createMoMoUrl = async (req, res, next) => {
   try {
     const { orderId } = req.body
-    if (!orderId) return res.status(400).json({ error: 'Thiáº¿u orderId' })
+    if (!orderId) throw new AppError('Missing orderId', 400)
 
     const result = await paymentService.createMoMoUrl({
       orderId,
@@ -41,12 +39,11 @@ module.exports.createMoMoUrl = async (req, res) => {
 
     res.status(result.statusCode).json(result.body)
   } catch (err) {
-    logger.error('[MoMo] createUrl error:', err)
-    res.status(500).json({ error: err.message || 'Lá»—i táº¡o MoMo URL' })
+    return next(err)
   }
 }
 
-module.exports.momoCallback = async (req, res) => {
+module.exports.momoCallback = async (req, res, next) => {
   try {
     const result = await paymentService.handleMoMoCallback(req.body)
     if (result.statusCode === 204) {
@@ -54,15 +51,14 @@ module.exports.momoCallback = async (req, res) => {
     }
     res.status(result.statusCode).json(result.body)
   } catch (err) {
-    logger.error('[MoMo] callback error:', err)
-    res.status(500).json({ error: err.message })
+    return next(err)
   }
 }
 
-module.exports.createZaloPayUrl = async (req, res) => {
+module.exports.createZaloPayUrl = async (req, res, next) => {
   try {
     const { orderId } = req.body
-    if (!orderId) return res.status(400).json({ error: 'Thiáº¿u orderId' })
+    if (!orderId) throw new AppError('Missing orderId', 400)
 
     const result = await paymentService.createZaloPayUrl({
       orderId,
@@ -71,18 +67,16 @@ module.exports.createZaloPayUrl = async (req, res) => {
 
     res.status(result.statusCode).json(result.body)
   } catch (err) {
-    logger.error('[ZaloPay] createUrl error:', err)
-    res.status(500).json({ error: err.message || 'Lá»—i táº¡o ZaloPay URL' })
+    return next(err)
   }
 }
 
-module.exports.zalopayCallback = async (req, res) => {
+module.exports.zalopayCallback = async (req, res, next) => {
   try {
     const result = await paymentService.handleZaloPayCallback(req.body)
     res.status(result.statusCode).json(result.body)
   } catch (err) {
-    logger.error('[ZaloPay] callback error:', err)
-    res.status(200).json({ return_code: 0, return_message: err.message })
+    return next(err)
   }
 }
 

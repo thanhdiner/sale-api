@@ -1,5 +1,6 @@
 const crypto = require('crypto')
 const axios = require('axios')
+const AppError = require('../../utils/AppError')
 
 const MOMO_CONFIG = {
   partnerCode: process.env.MOMO_PARTNER_CODE || 'MOMO',
@@ -54,7 +55,7 @@ async function createPaymentUrl({ orderId, amount, orderInfo = 'Thanh toan don h
   })
 
   if (response.data.resultCode !== 0) {
-    throw new Error(response.data.message || 'MoMo tạo payment thất bại')
+    throw new AppError(response.data.message || 'MoMo payment creation failed', 400)
   }
 
   return {
